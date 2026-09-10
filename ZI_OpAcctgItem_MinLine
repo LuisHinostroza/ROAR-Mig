@@ -1,0 +1,176 @@
+1. Vista auxiliar — resuelve el MIN determinista (reemplaza tu punto del MIN)
+abap
+@AbapCatalog.sqlViewName: 'ZIOPACCTMINLN'
+@AccessControl.authorizationCheck: #NOT_REQUIRED
+@VDM.viewType: #BASIC
+@EndUserText.label: 'Min. línea por tipo de cuenta'
+define view ZI_OpAcctgItem_MinLine
+  as select from I_OperationalAcctgDocItem
+{
+  key CompanyCode,
+  key FiscalYear,
+  key AccountingDocument,
+  key FinancialAccountType,
+      min( LedgerGLLineItem ) as MinLedgerGLLineItem
+}
+group by CompanyCode, FiscalYear, AccountingDocument, FinancialAccountType
+
+(LedgerGLLineItem es el campo de 6 caracteres compatible con DOCLN — aquí resolvemos el mismo problema que el MIN(BUZEI) original, pero al grano correcto)
+
+2. Basic View — línea base (KOART = 'S')
+abap
+@AbapCatalog.sqlViewName: 'ZICONTRAPART'
+@AccessControl.authorizationCheck: #NOT_REQUIRED
+@VDM.viewType: #BASIC
+@EndUserText.label: 'Contrapartida - Base'
+define view ZI_Contrapartida
+  as select from I_OperationalAcctgDocItem as Item
+{
+  key Item.CompanyCode,
+  key Item.FiscalYear,
+  key Item.AccountingDocument,
+  key Item.LedgerGLLineItem,
+      Item.GLAccount,
+      Item.PostingKey,                        // -- confirmar (BSCHL)
+      Item.AmountInCompanyCodeCurrency,
+      Item.CompanyCodeCurrency,
+      Item.DocumentItemText,                  // -- confirmar (SGTXT)
+      Item.PostingDate,
+      Item.AccountingDocumentType,
+      Item.FinancialAccountType
+}
+where Item.FinancialAccountType = 'S'
+3. Composite View — join proveedor/deudor + maestros + base imponible
+abap
+@AbapCatalog.sqlViewName: 'ZCCONTRAPART'
+@AccessControl.authorizationCheck: #NOT_REQUIRED
+@VDM.viewType: #COMPOSITE
+@EndUserText.label: 'Contrapartida - Composite'
+define view ZC_Contrapartida
+  as select from ZI_Contrapartida as Item
+
+  association [0..1] to ZI_OpAcctgItem_MinLine as _MinProveedor
+    on  _MinProveedor.CompanyCode          = Item.CompanyCode
+    and _MinProveedor.FiscalYear           = Item.FiscalYear
+    and _MinProveedor.AccountingDocument   = Item.AccountingDocument
+    and _MinProveedor.FinancialAccountType = 'K'
+
+  association [0..1] to I_OperationalAcctgDocItem as _ItemProveedor
+    on  _ItemProveedor.CompanyCode         = Item.CompanyCode
+    and _ItemProveedor.FiscalYear          = Item.FiscalYear
+    and _ItemProveedor.AccountingDocument  = Item.AccountingDocument
+    and _ItemProveedor.LedgerGLLineItem    = _MinProveedor.MinLedgerGLLineItem
+
+  association [0..1] to ZI_OpAcctgItem_MinLine as _MinDeudor
+    on  _MinDeudor.CompanyCode          = Item.CompanyCode
+    and _MinDeudor.FiscalYear           = Item.FiscalYear
+    and _MinDeudor.AccountingDocument   = Item.AccountingDocument
+    and _MinDeudor.FinancialAccountType = 'D'
+
+  association [0..1] to I_OperationalAcctgDocItem as _ItemDeudor
+    on  _ItemDeudor.CompanyCode         = Item.CompanyCode
+    and _ItemDeudor.FiscalYear          = Item.FiscalYear
+    and _ItemDeudor.AccountingDocument  = Item.AccountingDocument
+    and _ItemDeudor.LedgerGLLineItem    = _MinDeudor.MinLedgerGLLineItem
+
+  association [0..1] to I_Supplier as _Proveedor           // vista estándar sobre LFA1
+    on _Proveedor.Supplier = _ItemProveedor.Supplier        // -- confirmar nombre campo proveedor
+
+  association [0..1] to I_Customer as _Cliente              // vista estándar sobre KNA1
+    on _Cliente.Customer = _ItemDeudor.Customer              // -- confirmar nombre campo cliente
+
+{
+  key Item.CompanyCode,
+  key Item.FiscalYear,
+  key Item.AccountingDocument,
+  key Item.LedgerGLLineItem,
+      Item.GLAccount,
+      Item.PostingKey,
+      Item.AmountInCompanyCodeCurrency,
+      Item.CompanyCodeCurrency,
+      Item.DocumentItemText,
+      Item.PostingDate,
+      Item.AccountingDocumentType,
+      _ItemProveedor.Supplier      as Proveedor,
+      _Proveedor.SupplierName      as NombreProveedor,      // -- confirmar
+      _Proveedor.TaxNumber1        as NifProveedor,          // -- confirmar
+      _ItemDeudor.Customer         as Deudor,
+      _Cliente.TaxNumber1          as NifCliente             // -- confirmar
+}
+
+Dato importante que encontré: I_OperationalAcctgDocItem documenta explícitamente que expone "tax amount and tax base amount" como atributo propio — es decir, es posible que ya no necesites el join a BSET que traíamos arrastrando. Búscalo en el outline de la vista en Eclipse (probablemente algo como TaxBaseAmountInCoCodeCrcy); si existe, lo agregas directo aquí y nos ahorramos esa capa extra por completo.
+
+4. Consumption View — expuesta a Fiori
+abap
+@AbapCatalog.sqlViewName: 'ZCPCONTRAP'
+@AccessControl.authorizationCheck: #CHECK
+@OData.publish: true
+@VDM.viewType: #CONSUMPTION
+@EndUserText.label: 'Contrapartida - Consumo'
+@UI.headerInfo: { typeName: 'Contrapartida', typeNamePlural: 'Contrapartidas' }
+define view ZCP_Contrapartida
+  as select from ZC_Contrapartida
+{
+  @UI.selectionField: [{ position: 10 }]
+  key CompanyCode,
+  key FiscalYear,
+  key AccountingDocument,
+  key LedgerGLLineItem,
+
+  @UI.lineItem: [{ position: 10 }]
+  GLAccount,
+
+  @UI.lineItem: [{ position: 20 }]
+  PostingKey,
+
+  @Semantics.amount.currencyCode: 'CompanyCodeCurrency'
+  @UI.lineItem: [{ position: 30 }]
+  AmountInCompanyCodeCurrency,
+
+  CompanyCodeCurrency,
+
+  @UI.selectionField: [{ position: 20 }]
+  @UI.lineItem: [{ position: 40 }]
+  PostingDate,
+
+  @UI.lineItem: [{ position: 50 }]
+  Proveedor,
+
+  @UI.lineItem: [{ position: 60 }]
+  NombreProveedor,
+
+  NifProveedor,
+
+  @UI.lineItem: [{ position: 70 }]
+  DocumentItemText,
+
+  Deudor,
+  NifCliente
+}
+5. Metadata Extension (separa lo puramente UI)
+abap
+@Metadata.layer: #CORE
+annotate view ZCP_Contrapartida with
+{
+  @UI.facet: [{
+    id: 'Header',
+    purpose: #STANDARD,
+    type: #IDENTIFICATION_REFERENCE,
+    label: 'Datos Generales',
+    position: 10
+  }]
+  CompanyCode;
+}
+6. DCL — autorización solo por BUKRS (como pediste)
+abap
+@MappingRole: true
+define role ZRL_CONTRAPARTIDA_AUTH {
+  grant select on ZCP_Contrapartida
+    where ( CompanyCode ) = aspect pfcg_auth( F_BKPF_BUK, BUKRS, ACTVT = '03' );
+}
+7. Service Definition
+abap
+@EndUserText.label: 'Servicio Contrapartida'
+define service ZSD_CONTRAPARTIDA {
+  expose ZCP_Contrapartida as Contrapartida;
+}
