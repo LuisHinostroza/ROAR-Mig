@@ -1,11 +1,49 @@
-Lista final: 5 CDS View Entities + 1 Metadata Extension + 1 DCL + 1 Service Definition + 1 Service Binding = 9 objetos
-1. ZI_CtrapProveedor — Basic (DEFINE VIEW ENTITY)
+Aquí está el paquete completo y final, consolidado con todas las correcciones:
+
+Resumen: 10 objetos
+#	Nombre	Tipo
+1	ZI_OpAcctgItem_MinLine	DEFINE VIEW ENTITY (Basic)
+2	ZI_CtrapProveedor	DEFINE VIEW ENTITY (Basic)
+3	ZI_CtrapDeudor	DEFINE VIEW ENTITY (Basic)
+4	ZI_Contrapartida	DEFINE VIEW ENTITY (Basic)
+5	ZC_Contrapartida	DEFINE VIEW ENTITY (Composite)
+6	ZCP_Contrapartida	DEFINE ROOT VIEW ENTITY ... AS PROJECTION ON (Consumption)
+7	Metadata Extension sobre ZCP_Contrapartida	ANNOTATE VIEW
+8	ZRL_CONTRAPARTIDA_AUTH	DCL (DEFINE ROLE)
+9	ZSD_CONTRAPARTIDA	Service Definition
+10	ZSB_CONTRAPARTIDA	Service Binding (OData V4 - UI)
+
+Orden de creación: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 → 9 → 10
+
+1. ZI_OpAcctgItem_MinLine
+abap
+@AccessControl.authorizationCheck: #NOT_REQUIRED
+@VDM.viewType: #BASIC
+@EndUserText.label: 'Min. posición por tipo de cuenta'
+define view entity ZI_OpAcctgItem_MinLine
+  as select from I_OperationalAcctgDocItem
+{
+  key CompanyCode,
+  key FiscalYear,
+  key AccountingDocument,
+  key FinancialAccountType,
+      min( AccountingDocumentItem ) as MinAccountingDocumentItem
+}
+group by CompanyCode, FiscalYear, AccountingDocument, FinancialAccountType
+2. ZI_CtrapProveedor
 abap
 @AccessControl.authorizationCheck: #NOT_REQUIRED
 @VDM.viewType: #BASIC
 @EndUserText.label: 'Contrapartida - Datos Proveedor'
 define view entity ZI_CtrapProveedor
   as select from I_OperationalAcctgDocItem as K
+
+  inner join ZI_OpAcctgItem_MinLine as Min
+    on  Min.CompanyCode               = K.CompanyCode
+    and Min.FiscalYear                = K.FiscalYear
+    and Min.AccountingDocument        = K.AccountingDocument
+    and Min.FinancialAccountType      = K.FinancialAccountType
+    and Min.MinAccountingDocumentItem = K.AccountingDocumentItem
 
   association [0..1] to I_Supplier as _Supplier
     on _Supplier.Supplier = K.Supplier
@@ -15,25 +53,24 @@ define view entity ZI_CtrapProveedor
   key K.FiscalYear,
   key K.AccountingDocument,
       K.Supplier,
-      _Supplier.SupplierName,   // -- confirmar nombre exacto del campo en I_Supplier
-      _Supplier.TaxNumber1      // -- confirmar nombre exacto del campo en I_Supplier
+      _Supplier.SupplierName,   // -- confirmar nombre exacto
+      _Supplier.TaxNumber1      // -- confirmar nombre exacto
 }
 where K.FinancialAccountType = 'K'
-  and K.AccountingDocumentItem = (
-        select min( I2.AccountingDocumentItem )
-          from I_OperationalAcctgDocItem as I2
-         where I2.CompanyCode          = K.CompanyCode
-           and I2.FiscalYear           = K.FiscalYear
-           and I2.AccountingDocument   = K.AccountingDocument
-           and I2.FinancialAccountType = 'K'
-      )
-2. ZI_CtrapDeudor — Basic (DEFINE VIEW ENTITY)
+3. ZI_CtrapDeudor
 abap
 @AccessControl.authorizationCheck: #NOT_REQUIRED
 @VDM.viewType: #BASIC
 @EndUserText.label: 'Contrapartida - Datos Deudor'
 define view entity ZI_CtrapDeudor
   as select from I_OperationalAcctgDocItem as K
+
+  inner join ZI_OpAcctgItem_MinLine as Min
+    on  Min.CompanyCode               = K.CompanyCode
+    and Min.FiscalYear                = K.FiscalYear
+    and Min.AccountingDocument        = K.AccountingDocument
+    and Min.FinancialAccountType      = K.FinancialAccountType
+    and Min.MinAccountingDocumentItem = K.AccountingDocumentItem
 
   association [0..1] to I_Customer as _Customer
     on _Customer.Customer = K.Customer
@@ -43,18 +80,10 @@ define view entity ZI_CtrapDeudor
   key K.FiscalYear,
   key K.AccountingDocument,
       K.Customer,
-      _Customer.TaxNumber1      // -- confirmar nombre exacto del campo en I_Customer
+      _Customer.TaxNumber1      // -- confirmar nombre exacto
 }
 where K.FinancialAccountType = 'D'
-  and K.AccountingDocumentItem = (
-        select min( I2.AccountingDocumentItem )
-          from I_OperationalAcctgDocItem as I2
-         where I2.CompanyCode          = K.CompanyCode
-           and I2.FiscalYear           = K.FiscalYear
-           and I2.AccountingDocument   = K.AccountingDocument
-           and I2.FinancialAccountType = 'D'
-      )
-3. ZI_Contrapartida — Basic, línea base (DEFINE VIEW ENTITY)
+4. ZI_Contrapartida
 abap
 @AccessControl.authorizationCheck: #NOT_REQUIRED
 @VDM.viewType: #BASIC
@@ -68,17 +97,17 @@ define view entity ZI_Contrapartida
   key Item.AccountingDocumentItem,
       Item.GLAccount,
       Item.PostingKey,
-      Item.AbsoluteAmountInCoCodeCrcy       as Amount,          // = BSEG-DMBTR original (sin signo)
+      Item.AbsoluteAmountInCoCodeCrcy      as Amount,
       Item.CompanyCodeCurrency,
       Item.DocumentItemText,
       Item.PostingDate,
       Item.AccountingDocumentType,
-      Item.TreasuryContractType,                                 // ex VERTT
-      Item.AssetContract,                                        // ex VERTN
-      Item.TaxAbsltBaseAmountInCoCodeCrcy   as TaxBaseAmount     // ex BASE/HWBAS — ya no se necesita BSET
+      Item.TreasuryContractType,
+      Item.AssetContract,
+      Item.TaxAbsltBaseAmountInCoCodeCrcy  as TaxBaseAmount
 }
 where Item.FinancialAccountType = 'S'
-4. ZC_Contrapartida — Composite (DEFINE VIEW ENTITY)
+5. ZC_Contrapartida
 abap
 @AccessControl.authorizationCheck: #NOT_REQUIRED
 @VDM.viewType: #COMPOSITE
@@ -117,7 +146,7 @@ define view entity ZC_Contrapartida
       _Deudor.Customer         as Deudor,
       _Deudor.TaxNumber1       as NifCliente
 }
-5. ZCP_Contrapartida — Consumption (DEFINE ROOT VIEW ENTITY ... AS PROJECTION ON)
+6. ZCP_Contrapartida
 abap
 @AccessControl.authorizationCheck: #CHECK
 @OData.publish: true
@@ -169,7 +198,7 @@ define root view entity ZCP_Contrapartida
   Item.TreasuryContractType,
   Item.AssetContract
 }
-6. Metadata Extension
+7. Metadata Extension
 abap
 @Metadata.layer: #CORE
 annotate view ZCP_Contrapartida with
@@ -177,23 +206,23 @@ annotate view ZCP_Contrapartida with
   @UI.facet: [{ id: 'Header', purpose: #STANDARD, type: #IDENTIFICATION_REFERENCE, label: 'Datos Generales', position: 10 }]
   CompanyCode;
 }
-7. DCL — autorización solo BUKRS
+8. DCL
 abap
 @MappingRole: true
 define role ZRL_CONTRAPARTIDA_AUTH {
   grant select on ZCP_Contrapartida
     where ( CompanyCode ) = aspect pfcg_auth( F_BKPF_BUK, BUKRS, ACTVT = '03' );
 }
-8. Service Definition
+9. Service Definition
 abap
 @EndUserText.label: 'Servicio Contrapartida'
 define service ZSD_CONTRAPARTIDA {
   expose ZCP_Contrapartida as Contrapartida;
 }
-9. Service Binding
+10. Service Binding
 
-Vía wizard en ADT (New > Core Data Services > Service Binding), tipo OData V4 - UI, apuntando a ZSD_CONTRAPARTIDA.
+Vía wizard en ADT: New > Core Data Services > Service Binding, tipo OData V4 - UI, Service Definition ZSD_CONTRAPARTIDA.
 
-Orden de creación: ZI_CtrapProveedor → ZI_CtrapDeudor → ZI_Contrapartida → ZC_Contrapartida → ZCP_Contrapartida → Metadata Extension → DCL → Service Definition → Service Binding.
+Updated memory
 
-Lo único que queda por confirmar en tu sistema (marcado -- confirmar) es el nombre exacto de los campos de nombre/NIF en I_Supplier/I_Customer — ábrelas en Eclipse y ajusta esas dos líneas si el autocomplete te da otro nombre.
+Este es el set final y estable. Los únicos dos puntos marcados -- confirmar (nombre de campo de nombre/NIF en I_Supplier/I_Customer) se resuelven solos con autocomplete al escribir en Eclipse.
