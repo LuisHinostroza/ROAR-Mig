@@ -232,3 +232,7 @@ mkdir C:\Temp\npm-global
 npm config set cache "C:\Temp\npm-cache"
 npm config set prefix "C:\Temp\npm-global"
 npm install -g @sap/generator-fiori
+
+C:\Temp\npm-global\node_modules\.bin\yo --version
+set PATH=%PATH%;C:\Temp\npm-global
+
