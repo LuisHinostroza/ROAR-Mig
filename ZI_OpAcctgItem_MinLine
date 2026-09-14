@@ -236,3 +236,173 @@ npm install -g @sap/generator-fiori
 C:\Temp\npm-global\node_modules\.bin\yo --version
 set PATH=%PATH%;C:\Temp\npm-global
 
+C:\Users\LUISHIN>npm install -g @sap/generator-fiori
+(node:37712) ExperimentalWarning: CommonJS module C:\Program Files\nodejs\node_modules\npm\node_modules\debug\src\node.js is loading ES Module C:\Program Files\nodejs\node_modules\npm\node_modules\supports-color\index.js using require().
+Support for loading ES Module in require() is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+added 2 packages in 9s
+
+C:\Users\LUISHIN>C:\Temp\npm-global\node_modules\.bin\yo --version
+El sistema no puede encontrar la ruta especificada.
+
+C:\Users\LUISHIN>npm install -g yo
+(node:43084) ExperimentalWarning: CommonJS module C:\Program Files\nodejs\node_modules\npm\node_modules\debug\src\node.js is loading ES Module C:\Program Files\nodejs\node_modules\npm\node_modules\supports-color\index.js using require().
+Support for loading ES Module in require() is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+npm warn EBADENGINE Unsupported engine {
+npm warn EBADENGINE   package: '@inquirer/core@11.2.1',
+npm warn EBADENGINE   required: { node: '>=23.5.0 || ^22.13.0 || ^20.17.0' },
+npm warn EBADENGINE   current: { node: 'v23.3.0', npm: '10.9.0' }
+npm warn EBADENGINE }
+npm warn EBADENGINE Unsupported engine {
+npm warn EBADENGINE   package: '@inquirer/prompts@8.7.2',
+npm warn EBADENGINE   required: { node: '>=23.5.0 || ^22.13.0 || ^20.17.0' },
+npm warn EBADENGINE   current: { node: 'v23.3.0', npm: '10.9.0' }
+npm warn EBADENGINE }
+npm warn EBADENGINE Unsupported engine {
+npm warn EBADENGINE   package: 'inquirer@13.4.3',
+npm warn EBADENGINE   required: { node: '>=23.5.0 || ^22.13.0 || ^21.7.0 || ^20.12.0' },
+npm warn EBADENGINE   current: { node: 'v23.3.0', npm: '10.9.0' }
+npm warn EBADENGINE }
+npm warn EBADENGINE Unsupported engine {
+npm warn EBADENGINE   package: '@inquirer/ansi@2.0.8',
+npm warn EBADENGINE   required: { node: '>=23.5.0 || ^22.13.0 || ^20.17.0' },
+npm warn EBADENGINE   current: { node: 'v23.3.0', npm: '10.9.0' }
+npm warn EBADENGINE }
+npm warn EBADENGINE Unsupported engine {
+npm warn EBADENGINE   package: '@inquirer/figures@2.0.9',
+npm warn EBADENGINE   required: { node: '>=23.5.0 || ^22.13.0 || ^20.17.0' },
+npm warn EBADENGINE   current: { node: 'v23.3.0', npm: '10.9.0' }
+npm warn EBADENGINE }
+npm warn EBADENGINE Unsupported engine {
+npm warn EBADENGINE   package: '@inquirer/type@4.1.1',
+npm warn EBADENGINE   required: { node: '>=23.5.0 || ^22.13.0 || ^20.17.0' },
+npm warn EBADENGINE   current: { node: 'v23.3.0', npm: '10.9.0' }
+npm warn EBADENGINE }
+npm warn EBADENGINE Unsupported engine {
+npm warn EBADENGINE   package: '@inquirer/checkbox@5.2.5',
+npm warn EBADENGINE   required: { node: '>=23.5.0 || ^22.13.0 || ^20.17.0' },
+npm warn EBADENGINE   current: { node: 'v23.3.0', npm: '10.9.0' }
+npm warn EBADENGINE }
+npm warn EBADENGINE Unsupported engine {
+npm warn EBADENGINE   package: '@inquirer/confirm@6.3.2',
+npm warn EBADENGINE   required: { node: '>=23.5.0 || ^22.13.0 || ^20.17.0' },
+npm warn EBADENGINE   current: { node: 'v23.3.0', npm: '10.9.0' }
+npm warn EBADENGINE }
+npm warn EBADENGINE Unsupported engine {
+npm warn EBADENGINE   package: '@inquirer/editor@5.3.3',
+npm warn EBADENGINE   required: { node: '>=23.5.0 || ^22.13.0 || ^20.17.0' },
+npm warn EBADENGINE   current: { node: 'v23.3.0', npm: '10.9.0' }
+npm warn EBADENGINE }
+npm warn EBADENGINE Unsupported engine {
+npm warn EBADENGINE   package: '@inquirer/expand@5.1.5',
+npm warn EBADENGINE   required: { node: '>=23.5.0 || ^22.13.0 || ^20.17.0' },
+npm warn EBADENGINE   current: { node: 'v23.3.0', npm: '10.9.0' }
+npm warn EBADENGINE }
+npm warn EBADENGINE Unsupported engine {
+npm warn EBADENGINE   package: '@inquirer/input@5.1.6',
+npm warn EBADENGINE   required: { node: '>=23.5.0 || ^22.13.0 || ^20.17.0' },
+npm warn EBADENGINE   current: { node: 'v23.3.0', npm: '10.9.0' }
+npm warn EBADENGINE }
+npm warn EBADENGINE Unsupported engine {
+npm warn EBADENGINE   package: '@inquirer/number@4.2.3',
+npm warn EBADENGINE   required: { node: '>=23.5.0 || ^22.13.0 || ^20.17.0' },
+npm warn EBADENGINE   current: { node: 'v23.3.0', npm: '10.9.0' }
+npm warn EBADENGINE }
+npm warn EBADENGINE Unsupported engine {
+npm warn EBADENGINE   package: '@inquirer/password@5.2.2',
+npm warn EBADENGINE   required: { node: '>=23.5.0 || ^22.13.0 || ^20.17.0' },
+npm warn EBADENGINE   current: { node: 'v23.3.0', npm: '10.9.0' }
+npm warn EBADENGINE }
+npm warn EBADENGINE Unsupported engine {
+npm warn EBADENGINE   package: '@inquirer/rawlist@5.3.5',
+npm warn EBADENGINE   required: { node: '>=23.5.0 || ^22.13.0 || ^20.17.0' },
+npm warn EBADENGINE   current: { node: 'v23.3.0', npm: '10.9.0' }
+npm warn EBADENGINE }
+npm warn EBADENGINE Unsupported engine {
+npm warn EBADENGINE   package: '@inquirer/search@4.3.3',
+npm warn EBADENGINE   required: { node: '>=23.5.0 || ^22.13.0 || ^20.17.0' },
+npm warn EBADENGINE   current: { node: 'v23.3.0', npm: '10.9.0' }
+npm warn EBADENGINE }
+npm warn EBADENGINE Unsupported engine {
+npm warn EBADENGINE   package: '@inquirer/select@5.2.5',
+npm warn EBADENGINE   required: { node: '>=23.5.0 || ^22.13.0 || ^20.17.0' },
+npm warn EBADENGINE   current: { node: 'v23.3.0', npm: '10.9.0' }
+npm warn EBADENGINE }
+npm warn EBADENGINE Unsupported engine {
+npm warn EBADENGINE   package: '@inquirer/core@12.0.3',
+npm warn EBADENGINE   required: { node: '>=23.5.0 || ^22.13.0 || ^20.17.0' },
+npm warn EBADENGINE   current: { node: 'v23.3.0', npm: '10.9.0' }
+npm warn EBADENGINE }
+npm warn EBADENGINE Unsupported engine {
+npm warn EBADENGINE   package: '@inquirer/core@12.0.3',
+npm warn EBADENGINE   required: { node: '>=23.5.0 || ^22.13.0 || ^20.17.0' },
+npm warn EBADENGINE   current: { node: 'v23.3.0', npm: '10.9.0' }
+npm warn EBADENGINE }
+npm warn EBADENGINE Unsupported engine {
+npm warn EBADENGINE   package: '@inquirer/core@12.0.3',
+npm warn EBADENGINE   required: { node: '>=23.5.0 || ^22.13.0 || ^20.17.0' },
+npm warn EBADENGINE   current: { node: 'v23.3.0', npm: '10.9.0' }
+npm warn EBADENGINE }
+npm warn EBADENGINE Unsupported engine {
+npm warn EBADENGINE   package: '@inquirer/external-editor@3.0.5',
+npm warn EBADENGINE   required: { node: '>=23.5.0 || ^22.13.0 || ^20.17.0' },
+npm warn EBADENGINE   current: { node: 'v23.3.0', npm: '10.9.0' }
+npm warn EBADENGINE }
+npm warn EBADENGINE Unsupported engine {
+npm warn EBADENGINE   package: '@inquirer/core@12.0.3',
+npm warn EBADENGINE   required: { node: '>=23.5.0 || ^22.13.0 || ^20.17.0' },
+npm warn EBADENGINE   current: { node: 'v23.3.0', npm: '10.9.0' }
+npm warn EBADENGINE }
+npm warn EBADENGINE Unsupported engine {
+npm warn EBADENGINE   package: '@inquirer/core@12.0.3',
+npm warn EBADENGINE   required: { node: '>=23.5.0 || ^22.13.0 || ^20.17.0' },
+npm warn EBADENGINE   current: { node: 'v23.3.0', npm: '10.9.0' }
+npm warn EBADENGINE }
+npm warn EBADENGINE Unsupported engine {
+npm warn EBADENGINE   package: '@inquirer/core@12.0.3',
+npm warn EBADENGINE   required: { node: '>=23.5.0 || ^22.13.0 || ^20.17.0' },
+npm warn EBADENGINE   current: { node: 'v23.3.0', npm: '10.9.0' }
+npm warn EBADENGINE }
+npm warn EBADENGINE Unsupported engine {
+npm warn EBADENGINE   package: '@inquirer/core@12.0.3',
+npm warn EBADENGINE   required: { node: '>=23.5.0 || ^22.13.0 || ^20.17.0' },
+npm warn EBADENGINE   current: { node: 'v23.3.0', npm: '10.9.0' }
+npm warn EBADENGINE }
+npm warn EBADENGINE Unsupported engine {
+npm warn EBADENGINE   package: '@inquirer/core@12.0.3',
+npm warn EBADENGINE   required: { node: '>=23.5.0 || ^22.13.0 || ^20.17.0' },
+npm warn EBADENGINE   current: { node: 'v23.3.0', npm: '10.9.0' }
+npm warn EBADENGINE }
+npm warn EBADENGINE Unsupported engine {
+npm warn EBADENGINE   package: '@inquirer/core@12.0.3',
+npm warn EBADENGINE   required: { node: '>=23.5.0 || ^22.13.0 || ^20.17.0' },
+npm warn EBADENGINE   current: { node: 'v23.3.0', npm: '10.9.0' }
+npm warn EBADENGINE }
+npm warn EBADENGINE Unsupported engine {
+npm warn EBADENGINE   package: '@inquirer/core@12.0.3',
+npm warn EBADENGINE   required: { node: '>=23.5.0 || ^22.13.0 || ^20.17.0' },
+npm warn EBADENGINE   current: { node: 'v23.3.0', npm: '10.9.0' }
+npm warn EBADENGINE }
+npm warn deprecated boolean@3.2.0: Package no longer supported. Contact Support at https://www.npmjs.com/support for more info.
+
+added 511 packages in 41s
+
+190 packages are looking for funding
+  run `npm fund` for details
+
+C:\Users\LUISHIN>npm fund
+(node:53452) ExperimentalWarning: CommonJS module C:\Program Files\nodejs\node_modules\npm\node_modules\debug\src\node.js is loading ES Module C:\Program Files\nodejs\node_modules\npm\node_modules\supports-color\index.js using require().
+Support for loading ES Module in require() is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+LUISHIN
+
+
+C:\Users\LUISHIN>dir C:\Temp\npm-global\node_modules\.bin
+ El volumen de la unidad C es Windows
+ El número de serie del volumen es: 3CB6-2C00
+
+ Directorio de C:\Temp\npm-global\node_modules
+
+No se encuentra el archivo
