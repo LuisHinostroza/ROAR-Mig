@@ -406,3 +406,6 @@ C:\Users\LUISHIN>dir C:\Temp\npm-global\node_modules\.bin
  Directorio de C:\Temp\npm-global\node_modules
 
 No se encuentra el archivo
+
+set PATH=%PATH%;C:\Temp\npm-global
+yo --generators
