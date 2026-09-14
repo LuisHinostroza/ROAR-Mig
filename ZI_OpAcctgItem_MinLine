@@ -409,3 +409,75 @@ No se encuentra el archivo
 
 set PATH=%PATH%;C:\Temp\npm-global
 yo --generators
+
+C:\Users\LUISHIN>dir C:\Temp\npm-global
+ El volumen de la unidad C es Windows
+ El número de serie del volumen es: 3CB6-2C00
+
+ Directorio de C:\Temp\npm-global
+
+14/09/2026  12:55    <DIR>          .
+14/09/2026  12:45    <DIR>          ..
+14/09/2026  12:55    <DIR>          node_modules
+14/09/2026  12:55               395 yo
+14/09/2026  12:55               328 yo.cmd
+14/09/2026  12:55               817 yo.ps1
+               3 archivos          1.540 bytes
+               3 dirs  29.040.234.496 bytes libres
+
+C:\Users\LUISHIN> C:\Temp\npm-global\yo.cmd --version
+7.0.1
+
+C:\Users\LUISHIN>set PATH=%PATH%;C:\Temp\npm-global
+
+C:\Users\LUISHIN>yo --generators
+Available Generators:
+
+  @sap/fiori
+    abap-deploy-config-sub-generator
+    adp
+    adp-flp-config
+    adp-flp-config-sub-generator
+    adp_add-annotations-to-odata
+    adp_add-component-usages
+    adp_add-new-model
+    adp_change-data-source
+    app-router
+    cap-config-writer
+    cf-deploy-config-sub-generator
+    deploy-config
+    deploy-config-headless
+    deploy-config-headless_abap
+    deploy-config-headless_cf
+    deploy-config-sub-generator
+    deploy-config_abap
+    deploy-config_cf
+    fiori-app-sub-gen
+    fiori-app-sub-generator
+    fiori-app-sub-gen_headless
+    fiori-deployment
+    fiori-deployment_cf
+    fiori-deployment_deploy
+    fiori-deployment_headless
+    fiori-deployment_headless_abap
+    fiori-deployment_headless_cf
+    flp-config
+    flp-config-sub-generator
+    headless
+    mockserver-config-writer
+    reference-lib
+    repo-app-downloader
+    repo-app-import-sub-generator
+    reuse-lib
+    server
+    ui-service
+    ui-service-sub-generator
+    ui5-library-reference-sub-generator
+    ui5-library-sub-generator
+  @sap/adp
+
+(node:57748) ExperimentalWarning: CommonJS module C:\Temp\npm-global\node_modules\yo\node_modules\debug\src\node.js is loading ES Module C:\Temp\npm-global\node_modules\yo\node_modules\supports-color\index.js using require().
+Support for loading ES Module in require() is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+C:\Users\LUISHIN>
