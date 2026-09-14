@@ -481,3 +481,35 @@ Support for loading ES Module in require() is an experimental feature and might 
 (Use `node --trace-warnings ...` to show where the warning was created)
 
 C:\Users\LUISHIN>
+
+
+C:\Users\LUISHIN>set DEBUG=yeoman:*
+
+C:\Users\LUISHIN>yo @sap/fiori
+  yeoman:environment Running lookup with options: { filePatterns: [ './*/index.ts', './*/index.cts', './*/index.mts', './*/index.js', './*/index.cjs', './*/index.mjs', 'generators/*/index.ts', 'generators/*/index.cts', 'generators/*/index.mts', 'generators/*/index.js', 'generators/*/index.cjs', 'generators/*/index.mjs', 'lib/generators/*/index.ts', 'lib/generators/*/index.cts', 'lib/generators/*/index.mts', 'lib/generators/*/index.js', 'lib/generators/*/index.cjs', 'lib/generators/*/index.mjs', 'dist/generators/*/index.ts', 'dist/generators/*/index.cts', 'dist/generators/*/index.mts', 'dist/generators/*/index.js', 'dist/generators/*/index.cjs', 'dist/generators/*/index.mjs' ], filterPaths: false, packagePatterns: [ 'generator-*' ], reverse: true, lookups: [ '.', 'generators', 'lib/generators', 'dist/generators' ] } +0ms
+  yeoman:environment Lookup calculated options: { filePatterns: [ './*/index.ts', './*/index.cts', './*/index.mts', './*/index.js', './*/index.cjs', './*/index.mjs', 'generators/*/index.ts', 'generators/*/index.cts', 'generators/*/index.mts', 'generators/*/index.js', 'generators/*/index.cjs', 'generators/*/index.mjs', 'lib/generators/*/index.ts', 'lib/generators/*/index.cts', 'lib/generators/*/index.mts', 'lib/generators/*/index.js', 'lib/generators/*/index.cjs', 'lib/generators/*/index.mjs', 'dist/generators/*/index.ts', 'dist/generators/*/index.cts', 'dist/generators/*/index.mts', 'dist/generators/*/index.js', 'dist/generators/*/index.cjs', 'dist/generators/*/index.mjs' ], filterPaths: false, packagePatterns: [ 'generator-*' ], reverse: true, lookups: [ '.', 'generators', 'lib/generators', 'dist/generators' ], npmPaths: [ 'C:\\Users\\LUISHIN\\AppData\\Roaming\\npm\\node_modules', 'C:\\Temp\\npm-global\\node_modules\\yo\\node_modules', 'C:\\Temp\\npm-global\\node_modules', 'C:\\node_modules', 'C:\\Users\\node_modules', 'C:\\Users\\LUISHIN\\node_modules' ], packagePaths: [ 'C:/Temp/npm-global/node_modules/@sap/generator-fiori' ] } +6s
+  yeoman:environment Running lookup with options: { filePatterns: [ './*/index.ts', './*/index.cts', './*/index.mts', './*/index.js', './*/index.cjs', './*/index.mjs', 'generators/*/index.ts', 'generators/*/index.cts', 'generators/*/index.mts', 'generators/*/index.js', 'generators/*/index.cjs', 'generators/*/index.mjs', 'lib/generators/*/index.ts', 'lib/generators/*/index.cts', 'lib/generators/*/index.mts', 'lib/generators/*/index.js', 'lib/generators/*/index.cjs', 'lib/generators/*/index.mjs', 'dist/generators/*/index.ts', 'dist/generators/*/index.cts', 'dist/generators/*/index.mts', 'dist/generators/*/index.js', 'dist/generators/*/index.cjs', 'dist/generators/*/index.mjs' ], filterPaths: false, packagePatterns: [ '@sap/generator-fiori' ], reverse: true, lookups: [ '.', 'generators', 'lib/generators', 'dist/generators' ] } +9s
+  yeoman:environment Lookup calculated options: { filePatterns: [ './*/index.ts', './*/index.cts', './*/index.mts', './*/index.js', './*/index.cjs', './*/index.mjs', 'generators/*/index.ts', 'generators/*/index.cts', 'generators/*/index.mts', 'generators/*/index.js', 'generators/*/index.cjs', 'generators/*/index.mjs', 'lib/generators/*/index.ts', 'lib/generators/*/index.cts', 'lib/generators/*/index.mts', 'lib/generators/*/index.js', 'lib/generators/*/index.cjs', 'lib/generators/*/index.mjs', 'dist/generators/*/index.ts', 'dist/generators/*/index.cts', 'dist/generators/*/index.mts', 'dist/generators/*/index.js', 'dist/generators/*/index.cjs', 'dist/generators/*/index.mjs' ], filterPaths: false, packagePatterns: [ '@sap/generator-fiori' ], reverse: true, lookups: [ '.', 'generators', 'lib/generators', 'dist/generators' ], npmPaths: [ 'C:\\Users\\LUISHIN\\AppData\\Roaming\\npm\\node_modules', 'C:\\Temp\\npm-global\\node_modules\\yo\\node_modules', 'C:\\Temp\\npm-global\\node_modules', 'C:\\node_modules', 'C:\\Users\\node_modules', 'C:\\Users\\LUISHIN\\node_modules' ], packagePaths: [ 'C:/Temp/npm-global/node_modules/@sap/generator-fiori' ] } +3s
+  yeoman:generator Queueing generator @sap/fiori:app with generator version 5.10.0 +0ms
+  yeoman:generator Queueing @sap/fiori:app#prompting with options { priorityName: 'prompting', queueName: 'prompting', cancellable: true, run: false, auto: true, taskName: 'prompting' } +2ms
+  yeoman:generator Queueing @sap/fiori:app#default with options { priorityName: 'default', queueName: 'default', cancellable: true, run: false, auto: true, taskName: 'default' } +3ms
+  yeoman:generator Queueing @sap/fiori:app#initializing with options { priorityName: 'initializing', queueName: 'initializing', cancellable: true, run: false, auto: true, taskName: 'initializing' } +1ms
+  yeoman:generator Queueing @sap/fiori:app#install with options { priorityName: 'install', queueName: 'install', cancellable: true, run: false, auto: true, taskName: 'install' } +1ms
+  yeoman:environment Queueing conflicts task +0ms
+(node:54252) ExperimentalWarning: CommonJS module C:\Temp\npm-global\node_modules\yo\node_modules\debug\src\node.js is loading ES Module C:\Temp\npm-global\node_modules\yo\node_modules\supports-color\index.js using require().
+Support for loading ES Module in require() is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+  yeoman:generator Running @sap/fiori:app#initializing +15ms
+  yeoman:generator Done event done$@sap/fiori:app#initializing +10s
+  yeoman:generator Running @sap/fiori:app#prompting +1ms
+`list` prompt is deprecated. Use `select` prompt instead.
+√ Which template do you want to use? List Report Page
+  yeoman:generator Queueing generator @sap/fiori:fiori-app-sub-gen with generator version 5.10.0 +47s
+  yeoman:generator Queueing @sap/fiori:fiori-app-sub-gen#initializing with options { priorityName: 'initializing', queueName: 'initializing', cancellable: true, run: false, auto: true, taskName: 'initializing' } +0ms
+  yeoman:generator Queueing @sap/fiori:fiori-app-sub-gen#prompting with options { priorityName: 'prompting', queueName: 'prompting', cancellable: true, run: false, auto: true, taskName: 'prompting' } +1ms
+  yeoman:generator Queueing @sap/fiori:fiori-app-sub-gen#writing with options { priorityName: 'writing', queueName: 'writing', cancellable: true, run: false, auto: true, taskName: 'writing' } +0ms
+  yeoman:generator Queueing @sap/fiori:fiori-app-sub-gen#install with options { priorityName: 'install', queueName: 'install', cancellable: true, run: false, auto: true, taskName: 'install' } +0ms
+  yeoman:generator Queueing @sap/fiori:fiori-app-sub-gen#end with options { priorityName: 'end', queueName: 'end', cancellable: true, run: false, auto: true, taskName: 'end' } +0ms
+  yeoman:generator Done event done$@sap/fiori:app#prompting +1ms
+  yeoman:generator Running @sap/fiori:fiori-app-sub-gen#initializing +1ms
+
