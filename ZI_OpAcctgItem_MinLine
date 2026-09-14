@@ -226,3 +226,9 @@ Vía wizard en ADT: New > Core Data Services > Service Binding, tipo OData V4 - 
 Updated memory
 
 Este es el set final y estable. Los únicos dos puntos marcados -- confirmar (nombre de campo de nombre/NIF en I_Supplier/I_Customer) se resuelven solos con autocomplete al escribir en Eclipse.
+
+mkdir C:\Temp\npm-cache
+mkdir C:\Temp\npm-global
+npm config set cache "C:\Temp\npm-cache"
+npm config set prefix "C:\Temp\npm-global"
+npm install -g @sap/generator-fiori
