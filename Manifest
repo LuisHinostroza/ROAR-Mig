@@ -1,0 +1,170 @@
+{
+	"_version": "1.60.0",
+	"sap.app": {
+		"id": "com.mapfre.zmcmliqsm",
+		"type": "application",
+		"i18n": {
+			"bundleUrl": "i18n/i18n.properties",
+			"supportedLocales": [
+				""
+			]
+		},
+		"applicationVersion": {
+			"version": "0.0.1"
+		},
+		"title": "{{appTitle}}",
+		"description": "{{appDescription}}",
+		"resources": "resources.json",
+		"sourceTemplate": {
+			"id": "@sap/generator-fiori:lrop",
+			"version": "1.30.0",
+			"toolsId": "d7f1e5c2-1dd2-4b48-a7fb-73aca840e797"
+		},
+		"dataSources": {
+			"annotation": {
+				"type": "ODataAnnotation",
+				"uri": "annotations/annotation.xml",
+				"settings": {
+					"localUri": "annotations/annotation.xml"
+				}
+			},
+			"mainService": {
+				"uri": "/sap/opu/odata4/sap/zui_mcm_informe_saldo_medio_04/srvd/sap/zmcm_sd_informe_saldo_medio/0001/",
+				"type": "OData",
+				"settings": {
+					"annotations": [
+						"annotation"
+					],
+					"localUri": "localService/mainService/metadata.xml",
+					"odataVersion": "4.0"
+				}
+			}
+		}
+	},
+	"sap.ui": {
+		"technology": "UI5",
+		"icons": {
+			"icon": "",
+			"favIcon": "",
+			"phone": "",
+			"phone@2": "",
+			"tablet": "",
+			"tablet@2": ""
+		},
+		"deviceTypes": {
+			"desktop": true,
+			"tablet": true,
+			"phone": true
+		}
+	},
+	"sap.ui5": {
+		"flexEnabled": true,
+		"dependencies": {
+			"minUI5Version": "1.120.23",
+			"libs": {
+				"sap.m": {},
+				"sap.ui.core": {},
+				"sap.fe.templates": {}
+			}
+		},
+		"contentDensities": {
+			"compact": true,
+			"cozy": true
+		},
+		"models": {
+			"i18n": {
+				"type": "sap.ui.model.resource.ResourceModel",
+				"settings": {
+					"bundleName": "com.mapfre.zmcmliqsm.i18n.i18n",
+					"supportedLocales": [
+						""
+					]
+				}
+			},
+			"": {
+				"dataSource": "mainService",
+				"preload": true,
+				"settings": {
+					"operationMode": "Server",
+					"autoExpandSelect": true,
+					"earlyRequests": true
+				}
+			},
+			"@i18n": {
+				"type": "sap.ui.model.resource.ResourceModel",
+				"uri": "i18n/i18n.properties",
+				"settings": {
+					"supportedLocales": [
+						""
+					]
+				}
+			}
+		},
+		"resources": {
+			"css": []
+		},
+		"routing": {
+			"config": {},
+			"routes": [
+				{
+					"pattern": ":?query:",
+					"name": "ZC_MCM_INFORME_SALDO_MEDIOList",
+					"target": "ZC_MCM_INFORME_SALDO_MEDIOList"
+				},
+				{
+					"pattern": "ZC_MCM_INFORME_SALDO_MEDIO({key}):?query:",
+					"name": "ZC_MCM_INFORME_SALDO_MEDIOObjectPage",
+					"target": "ZC_MCM_INFORME_SALDO_MEDIOObjectPage"
+				}
+			],
+			"targets": {
+				"ZC_MCM_INFORME_SALDO_MEDIOList": {
+					"type": "Component",
+					"id": "ZC_MCM_INFORME_SALDO_MEDIOList",
+					"name": "sap.fe.templates.ListReport",
+					"options": {
+						"settings": {
+							"contextPath": "/ZC_MCM_INFORME_SALDO_MEDIO",
+							"variantManagement": "Page",
+							"navigation": {
+								"ZC_MCM_INFORME_SALDO_MEDIO": {
+									"detail": {
+										"route": "ZC_MCM_INFORME_SALDO_MEDIOObjectPage"
+									}
+								}
+							},
+							"controlConfiguration": {
+								"@com.sap.vocabularies.UI.v1.LineItem": {
+									"tableSettings": {
+										"type": "ResponsiveTable"
+									}
+								}
+							}
+						}
+					}
+				},
+				"ZC_MCM_INFORME_SALDO_MEDIOObjectPage": {
+					"type": "Component",
+					"id": "ZC_MCM_INFORME_SALDO_MEDIOObjectPage",
+					"name": "sap.fe.templates.ObjectPage",
+					"options": {
+						"settings": {
+							"editableHeaderContent": false,
+							"contextPath": "/ZC_MCM_INFORME_SALDO_MEDIO"
+						}
+					}
+				}
+			}
+		},
+		"flexBundle": false
+	},
+	"sap.fiori": {
+		"registrationIds": [],
+		"archeType": "transactional"
+	},
+	"sap.fe": {
+		"app": {
+			"enableLazyLoading": true
+		}
+	}
+}
