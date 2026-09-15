@@ -2214,3 +2214,34 @@ Después de subida
 En /UI2/FLPD_CUST (o FLPCM_CONF), ahora sí en el Target Mapping la opción "Aplicación Fiori SAPUI5" te va a pedir el nombre del componente — pones mapfre.fi.contrapartida, y el sistema ya tiene un Component.js real que referenciar.
 
 ¿Empezamos por crear la BSP Application en SE80, o quieres que primero probemos si estos archivos corren bien copiándolos temporalmente en algún lado accesible desde tu navegador para validar antes de subir a SAP?
+
+
+"routing": {
+  "config": {
+    "routerClass": "sap.f.routing.Router",
+    "controlAggregation": "beginColumnPages",
+    "controlId": "fcl",
+    "transition": "slide",
+    "type": "Fcl"
+  },
+  "routes": [
+    {
+      "pattern": ":?query:",
+      "name": "ContrapartidaList",
+      "target": "ContrapartidaList"
+    }
+  ],
+  "targets": {
+    "ContrapartidaList": {
+      "type": "Component",
+      "id": "ContrapartidaList",
+      "name": "sap.fe.templates.ListReport",
+      "options": {
+        "settings": {
+          "entitySet": "Contrapartida",
+          "navigation": {}
+        }
+      }
+    }
+  }
+}
