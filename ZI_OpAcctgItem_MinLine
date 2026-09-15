@@ -2245,3 +2245,77 @@ En /UI2/FLPD_CUST (o FLPCM_CONF), ahora sí en el Target Mapping la opción "Apl
     }
   }
 }
+
+{
+    "_version": "1.59.0",
+    "sap.app": {
+      "id": "mapfre.fi.contrapartida",
+      "type": "application",
+      "title": "Contrapartida",
+      "applicationVersion": { "version": "1.0.0" },
+      "dataSources": {
+        "mainService": {
+          "uri": "/sap/opu/odata4/sap/zsb_contrapartida/srvd/sap/zsd_contrapartida/0001/",
+          "type": "OData",
+          "settings": {
+            "odataVersion": "4.0"
+          }
+        }
+      }
+    },
+    "sap.ui": {
+      "technology": "UI5",
+      "deviceTypes": { "desktop": true, "tablet": true, "phone": true }
+    },
+    "sap.ui5": {
+      "dependencies": {
+        "minUI5Version": "1.108.0",
+        "libs": {
+          "sap.fe.templates": {},
+          "sap.ui.core": {},
+          "sap.fe.core": {}
+        }
+      },
+      "models": {
+        "i18n": { "type": "sap.ui.model.resource.ResourceModel", "settings": { "bundleName": "mapfre.fi.contrapartida.i18n.i18n" } },
+        "": {
+          "dataSource": "mainService",
+          "settings": {
+            "synchronizationMode": "None",
+            "operationMode": "Server",
+            "autoExpandSelect": true,
+            "earlyRequests": true
+          }
+        }
+      },
+      "routing": {
+        "config": {
+          "routerClass": "sap.f.routing.Router",
+          "controlAggregation": "beginColumnPages",
+          "controlId": "fcl",
+          "transition": "slide",
+          "type": "Fcl"
+        },
+        "routes": [
+          {
+            "pattern": ":?query:",
+            "name": "ContrapartidaList",
+            "target": "ContrapartidaList"
+          }
+        ],
+        "targets": {
+          "ContrapartidaList": {
+            "type": "Component",
+            "id": "ContrapartidaList",
+            "name": "sap.fe.templates.ListReport",
+            "options": {
+              "settings": {
+                "entitySet": "Contrapartida",
+                "navigation": {}
+              }
+            }
+          }
+        }
+      }
+    }
+  }
