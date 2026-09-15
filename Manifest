@@ -1,180 +1,6 @@
 {
 	"_version": "1.60.0",
 	"sap.app": {
-		"id": "com.mapfre.zmcmliqsm",
-		"type": "application",
-		"i18n": {
-			"bundleUrl": "i18n/i18n.properties",
-			"supportedLocales": [
-				""
-			]
-		},
-		"applicationVersion": {
-			"version": "0.0.1"
-		},
-		"title": "{{appTitle}}",
-		"description": "{{appDescription}}",
-		"resources": "resources.json",
-		"sourceTemplate": {
-			"id": "@sap/generator-fiori:lrop",
-			"version": "1.30.0",
-			"toolsId": "d7f1e5c2-1dd2-4b48-a7fb-73aca840e797"
-		},
-		"dataSources": {
-			"annotation": {
-				"type": "ODataAnnotation",
-				"uri": "annotations/annotation.xml",
-				"settings": {
-					"localUri": "annotations/annotation.xml"
-				}
-			},
-			"mainService": {
-				"uri": "/sap/opu/odata4/sap/zui_mcm_informe_saldo_medio_04/srvd/sap/zmcm_sd_informe_saldo_medio/0001/",
-				"type": "OData",
-				"settings": {
-					"annotations": [
-						"annotation"
-					],
-					"localUri": "localService/mainService/metadata.xml",
-					"odataVersion": "4.0"
-				}
-			}
-		}
-	},
-	"sap.ui": {
-		"technology": "UI5",
-		"icons": {
-			"icon": "",
-			"favIcon": "",
-			"phone": "",
-			"phone@2": "",
-			"tablet": "",
-			"tablet@2": ""
-		},
-		"deviceTypes": {
-			"desktop": true,
-			"tablet": true,
-			"phone": true
-		}
-	},
-	"sap.ui5": {
-		"flexEnabled": true,
-		"dependencies": {
-			"minUI5Version": "1.120.23",
-			"libs": {
-				"sap.m": {},
-				"sap.ui.core": {},
-				"sap.fe.templates": {}
-			}
-		},
-		"contentDensities": {
-			"compact": true,
-			"cozy": true
-		},
-		"models": {
-			"i18n": {
-				"type": "sap.ui.model.resource.ResourceModel",
-				"settings": {
-					"bundleName": "com.mapfre.zmcmliqsm.i18n.i18n",
-					"supportedLocales": [
-						""
-					]
-				}
-			},
-			"": {
-				"dataSource": "mainService",
-				"preload": true,
-				"settings": {
-					"operationMode": "Server",
-					"autoExpandSelect": true,
-					"earlyRequests": true
-				}
-			},
-			"@i18n": {
-				"type": "sap.ui.model.resource.ResourceModel",
-				"uri": "i18n/i18n.properties",
-				"settings": {
-					"supportedLocales": [
-						""
-					]
-				}
-			}
-		},
-		"resources": {
-			"css": []
-		},
-		"routing": {
-			"config": {},
-			"routes": [
-				{
-					"pattern": ":?query:",
-					"name": "ZC_MCM_INFORME_SALDO_MEDIOList",
-					"target": "ZC_MCM_INFORME_SALDO_MEDIOList"
-				},
-				{
-					"pattern": "ZC_MCM_INFORME_SALDO_MEDIO({key}):?query:",
-					"name": "ZC_MCM_INFORME_SALDO_MEDIOObjectPage",
-					"target": "ZC_MCM_INFORME_SALDO_MEDIOObjectPage"
-				}
-			],
-			"targets": {
-				"ZC_MCM_INFORME_SALDO_MEDIOList": {
-					"type": "Component",
-					"id": "ZC_MCM_INFORME_SALDO_MEDIOList",
-					"name": "sap.fe.templates.ListReport",
-					"options": {
-						"settings": {
-							"contextPath": "/ZC_MCM_INFORME_SALDO_MEDIO",
-							"variantManagement": "Page",
-							"navigation": {
-								"ZC_MCM_INFORME_SALDO_MEDIO": {
-									"detail": {
-										"route": "ZC_MCM_INFORME_SALDO_MEDIOObjectPage"
-									}
-								}
-							},
-							"controlConfiguration": {
-								"@com.sap.vocabularies.UI.v1.LineItem": {
-									"tableSettings": {
-										"type": "ResponsiveTable"
-									}
-								}
-							}
-						}
-					}
-				},
-				"ZC_MCM_INFORME_SALDO_MEDIOObjectPage": {
-					"type": "Component",
-					"id": "ZC_MCM_INFORME_SALDO_MEDIOObjectPage",
-					"name": "sap.fe.templates.ObjectPage",
-					"options": {
-						"settings": {
-							"editableHeaderContent": false,
-							"contextPath": "/ZC_MCM_INFORME_SALDO_MEDIO"
-						}
-					}
-				}
-			}
-		},
-		"flexBundle": false
-	},
-	"sap.fiori": {
-		"registrationIds": [],
-		"archeType": "transactional"
-	},
-	"sap.fe": {
-		"app": {
-			"enableLazyLoading": true
-		}
-	}
-}
-
-
-***************************************************************************************
-
-{
-	"_version": "1.60.0",
-	"sap.app": {
 		"id": "mapfre.fi.contrapartida",
 		"type": "application",
 		"i18n": {
@@ -293,14 +119,25 @@
 		}
 	}
 }
-**********************************Index.html
+
+Component.js
+
+Usa exactamente el mismo patrón compilado/minificado que el de referencia, solo cambiando el namespace:
+
+javascript
+sap.ui.define(["sap/fe/core/AppComponent"],function(e){"use strict";return e.extend("mapfre.fi.contrapartida.Component",{metadata:{manifest:"json"}})});
+index.html
+
+Aquí hay una diferencia importante con el que yo te había dado — el de referencia usa sapUiSizeCompact en el body y una ruta ligeramente distinta de bootstrap. Mantén la ruta absoluta que ya sabemos que carga bien en tu sistema (/sap/public/bc/ui5_ui5/1/resources/sap-ui-core.js), pero adopta el resto del patrón:
+
+html
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <title>Informe de Liquidación Saldo Medio</title>
+    <title>Contrapartida</title>
     <style>
         html, body, body > div, #container, #container-uiarea {
             height: 100%;
@@ -308,10 +145,10 @@
     </style>
     <script
         id="sap-ui-bootstrap"
-        src="resources/sap-ui-core.js"
+        src="/sap/public/bc/ui5_ui5/1/resources/sap-ui-core.js"
         data-sap-ui-theme="sap_horizon"
         data-sap-ui-resource-roots='{
-            "com.mapfre.zmcmliqsm": "./"
+            "mapfre.fi.contrapartida": "./"
         }'
         data-sap-ui-on-init="module:sap/ui/core/ComponentSupport"
         data-sap-ui-compat-version="edge"
@@ -322,110 +159,21 @@
 <body class="sapUiBody sapUiSizeCompact" id="content">
     <div
         data-sap-ui-component
-        data-name="com.mapfre.zmcmliqsm"
+        data-name="mapfre.fi.contrapartida"
         data-id="container"
-        data-settings='{"id" : "com.mapfre.zmcmliqsm"}'
+        data-settings='{"id" : "mapfre.fi.contrapartida"}'
         data-handle-validation="true"
     ></div>
 </body>
 </html>
-************************************************annotation.xml
-<edmx:Edmx xmlns:edmx="http://docs.oasis-open.org/odata/ns/edmx" Version="4.0">
-    <edmx:Reference Uri="https://sap.github.io/odata-vocabularies/vocabularies/UI.xml">
-        <edmx:Include Namespace="com.sap.vocabularies.UI.v1" Alias="UI"/>
-    </edmx:Reference>
-    <edmx:Reference Uri="/sap/opu/odata4/sap/zui_mcm_informe_saldo_medio_04/srvd/sap/zmcm_sd_informe_saldo_medio/0001/$metadata">
-        <edmx:Include Namespace="com.sap.gateway.srvd.zmcm_sd_informe_saldo_medio.v0001" Alias="SAP__self"/>
-    </edmx:Reference>
-    <edmx:DataServices>
-        <Schema xmlns="http://docs.oasis-open.org/odata/ns/edm" Namespace="local">
-            <Annotations Target="SAP__self.ZC_MCM_INFORME_SALDO_MEDIOType">
-                <Annotation Term="UI.FieldGroup" Qualifier="GeneratedGroup">
-                    <Record Type="UI.FieldGroupType">
-                        <PropertyValue Property="Data">
-                            <Collection>
-                                <Record Type="UI.DataField">
-                                    <PropertyValue Property="Label" String="GroupKey"/>
-                                    <PropertyValue Property="Value" Path="GroupKey"/>
-                                </Record>
-                                <Record Type="UI.DataField">
-                                    <PropertyValue Property="Label" String="Agrupacion"/>
-                                    <PropertyValue Property="Value" Path="Agrupacion"/>
-                                </Record>
-                                <Record Type="UI.DataField">
-                                    <PropertyValue Property="Label" String="Periodo"/>
-                                    <PropertyValue Property="Value" Path="Periodo"/>
-                                </Record>
-                                <Record Type="UI.DataField">
-                                    <PropertyValue Property="Label" String="Convenio"/>
-                                    <PropertyValue Property="Value" Path="Convenio"/>
-                                </Record>
-                                <Record Type="UI.DataField">
-                                    <PropertyValue Property="Label" String="TipoCuenta"/>
-                                    <PropertyValue Property="Value" Path="TipoCuenta"/>
-                                </Record>
-                                <Record Type="UI.DataField">
-                                    <PropertyValue Property="Label" String="Cuenta"/>
-                                    <PropertyValue Property="Value" Path="Cuenta"/>
-                                </Record>
-                                <Record Type="UI.DataField">
-                                    <PropertyValue Property="Label" String="Moneda"/>
-                                    <PropertyValue Property="Value" Path="Moneda"/>
-                                </Record>
-                                <Record Type="UI.DataField">
-                                    <PropertyValue Property="Label" String="Sociedad"/>
-                                    <PropertyValue Property="Value" Path="Sociedad"/>
-                                </Record>
-                                <Record Type="UI.DataField">
-                                    <PropertyValue Property="Label" String="Banco"/>
-                                    <PropertyValue Property="Value" Path="Banco"/>
-                                </Record>
-                                <Record Type="UI.DataField">
-                                    <PropertyValue Property="Label" String="SaldoMedio"/>
-                                    <PropertyValue Property="Value" Path="SaldoMedio"/>
-                                </Record>
-                                <Record Type="UI.DataField">
-                                    <PropertyValue Property="Label" String="Intereses"/>
-                                    <PropertyValue Property="Value" Path="Intereses"/>
-                                </Record>
-                                <Record Type="UI.DataField">
-                                    <PropertyValue Property="Value" Path="Rentabilidad"/>
-                                </Record>
-                                <Record Type="UI.DataField">
-                                    <PropertyValue Property="Label" String="DiasPeriodo"/>
-                                    <PropertyValue Property="Value" Path="DiasPeriodo"/>
-                                </Record>
-                            </Collection>
-                        </PropertyValue>
-                    </Record>
-                </Annotation>
-                <Annotation Term="UI.Facets">
-                    <Collection>
-                        <Record Type="UI.ReferenceFacet">
-                            <PropertyValue Property="ID" String="GeneratedFacet1"/>
-                            <PropertyValue Property="Label" String="General Information"/>
-                            <PropertyValue Property="Target" AnnotationPath="@UI.FieldGroup#GeneratedGroup"/>
-                        </Record>
-                    </Collection>
-                </Annotation>
-            </Annotations>
-        </Schema>
-    </edmx:DataServices>
-</edmx:Edmx>
-¨***************************************************i18n.properties
-# This is the resource bundle for com.mapfre.zmcmliqsm
+i18n.properties
+# This is the resource bundle for mapfre.fi.contrapartida
 
 #Texts for manifest.json
 
 #XTIT: Application name
-appTitle=Informe de Liquidaci\u00f3n Saldo Medio
+appTitle=Contrapartida
 
 #YDES: Application description
-appDescription=Informe de Liquidaci\u00f3n Saldo Medio
-***********************************************************Component.js
-sap.ui.define(["sap/fe/core/AppComponent"],function(e){"use strict";return e.extend("com.mapfre.zmcmliqsm.Component",{metadata:{manifest:"json"}})});
-//# sourceMappingURL=Component.js.map
-******************************************************Component.js.map
-{"version":3,"file":"Component.js","names":["sap","ui","define","Component","extend","metadata","manifest"],"sources":["Component-dbg.js"],"mappings":"AAAAA,IAAIC,GAAGC,OACH,CAAC,4BACD,SAAUC,GACN,aAEA,OAAOA,EAAUC,OAAO,iCAAkC,CACtDC,SAAU,CACNC,SAAU,SAGtB"+
-,"ignoreList":[]}
+appDescription=Contrapartida
 
