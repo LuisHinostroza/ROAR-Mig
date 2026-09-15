@@ -293,3 +293,139 @@
 		}
 	}
 }
+**********************************Index.html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <title>Informe de Liquidación Saldo Medio</title>
+    <style>
+        html, body, body > div, #container, #container-uiarea {
+            height: 100%;
+        }
+    </style>
+    <script
+        id="sap-ui-bootstrap"
+        src="resources/sap-ui-core.js"
+        data-sap-ui-theme="sap_horizon"
+        data-sap-ui-resource-roots='{
+            "com.mapfre.zmcmliqsm": "./"
+        }'
+        data-sap-ui-on-init="module:sap/ui/core/ComponentSupport"
+        data-sap-ui-compat-version="edge"
+        data-sap-ui-async="true"
+        data-sap-ui-frame-options="trusted"
+    ></script>
+</head>
+<body class="sapUiBody sapUiSizeCompact" id="content">
+    <div
+        data-sap-ui-component
+        data-name="com.mapfre.zmcmliqsm"
+        data-id="container"
+        data-settings='{"id" : "com.mapfre.zmcmliqsm"}'
+        data-handle-validation="true"
+    ></div>
+</body>
+</html>
+************************************************annotation.xml
+<edmx:Edmx xmlns:edmx="http://docs.oasis-open.org/odata/ns/edmx" Version="4.0">
+    <edmx:Reference Uri="https://sap.github.io/odata-vocabularies/vocabularies/UI.xml">
+        <edmx:Include Namespace="com.sap.vocabularies.UI.v1" Alias="UI"/>
+    </edmx:Reference>
+    <edmx:Reference Uri="/sap/opu/odata4/sap/zui_mcm_informe_saldo_medio_04/srvd/sap/zmcm_sd_informe_saldo_medio/0001/$metadata">
+        <edmx:Include Namespace="com.sap.gateway.srvd.zmcm_sd_informe_saldo_medio.v0001" Alias="SAP__self"/>
+    </edmx:Reference>
+    <edmx:DataServices>
+        <Schema xmlns="http://docs.oasis-open.org/odata/ns/edm" Namespace="local">
+            <Annotations Target="SAP__self.ZC_MCM_INFORME_SALDO_MEDIOType">
+                <Annotation Term="UI.FieldGroup" Qualifier="GeneratedGroup">
+                    <Record Type="UI.FieldGroupType">
+                        <PropertyValue Property="Data">
+                            <Collection>
+                                <Record Type="UI.DataField">
+                                    <PropertyValue Property="Label" String="GroupKey"/>
+                                    <PropertyValue Property="Value" Path="GroupKey"/>
+                                </Record>
+                                <Record Type="UI.DataField">
+                                    <PropertyValue Property="Label" String="Agrupacion"/>
+                                    <PropertyValue Property="Value" Path="Agrupacion"/>
+                                </Record>
+                                <Record Type="UI.DataField">
+                                    <PropertyValue Property="Label" String="Periodo"/>
+                                    <PropertyValue Property="Value" Path="Periodo"/>
+                                </Record>
+                                <Record Type="UI.DataField">
+                                    <PropertyValue Property="Label" String="Convenio"/>
+                                    <PropertyValue Property="Value" Path="Convenio"/>
+                                </Record>
+                                <Record Type="UI.DataField">
+                                    <PropertyValue Property="Label" String="TipoCuenta"/>
+                                    <PropertyValue Property="Value" Path="TipoCuenta"/>
+                                </Record>
+                                <Record Type="UI.DataField">
+                                    <PropertyValue Property="Label" String="Cuenta"/>
+                                    <PropertyValue Property="Value" Path="Cuenta"/>
+                                </Record>
+                                <Record Type="UI.DataField">
+                                    <PropertyValue Property="Label" String="Moneda"/>
+                                    <PropertyValue Property="Value" Path="Moneda"/>
+                                </Record>
+                                <Record Type="UI.DataField">
+                                    <PropertyValue Property="Label" String="Sociedad"/>
+                                    <PropertyValue Property="Value" Path="Sociedad"/>
+                                </Record>
+                                <Record Type="UI.DataField">
+                                    <PropertyValue Property="Label" String="Banco"/>
+                                    <PropertyValue Property="Value" Path="Banco"/>
+                                </Record>
+                                <Record Type="UI.DataField">
+                                    <PropertyValue Property="Label" String="SaldoMedio"/>
+                                    <PropertyValue Property="Value" Path="SaldoMedio"/>
+                                </Record>
+                                <Record Type="UI.DataField">
+                                    <PropertyValue Property="Label" String="Intereses"/>
+                                    <PropertyValue Property="Value" Path="Intereses"/>
+                                </Record>
+                                <Record Type="UI.DataField">
+                                    <PropertyValue Property="Value" Path="Rentabilidad"/>
+                                </Record>
+                                <Record Type="UI.DataField">
+                                    <PropertyValue Property="Label" String="DiasPeriodo"/>
+                                    <PropertyValue Property="Value" Path="DiasPeriodo"/>
+                                </Record>
+                            </Collection>
+                        </PropertyValue>
+                    </Record>
+                </Annotation>
+                <Annotation Term="UI.Facets">
+                    <Collection>
+                        <Record Type="UI.ReferenceFacet">
+                            <PropertyValue Property="ID" String="GeneratedFacet1"/>
+                            <PropertyValue Property="Label" String="General Information"/>
+                            <PropertyValue Property="Target" AnnotationPath="@UI.FieldGroup#GeneratedGroup"/>
+                        </Record>
+                    </Collection>
+                </Annotation>
+            </Annotations>
+        </Schema>
+    </edmx:DataServices>
+</edmx:Edmx>
+¨***************************************************i18n.properties
+# This is the resource bundle for com.mapfre.zmcmliqsm
+
+#Texts for manifest.json
+
+#XTIT: Application name
+appTitle=Informe de Liquidaci\u00f3n Saldo Medio
+
+#YDES: Application description
+appDescription=Informe de Liquidaci\u00f3n Saldo Medio
+***********************************************************Component.js
+sap.ui.define(["sap/fe/core/AppComponent"],function(e){"use strict";return e.extend("com.mapfre.zmcmliqsm.Component",{metadata:{manifest:"json"}})});
+//# sourceMappingURL=Component.js.map
+******************************************************Component.js.map
+{"version":3,"file":"Component.js","names":["sap","ui","define","Component","extend","metadata","manifest"],"sources":["Component-dbg.js"],"mappings":"AAAAA,IAAIC,GAAGC,OACH,CAAC,4BACD,SAAUC,GACN,aAEA,OAAOA,EAAUC,OAAO,iCAAkC,CACtDC,SAAU,CACNC,SAAU,SAGtB"+
+,"ignoreList":[]}
+
