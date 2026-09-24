@@ -4605,3 +4605,10 @@ org.xmlpull,1.1.3.4,plugins/org.xmlpull_1.1.3.4.jar,4,false
 slf4j.api,2.0.18,plugins/slf4j.api_2.0.18.jar,4,false
 slf4j.simple,2.0.18,plugins/slf4j.simple_2.0.18.jar,4,false
 stax2-api,4.3.0,plugins/stax2-api_4.3.0.jar,4,false
+*****************************************************************************************************
+
+org.objectweb.asm,9.9.1,plugins/org.objectweb.asm_9.9.1.jar,4,false
+org.objectweb.asm.commons,9.9.1,plugins/org.objectweb.asm.commons_9.9.1.jar,4,false
+org.objectweb.asm.tree,9.9.1,plugins/org.objectweb.asm.tree_9.9.1.jar,4,false
+org.objectweb.asm.tree.analysis,9.9.1,plugins/org.objectweb.asm.tree.analysis_9.9.1.jar,4,false
+org.objectweb.asm.util,9.9.1,plugins/org.objectweb.asm.util_9.9.1.jar,4,false
