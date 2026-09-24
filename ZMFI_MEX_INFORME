@@ -1,0 +1,1160 @@
+*&---------------------------------------------------------------------*
+*& Report  ZMFI_MEX_INFORME
+*&
+*&---------------------------------------------------------------------*
+*&
+*&
+*&---------------------------------------------------------------------*
+
+REPORT  zmfi_mex_informe MESSAGE-ID zmfi_mex_informe.
+
+INCLUDE  zmfi_mex_informe_cl01. "Class definition
+INCLUDE  zmfi_mex_informe_top.
+INCLUDE  zmfi_mex_informe_sel.
+INCLUDE  zmfi_mex_informe_cl02. "Class implementation
+INCLUDE  zmfi_mex_informe_eve.
+
+
+*&---------------------------------------------------------------------*
+*&  Include           ZMFI_MEX_INFORME_CL01
+*&---------------------------------------------------------------------*
+CLASS lcx_mex_informe DEFINITION INHERITING FROM cx_static_check.
+  PUBLIC SECTION.
+    " 1. Implementar la interfaz estándar de mensajes
+    INTERFACES if_t100_message.
+
+    " 2. Variables para recibir las variables del mensaje (&1, &2...)
+    DATA: mv_msgid TYPE symsgid,
+          mv_msgno TYPE symsgno,
+          mv_v1    TYPE symsgv,
+          mv_v2    TYPE symsgv,
+          mv_v3    TYPE symsgv,
+          mv_v4    TYPE symsgv.
+
+    " 3. Constructor personalizado para hacer la llamada fácil
+    METHODS constructor
+      IMPORTING
+        iv_msgid TYPE symsgid DEFAULT '00'
+        iv_msgno TYPE symsgno DEFAULT '000'
+        iv_v1    TYPE symsgv  OPTIONAL
+        iv_v2    TYPE symsgv  OPTIONAL
+        iv_v3    TYPE symsgv  OPTIONAL
+        iv_v4    TYPE symsgv  OPTIONAL.
+ENDCLASS.                    "lcx_mex_informe DEFINITION
+
+*----------------------------------------------------------------------*
+*       CLASS lcl_mex_informe DEFINITION
+*----------------------------------------------------------------------*
+*
+*----------------------------------------------------------------------*
+CLASS lcl_mex_informe DEFINITION.
+
+  PUBLIC SECTION.
+    TYPES: BEGIN OF ty_report,
+             sociedad             TYPE bukrs,
+             ejercicio            TYPE gjahr,
+             numerodocumento      TYPE belnr_d, "12
+             posicion             TYPE buzei,
+             fechadocumento       TYPE bldat,   "1
+             fechacontabilizacion TYPE budat,   "2
+             periodo              TYPE monat,   "3
+             referencia           TYPE xblnr1,  "4
+             nuevofoliofiscal     TYPE string,  "5
+             importemd            TYPE wrbtr,   "6
+             monedamd             TYPE waers,   "7
+             importeml            TYPE dmbtr,   "8
+             indicadoriva         TYPE mwskz,   "9
+             importeiva           TYPE fwste,   "10
+             retenciones          TYPE wt_wt1,  "11
+             doccompensacion      TYPE augbl,   "13
+             fechacompensacion    TYPE augdt,   "14
+             clasedocumento       TYPE blart,   "15
+             acreedor             TYPE lifnr,   "16
+             cliente              TYPE kunnr,   "17
+             niftercero           TYPE stcd1,   "18
+             nombretercero        TYPE name1_gp,"19
+             paistercero          TYPE land1_gp,"20
+             cptercero            TYPE pstlz,   "21
+             cuentagasto          TYPE hkont,   "22
+             cuentaiva            TYPE hkont,   "23
+             texto                TYPE sgtxt,   "24
+             ceco                 TYPE kostl,   "25
+             usuarioregistro      TYPE usnam,   "26
+           END OF ty_report,
+           ty_tt_report TYPE STANDARD TABLE OF ty_report.
+
+    METHODS: run.
+
+  PRIVATE SECTION.
+
+    TYPES:  BEGIN OF lty_t001,
+                    bukrs TYPE bukrs,
+            END OF lty_t001,
+            lty_tt_t001 TYPE STANDARD TABLE OF lty_t001,
+
+            BEGIN OF lty_bkpf,
+                    bukrs TYPE bukrs,
+                    belnr TYPE belnr_d,
+                    gjahr TYPE gjahr,
+                    blart TYPE blart,
+                    bldat TYPE bldat,
+                    budat TYPE budat,
+                    monat TYPE monat,
+                    xblnr TYPE xblnr1,
+                    waers TYPE waers,
+                    bstat TYPE bstat_d,
+                    usnam TYPE usnam,
+            END OF lty_bkpf,
+            lty_tt_bkpf TYPE STANDARD TABLE OF lty_bkpf,
+
+            BEGIN OF lty_bseg,
+                    bukrs TYPE bukrs,
+                    belnr TYPE belnr_d,
+                    gjahr TYPE gjahr,
+                    buzei TYPE buzei,
+                    augbl TYPE augbl,
+                    augdt TYPE augdt,
+                    lifnr TYPE lifnr,
+                    kunnr TYPE kunnr,
+                    wrbtr TYPE wrbtr,
+                    dmbtr TYPE dmbtr,
+                    mwskz TYPE mwskz,
+                    hkont TYPE hkont,
+                    sgtxt TYPE sgtxt,
+                    kostl TYPE kostl,
+            END OF lty_bseg,
+            lty_tt_bseg TYPE STANDARD TABLE OF lty_bseg,
+
+            BEGIN OF lty_bseg_gasto,
+                    bukrs TYPE bukrs,
+                    belnr TYPE belnr_d,
+                    gjahr TYPE gjahr,
+                    buzei TYPE buzei,
+                    hkont TYPE hkont,
+                    kostl TYPE kostl,
+            END OF lty_bseg_gasto,
+            lty_tt_bseg_gasto TYPE STANDARD TABLE OF lty_bseg,
+
+            BEGIN OF lty_bset,
+                    bukrs TYPE bukrs,
+                    belnr TYPE belnr_d,
+                    gjahr TYPE gjahr,
+                    buzei TYPE buzei,
+                    mwskz TYPE mwskz,
+                    fwste TYPE fwste,
+                    hkont TYPE hkont,
+            END OF lty_bset,
+            lty_tt_bset TYPE STANDARD TABLE OF lty_bset,
+
+           BEGIN OF lty_with_item,
+                    bukrs TYPE bukrs,
+                    belnr TYPE belnr_d,
+                    gjahr TYPE gjahr,
+                    buzei TYPE buzei,
+                    witht TYPE witht,
+                    wt_withcd TYPE wt_withcd,
+                    wt_qbshb TYPE wt_wt1,
+            END OF lty_with_item,
+            lty_tt_with_item TYPE STANDARD TABLE OF lty_with_item,
+
+            BEGIN OF lty_lfa1,
+                    lifnr TYPE lifnr,
+                    name1 TYPE name1_gp,
+                    stcd1 TYPE stcd1,
+                    land1 TYPE land1_gp,
+                    pstlz TYPE pstlz,
+            END OF lty_lfa1,
+            lty_tt_lfa1 TYPE STANDARD TABLE OF lty_lfa1,
+
+            BEGIN OF lty_kna1,
+                    kunnr TYPE kunnr,
+                    name1 TYPE name1_gp,
+                    stcd1 TYPE stcd1,
+                    land1 TYPE land1_gp,
+                    pstlz TYPE pstlz,
+            END OF lty_kna1,
+            lty_tt_kna1 TYPE STANDARD TABLE OF lty_kna1.
+
+    DATA: mt_data TYPE ty_tt_report.
+
+    METHODS:
+
+*Obtención datos
+             get_data RAISING lcx_mex_informe,
+
+             get_t001 CHANGING ct_t001 TYPE lty_tt_t001
+                      RAISING lcx_mex_informe,
+
+             get_bkpf IMPORTING it_t001 TYPE lty_tt_t001
+                      CHANGING ct_bkpf TYPE lty_tt_bkpf
+                      RAISING lcx_mex_informe,
+
+             get_bseg IMPORTING it_bkpf TYPE lty_tt_bkpf
+                      CHANGING ct_bseg TYPE lty_tt_bseg
+                               ct_bseg_gasto TYPE lty_tt_bseg_gasto
+                      RAISING lcx_mex_informe,
+
+             get_bset IMPORTING it_bkpf TYPE lty_tt_bkpf
+                      CHANGING ct_bset TYPE lty_tt_bset,
+
+             get_with_item IMPORTING it_bkpf TYPE lty_tt_bkpf
+                           CHANGING ct_with_item TYPE lty_tt_with_item,
+
+             get_tercero_data IMPORTING it_bseg TYPE lty_tt_bseg
+                              CHANGING ct_lfa1 TYPE lty_tt_lfa1
+                                       ct_kna1 TYPE lty_tt_kna1,
+
+             get_stxh IMPORTING it_bkpf TYPE lty_tt_bkpf
+                      CHANGING ct_stxh TYPE lxhme_stxh_t,
+
+*Inserción en tabla
+             insert_bseg IMPORTING is_bseg TYPE lty_bseg
+                         CHANGING cs_row TYPE ty_report,
+
+             insert_bkpf IMPORTING it_bkpf TYPE lty_tt_bkpf
+                                   is_bseg TYPE lty_bseg
+                         CHANGING cs_row TYPE ty_report,
+
+             insert_bseg_gasto IMPORTING it_bseg_gasto TYPE lty_tt_bseg_gasto
+                                         is_bseg TYPE lty_bseg
+                               CHANGING cs_row TYPE ty_report,
+
+             insert_bset IMPORTING it_bset TYPE lty_tt_bset
+                                   is_bseg TYPE lty_bseg
+                         CHANGING cs_row TYPE ty_report,
+
+             insert_with_item IMPORTING it_with_item TYPE lty_tt_with_item
+                                        is_bseg TYPE lty_bseg
+                              CHANGING cs_row TYPE ty_report,
+
+             insert_tercero_data IMPORTING it_lfa1 TYPE lty_tt_lfa1
+                                           it_kna1 TYPE lty_tt_kna1
+                                           is_bseg TYPE lty_bseg
+                                 CHANGING cs_row TYPE ty_report,
+
+             insert_folio_fiscal IMPORTING it_stxh TYPE lxhme_stxh_t
+                                           is_bseg TYPE lty_bseg
+                                           it_table_alv TYPE ty_tt_report
+                                CHANGING cs_row TYPE ty_report,
+
+             get_table_alv IMPORTING it_t001 TYPE lty_tt_t001
+                                     it_bkpf TYPE lty_tt_bkpf
+                                     it_bseg TYPE lty_tt_bseg
+                                     it_bseg_gasto TYPE lty_tt_bseg_gasto
+                                     it_bset TYPE lty_tt_bset
+                                     it_with_item TYPE lty_tt_with_item
+                                     it_lfa1 TYPE lty_tt_lfa1
+                                     it_kna1 TYPE lty_tt_kna1
+                                     it_stxh TYPE lxhme_stxh_t
+                           CHANGING ct_table_alv TYPE ty_tt_report,
+
+*ALV
+             display_alv RAISING lcx_mex_informe,
+
+             link_click FOR EVENT link_click OF cl_salv_events_table "click en enlace
+                        IMPORTING row
+                                  column,
+
+             on_user_command FOR EVENT before_user_command OF cl_gui_alv_grid
+                        IMPORTING e_ucomm,
+
+             on_after_refresh FOR EVENT after_refresh OF cl_gui_alv_grid
+                        IMPORTING sender.
+
+    CLASS-DATA grid_ref TYPE REF TO cl_gui_alv_grid.
+ENDCLASS.                    "lcl_mex_informe DEFINITION
+*&---------------------------------------------------------------------*
+*&  Include           ZMFI_MEX_INFORME_TOP
+*&---------------------------------------------------------------------*
+TABLES: bkpf,
+        bseg,
+        lfa1,
+        kna1.
+
+DATA: go_app TYPE REF TO lcl_mex_informe,
+      gx_error TYPE REF TO lcx_mex_informe,
+      gv_message TYPE string.
+*&---------------------------------------------------------------------*
+*&  Include           ZMFI_MEX_INFORME_SEL
+*&---------------------------------------------------------------------*
+SELECTION-SCREEN BEGIN OF BLOCK b1 WITH FRAME TITLE text-s01.
+SELECT-OPTIONS: s_bukrs FOR bkpf-bukrs NO-DISPLAY,
+                s_budat FOR bkpf-budat OBLIGATORY,
+                s_belnr FOR bkpf-belnr,
+                s_xblnr FOR bkpf-xblnr,
+                s_lifnr FOR lfa1-lifnr,
+                s_kunnr FOR kna1-kunnr.
+
+PARAMETERS: p_folio TYPE string LOWER CASE.
+SELECTION-SCREEN END OF BLOCK b1.
+
+*&---------------------------------------------------------------------*
+*&  Include           ZMFI_MEX_INFORME_CL02
+*&---------------------------------------------------------------------*
+
+*----------------------------------------------------------------------*
+*       CLASS lcx_mex_informe IMPLEMENTATION
+*----------------------------------------------------------------------*
+*
+*----------------------------------------------------------------------*
+CLASS lcx_mex_informe IMPLEMENTATION.
+  METHOD constructor.
+    " Llamar al constructor del padre
+    CALL METHOD super->constructor.
+
+    " Mapear los datos a la estructura estándar T100KEY
+    if_t100_message~t100key-msgid = iv_msgid.
+    if_t100_message~t100key-msgno = iv_msgno.
+    if_t100_message~t100key-attr1 = 'MV_V1'.
+    if_t100_message~t100key-attr2 = 'MV_V2'.
+    if_t100_message~t100key-attr3 = 'MV_V3'.
+    if_t100_message~t100key-attr4 = 'MV_V4'.
+
+    me->mv_msgid = iv_msgid.
+    me->mv_msgno = iv_msgno.
+    me->mv_v1    = iv_v1.
+    me->mv_v2    = iv_v2.
+    me->mv_v3    = iv_v3.
+    me->mv_v4    = iv_v4.
+  ENDMETHOD.                    "constructor
+ENDCLASS.                    "lcx_mex_informe IMPLEMENTATION
+
+*----------------------------------------------------------------------*
+*       CLASS lcl_mex_informe IMPLEMENTATION
+*----------------------------------------------------------------------*
+*
+*----------------------------------------------------------------------*
+CLASS lcl_mex_informe IMPLEMENTATION.
+
+  METHOD run.
+    TRY.
+        CALL METHOD me->get_data.
+
+        CALL METHOD me->display_alv.
+
+      CATCH lcx_mex_informe INTO gx_error.
+        CALL METHOD gx_error->if_message~get_text( RECEIVING result = gv_message  ).
+        MESSAGE gv_message TYPE 'E'.
+    ENDTRY.
+  ENDMETHOD.                    "run
+
+  METHOD get_data.
+    DATA: lt_t001       TYPE lty_tt_t001,
+          lt_bkpf       TYPE lty_tt_bkpf,
+          lt_bseg       TYPE lty_tt_bseg,
+          lt_bseg_gasto TYPE lty_tt_bseg_gasto,
+          lt_bset       TYPE lty_tt_bset,
+          lt_with_item  TYPE lty_tt_with_item,
+          lt_lfa1       TYPE lty_tt_lfa1,
+          lt_kna1       TYPE lty_tt_kna1,
+          lt_stxh       TYPE STANDARD TABLE OF stxh.
+
+    TRY.
+*1. Validar Sociedades MX
+        CALL METHOD get_t001( CHANGING ct_t001 = lt_t001 ).
+
+*2. Seleccionar BKPF
+        CALL METHOD get_bkpf( EXPORTING it_t001 = lt_t001
+                              CHANGING  ct_bkpf = lt_bkpf ).
+
+*3. Seleccionar BSEG
+        CALL METHOD get_bseg( EXPORTING it_bkpf = lt_bkpf
+                              CHANGING  ct_bseg = lt_bseg
+                                        ct_bseg_gasto = lt_bseg_gasto ).
+
+*4. Datos Auxiliares
+*** A) Impuestos
+        CALL METHOD get_bset( EXPORTING it_bkpf = lt_bkpf
+                              CHANGING  ct_bset = lt_bset ).
+
+*** B) Retenciones
+        CALL METHOD get_with_item( EXPORTING it_bkpf = lt_bkpf
+                                   CHANGING  ct_with_item = lt_with_item ).
+
+*** C) Nombres tercero
+        CALL METHOD get_tercero_data( EXPORTING it_bseg = lt_bseg
+                                      CHANGING  ct_lfa1 = lt_lfa1
+                                                ct_kna1 = lt_kna1 ).
+
+*** D) Nuevo folio fiscal
+        CALL METHOD get_stxh( EXPORTING it_bkpf = lt_bkpf
+                              CHANGING  ct_stxh = lt_stxh ).
+
+* 5. Armado de la tabla de salida
+        CALL METHOD get_table_alv( EXPORTING it_t001       = lt_t001
+                                             it_bkpf       = lt_bkpf
+                                             it_bseg       = lt_bseg
+                                             it_bseg_gasto = lt_bseg_gasto
+                                             it_bset       = lt_bset
+                                             it_with_item  = lt_with_item
+                                             it_lfa1       = lt_lfa1
+                                             it_kna1       = lt_kna1
+                                             it_stxh       = lt_stxh
+                                   CHANGING  ct_table_alv  = mt_data ).
+
+      CATCH lcx_mex_informe INTO gx_error.
+        RAISE EXCEPTION gx_error.
+    ENDTRY.
+  ENDMETHOD.                    "get_data
+
+  METHOD get_t001.
+    SELECT bukrs waers
+      FROM t001
+      INTO CORRESPONDING FIELDS OF TABLE ct_t001
+      WHERE bukrs IN s_bukrs
+        AND land1 = 'MX'.
+
+    IF ct_t001[] IS INITIAL.
+      RAISE EXCEPTION TYPE lcx_mex_informe
+      EXPORTING
+        iv_msgid = 'ZMFI_MEX_INFORME_MSG'
+        iv_msgno = '001'
+*        iv_v1    =
+*        iv_v2    =
+*        iv_v3    =
+*        iv_v4    =
+      .
+    ENDIF.
+
+    " Ordenar T001 para lectura binaria
+    SORT ct_t001 BY bukrs.
+  ENDMETHOD.                    "get_t001
+
+  METHOD get_bkpf.
+    " Tabla auxiliar para guardar documentos encontrados en los índices y optimizar la búsqueda por tercero
+    DATA: BEGIN OF ls_doc_keys,
+            bukrs TYPE bukrs,
+            belnr TYPE belnr_d,
+            gjahr TYPE gjahr,
+          END OF ls_doc_keys,
+          lt_doc_keys LIKE STANDARD TABLE OF ls_doc_keys.
+
+    IF s_lifnr[] IS NOT INITIAL OR
+       s_kunnr[] IS NOT INITIAL.
+
+      "Optimización si se selecciona tercero
+      IF s_lifnr[] IS NOT INITIAL.
+        " Buscar en Proveedores Abiertos (BSIK) y Compensados (BSAK)
+        SELECT bukrs belnr gjahr
+          FROM bsik
+          INTO TABLE lt_doc_keys
+          FOR ALL ENTRIES IN it_t001
+          WHERE bukrs = it_t001-bukrs
+            AND lifnr IN s_lifnr
+            AND bukrs IN s_bukrs
+            AND budat IN s_budat.
+
+        SELECT bukrs belnr gjahr
+          FROM bsak
+          APPENDING TABLE lt_doc_keys
+          FOR ALL ENTRIES IN it_t001
+          WHERE bukrs = it_t001-bukrs
+            AND lifnr IN s_lifnr
+            AND bukrs IN s_bukrs
+            AND budat IN s_budat.
+      ENDIF.
+
+      IF s_kunnr[] IS NOT INITIAL.
+        " Buscar en Clientes Abiertos (BSID) y Compensados (BSAD)
+        SELECT bukrs belnr gjahr
+          FROM bsid
+          APPENDING TABLE lt_doc_keys
+          FOR ALL ENTRIES IN it_t001
+          WHERE bukrs = it_t001-bukrs
+            AND kunnr IN s_kunnr
+            AND bukrs IN s_bukrs
+            AND budat IN s_budat.
+
+        SELECT bukrs belnr gjahr
+          FROM bsad
+          APPENDING TABLE lt_doc_keys
+          FOR ALL ENTRIES IN it_t001
+          WHERE bukrs = it_t001-bukrs
+            AND kunnr IN s_kunnr
+            AND bukrs IN s_bukrs
+            AND budat IN s_budat.
+      ENDIF.
+
+      IF lt_doc_keys[] IS NOT INITIAL.
+        SELECT bukrs belnr gjahr blart bldat budat monat xblnr waers bstat usnam
+        FROM bkpf
+        INTO CORRESPONDING FIELDS OF TABLE ct_bkpf
+        FOR ALL ENTRIES IN lt_doc_keys
+        WHERE bukrs = lt_doc_keys-bukrs
+          AND belnr = lt_doc_keys-belnr
+          AND gjahr = lt_doc_keys-gjahr
+          AND bukrs IN s_bukrs
+          AND budat IN s_budat
+          AND belnr IN s_belnr
+          AND xblnr IN s_xblnr
+          AND bstat = ' '.
+      ENDIF.
+
+      REFRESH lt_doc_keys.
+    ELSE.
+
+      SELECT bukrs belnr gjahr blart bldat budat monat xblnr waers bstat usnam
+      FROM bkpf
+      INTO CORRESPONDING FIELDS OF TABLE ct_bkpf
+      FOR ALL ENTRIES IN it_t001
+      WHERE bukrs = it_t001-bukrs
+        AND bukrs IN s_bukrs
+        AND budat IN s_budat
+        AND belnr IN s_belnr
+        AND xblnr IN s_xblnr
+        AND bstat = ' '.
+
+    ENDIF.
+
+    IF ct_bkpf[] IS INITIAL.
+      RAISE EXCEPTION TYPE lcx_mex_informe
+      EXPORTING
+        iv_msgid = 'ZMFI_MEX_INFORME_MSG'
+        iv_msgno = '000'
+*        iv_v1    =
+*        iv_v2    =
+*        iv_v3    =
+*        iv_v4    =
+      .
+    ENDIF.
+
+    SORT ct_bkpf BY bukrs belnr gjahr.
+  ENDMETHOD.                    "get_bkpf
+
+  METHOD get_bseg.
+    DATA: lr_hkont_gasto TYPE RANGE OF hkont.
+    FIELD-SYMBOLS: <fsr_hkont> LIKE LINE OF lr_hkont_gasto.
+
+    APPEND INITIAL LINE TO lr_hkont_gasto ASSIGNING <fsr_hkont>.
+    <fsr_hkont>-low = '5000000000'.
+    <fsr_hkont>-high = '5999999999'.
+    <fsr_hkont>-sign = 'I'.
+    <fsr_hkont>-option = 'BT'.
+
+    SELECT bukrs belnr gjahr buzei augbl augdt lifnr kunnr wrbtr dmbtr mwskz hkont sgtxt kostl
+      FROM bseg
+      INTO CORRESPONDING FIELDS OF TABLE ct_bseg
+      FOR ALL ENTRIES IN it_bkpf
+      WHERE bukrs = it_bkpf-bukrs
+        AND belnr = it_bkpf-belnr
+        AND gjahr = it_bkpf-gjahr
+        AND ( lifnr IN s_lifnr OR
+              kunnr IN s_kunnr )
+        AND buzid EQ space.
+
+    SORT ct_bseg BY bukrs belnr gjahr buzei.
+
+    IF ct_bseg[] IS INITIAL.
+      RAISE EXCEPTION TYPE lcx_mex_informe
+      EXPORTING
+        iv_msgid = 'ZMFI_MEX_INFORME_MSG'
+        iv_msgno = '000'
+*        iv_v1    =
+*        iv_v2    =
+*        iv_v3    =
+*        iv_v4    =
+      .
+    ELSE.
+
+      SELECT bukrs belnr gjahr hkont kostl
+        FROM bseg
+        INTO CORRESPONDING FIELDS OF TABLE ct_bseg_gasto
+        FOR ALL ENTRIES IN ct_bseg
+        WHERE bukrs = ct_bseg-bukrs
+          AND belnr = ct_bseg-belnr
+          AND gjahr = ct_bseg-gjahr
+          AND hkont IN lr_hkont_gasto
+          AND buzid EQ space
+          AND koart EQ 'S' .
+    ENDIF.
+
+    SORT ct_bseg_gasto BY bukrs belnr gjahr buzei.
+  ENDMETHOD.                    "get_bseg
+
+  METHOD get_bset.
+    SELECT bukrs belnr gjahr buzei mwskz fwste hkont
+      FROM bset
+      INTO CORRESPONDING FIELDS OF TABLE ct_bset
+      FOR ALL ENTRIES IN it_bkpf
+      WHERE bukrs = it_bkpf-bukrs
+        AND belnr = it_bkpf-belnr
+        AND gjahr = it_bkpf-gjahr.
+
+    SORT ct_bset BY bukrs belnr gjahr buzei mwskz.
+  ENDMETHOD.                    "get_bset
+
+  METHOD get_with_item.
+    SELECT bukrs belnr gjahr buzei witht wt_withcd wt_qbshb
+      FROM with_item
+      INTO CORRESPONDING FIELDS OF TABLE ct_with_item
+      FOR ALL ENTRIES IN it_bkpf
+      WHERE bukrs = it_bkpf-bukrs
+        AND belnr = it_bkpf-belnr
+        AND gjahr = it_bkpf-gjahr.
+
+    SORT ct_with_item BY bukrs belnr gjahr buzei witht.
+  ENDMETHOD.                    "get_with_item
+
+  METHOD get_tercero_data.
+    SELECT DISTINCT lifnr name1 stcd1 land1 pstlz
+      FROM lfa1
+      INTO CORRESPONDING FIELDS OF TABLE ct_lfa1
+      FOR ALL ENTRIES IN it_bseg
+      WHERE lifnr EQ it_bseg-lifnr AND
+            lifnr NE ''.
+
+    SORT ct_lfa1 BY lifnr.
+
+    SELECT DISTINCT kunnr name1 stcd1 land1 pstlz
+      FROM kna1
+      INTO CORRESPONDING FIELDS OF TABLE ct_kna1
+      FOR ALL ENTRIES IN it_bseg
+      WHERE kunnr EQ it_bseg-kunnr AND
+            kunnr NE ''.
+
+    SORT ct_kna1 BY kunnr.
+  ENDMETHOD.                    "get_tercero_name
+
+  METHOD get_stxh.
+    DATA: BEGIN OF ls_stxh_key,
+            tdname TYPE tdobname,
+          END OF ls_stxh_key,
+          lt_tdnames   TYPE RANGE OF tdobname.
+
+    FIELD-SYMBOLS: <fs_bkpf> TYPE lty_bkpf,
+                   <fs_tdnames> LIKE LINE OF lt_tdnames.
+
+    " 1. Construir Rango para STXH
+    LOOP AT it_bkpf ASSIGNING <fs_bkpf>.
+      APPEND INITIAL LINE TO lt_tdnames ASSIGNING <fs_tdnames>.
+      <fs_tdnames>-sign   = 'I'.
+      <fs_tdnames>-option = 'EQ'.
+      CONCATENATE <fs_bkpf>-bukrs <fs_bkpf>-belnr <fs_bkpf>-gjahr INTO <fs_tdnames>-low.
+    ENDLOOP.
+
+    " Eliminar duplicados del rango para eficiencia en el SELECT
+    SORT lt_tdnames BY low.
+    DELETE ADJACENT DUPLICATES FROM lt_tdnames COMPARING low.
+
+    " 2. Consultar STXH (Solo cabeceras)
+    SELECT tdname
+      FROM stxh
+      INTO CORRESPONDING FIELDS OF TABLE ct_stxh
+      FOR ALL ENTRIES IN lt_tdnames
+      WHERE tdobject EQ 'BELEG'
+        AND tdid     EQ 'YUUD'
+        AND tdname   EQ lt_tdnames-low
+        AND tdspras  EQ sy-langu.
+
+    SORT ct_stxh BY tdname.
+  ENDMETHOD.                    "get_stxh
+
+  METHOD insert_bkpf.
+    FIELD-SYMBOLS: <fs_bkpf>  TYPE lty_bkpf.
+
+    READ TABLE it_bkpf ASSIGNING <fs_bkpf>
+         WITH KEY bukrs = is_bseg-bukrs
+                  belnr = is_bseg-belnr
+                  gjahr = is_bseg-gjahr
+         BINARY SEARCH.
+    IF sy-subrc IS INITIAL AND
+       <fs_bkpf> IS ASSIGNED.
+      cs_row-clasedocumento       = <fs_bkpf>-blart.
+      cs_row-fechadocumento       = <fs_bkpf>-bldat.
+      cs_row-fechacontabilizacion = <fs_bkpf>-budat.
+      cs_row-periodo              = <fs_bkpf>-monat.
+      cs_row-referencia           = <fs_bkpf>-xblnr.
+      cs_row-monedamd             = <fs_bkpf>-waers.
+      cs_row-usuarioregistro      = <fs_bkpf>-usnam.
+    ENDIF.
+  ENDMETHOD.                    "insert_bkpf
+
+  METHOD insert_bseg.
+    cs_row-sociedad          = is_bseg-bukrs.
+    cs_row-ejercicio         = is_bseg-gjahr.
+    cs_row-numerodocumento   = is_bseg-belnr.
+    cs_row-posicion          = is_bseg-buzei.
+    cs_row-doccompensacion   = is_bseg-augbl.
+    cs_row-fechacompensacion = is_bseg-augdt.
+    cs_row-importemd         = is_bseg-wrbtr.
+    cs_row-importeml         = is_bseg-dmbtr.
+    cs_row-indicadoriva      = is_bseg-mwskz.
+    cs_row-texto             = is_bseg-sgtxt.
+  ENDMETHOD.                    "insert_bseg
+
+  METHOD insert_bseg_gasto.
+
+    FIELD-SYMBOLS: <fs_bseg_gasto> TYPE lty_bseg.
+
+    LOOP AT it_bseg_gasto ASSIGNING <fs_bseg_gasto> WHERE bukrs = is_bseg-bukrs AND
+                                                          gjahr EQ is_bseg-gjahr AND
+                                                          belnr EQ is_bseg-belnr AND
+                                                          hkont IS NOT INITIAL.
+      IF <fs_bseg_gasto>-hkont(1) EQ '5'. "Cuenta de gasto
+        cs_row-cuentagasto = <fs_bseg_gasto>-hkont.
+        cs_row-ceco        = <fs_bseg_gasto>-kostl.
+      ENDIF.
+    ENDLOOP.
+
+  ENDMETHOD.                    "insert_bseg_gasto
+
+  METHOD insert_bset.
+    FIELD-SYMBOLS: <fs_bset> TYPE lty_bset.
+
+    CASE is_bseg-mwskz.
+      WHEN '**'.
+        LOOP AT it_bset ASSIGNING <fs_bset> WHERE bukrs = is_bseg-bukrs AND
+                                                  belnr = is_bseg-belnr AND
+                                                  gjahr = is_bseg-gjahr AND
+                                                  fwste IS NOT INITIAL.
+          cs_row-importeiva = cs_row-importeiva + <fs_bset>-fwste.
+          IF <fs_bset>-hkont IS NOT INITIAL.
+            cs_row-cuentaiva = <fs_bset>-hkont.
+          ENDIF.
+        ENDLOOP.
+      WHEN OTHERS.
+        LOOP AT it_bset ASSIGNING <fs_bset> WHERE bukrs = is_bseg-bukrs AND
+                                                  belnr = is_bseg-belnr AND
+                                                  gjahr = is_bseg-gjahr AND
+                                                  mwskz = is_bseg-mwskz AND
+                                                  fwste IS NOT INITIAL.
+          cs_row-importeiva = cs_row-importeiva + <fs_bset>-fwste.
+          IF <fs_bset>-hkont IS NOT INITIAL.
+            cs_row-cuentaiva = <fs_bset>-hkont.
+          ENDIF.
+        ENDLOOP.
+    ENDCASE.
+  ENDMETHOD.                    "insert_bset
+
+  METHOD insert_with_item.
+    FIELD-SYMBOLS: <fs_with_item> TYPE lty_with_item.
+
+    LOOP AT it_with_item ASSIGNING <fs_with_item> WHERE bukrs = is_bseg-bukrs AND
+                                                        belnr = is_bseg-belnr AND
+                                                        gjahr = is_bseg-gjahr AND
+                                                        buzei = is_bseg-buzei AND
+                                                        wt_qbshb IS NOT INITIAL.
+      cs_row-retenciones = cs_row-retenciones + <fs_with_item>-wt_qbshb.
+    ENDLOOP.
+  ENDMETHOD.                    "insert_with_item
+
+  METHOD insert_tercero_data.
+    FIELD-SYMBOLS: <fs_lfa1> TYPE lty_lfa1,
+                   <fs_kna1> TYPE lty_kna1.
+
+    IF is_bseg-lifnr IS NOT INITIAL.
+      cs_row-acreedor = is_bseg-lifnr.
+
+      READ TABLE it_lfa1 ASSIGNING <fs_lfa1>
+           WITH KEY lifnr = is_bseg-lifnr
+           BINARY SEARCH.
+
+      IF <fs_lfa1> IS ASSIGNED.
+        cs_row-nombretercero = <fs_lfa1>-name1.
+        cs_row-niftercero = <fs_lfa1>-stcd1.
+        cs_row-paistercero = <fs_lfa1>-land1.
+        cs_row-cptercero = <fs_lfa1>-pstlz.
+      ENDIF.
+
+    ELSEIF is_bseg-kunnr IS NOT INITIAL.
+
+      cs_row-cliente = is_bseg-kunnr.
+
+      READ TABLE it_kna1 ASSIGNING <fs_kna1>
+           WITH KEY kunnr = is_bseg-kunnr
+           BINARY SEARCH.
+
+      IF <fs_kna1> IS ASSIGNED.
+        cs_row-nombretercero = <fs_kna1>-name1.
+        cs_row-nombretercero = <fs_kna1>-name1.
+        cs_row-niftercero = <fs_kna1>-stcd1.
+        cs_row-paistercero = <fs_kna1>-land1.
+        cs_row-cptercero = <fs_kna1>-pstlz.
+      ENDIF.
+    ENDIF.
+  ENDMETHOD.                    "insert_tercero_data
+
+  METHOD insert_folio_fiscal.
+    FIELD-SYMBOLS: <fs_line> TYPE tline.
+
+    DATA: lv_name            TYPE tdobname,
+          lt_lines           TYPE TABLE OF tline.
+
+    CONCATENATE is_bseg-bukrs is_bseg-belnr is_bseg-gjahr INTO lv_name.
+
+    READ TABLE it_stxh TRANSPORTING NO FIELDS
+         WITH KEY tdname = lv_name
+         BINARY SEARCH.
+
+    IF sy-subrc = 0.
+      READ TABLE it_table_alv
+      WITH KEY sociedad = is_bseg-bukrs
+               numerodocumento = is_bseg-belnr
+               ejercicio = is_bseg-gjahr
+      INTO cs_row
+      TRANSPORTING nuevofoliofiscal.
+
+      IF sy-subrc IS NOT INITIAL OR
+         cs_row-nuevofoliofiscal IS INITIAL. "Si ya se ha leido antes, no se vuelve a leer
+
+        CALL FUNCTION 'READ_TEXT'
+          EXPORTING
+            id       = 'YUUD'
+            language = sy-langu
+            name     = lv_name
+            object   = 'BELEG'
+          TABLES
+            lines    = lt_lines
+          EXCEPTIONS
+            OTHERS   = 1.
+
+        IF sy-subrc IS INITIAL.
+          LOOP AT lt_lines ASSIGNING <fs_line>.
+            IF cs_row-nuevofoliofiscal IS INITIAL.
+              cs_row-nuevofoliofiscal = <fs_line>-tdline.
+            ELSE.
+              CONCATENATE cs_row-nuevofoliofiscal <fs_line>-tdline
+                INTO cs_row-nuevofoliofiscal SEPARATED BY space.
+            ENDIF.
+          ENDLOOP.
+        ENDIF.
+      ENDIF.
+    ENDIF.
+  ENDMETHOD.                    "insert_folio_fiscal
+
+  METHOD get_table_alv.
+    FIELD-SYMBOLS: <fs_bseg> TYPE lty_bseg.
+
+    DATA: ls_row TYPE ty_report.
+
+    LOOP AT it_bseg ASSIGNING <fs_bseg>.
+      CLEAR ls_row.
+
+      " Leer Cabecera
+      CALL METHOD insert_bkpf( EXPORTING it_bkpf = it_bkpf
+                                         is_bseg = <fs_bseg>
+                               CHANGING  cs_row = ls_row ).
+
+      "Posición
+      CALL METHOD insert_bseg( EXPORTING is_bseg = <fs_bseg>
+                               CHANGING  cs_row = ls_row ).
+
+      "Gasto
+      CALL METHOD insert_bseg_gasto( EXPORTING it_bseg_gasto = it_bseg_gasto
+                                               is_bseg = <fs_bseg>
+                                     CHANGING  cs_row = ls_row ).
+
+      "Impuestos
+      CALL METHOD insert_bset( EXPORTING it_bset = it_bset
+                                         is_bseg = <fs_bseg>
+                               CHANGING  cs_row = ls_row ).
+
+      "Retenciones
+      CALL METHOD insert_with_item( EXPORTING it_with_item = it_with_item
+                                              is_bseg = <fs_bseg>
+                                    CHANGING  cs_row = ls_row ).
+
+      "Terceros
+      CALL METHOD insert_tercero_data( EXPORTING it_lfa1 = it_lfa1
+                                                 it_kna1 = it_kna1
+                                                 is_bseg = <fs_bseg>
+                                       CHANGING  cs_row = ls_row ).
+
+      "Nuevo Folio Fiscal
+      CALL METHOD insert_folio_fiscal( EXPORTING it_stxh = it_stxh
+                                                 is_bseg = <fs_bseg>
+                                                 it_table_alv = ct_table_alv
+                                       CHANGING  cs_row = ls_row ).
+
+      "Filtro Nuevo Folio Fiscal
+      IF p_folio IS NOT INITIAL.
+        CONDENSE p_folio NO-GAPS.
+        CHECK ls_row-nuevofoliofiscal EQ p_folio.
+      ENDIF.
+
+      APPEND ls_row TO ct_table_alv.
+    ENDLOOP.
+
+    SORT ct_table_alv BY sociedad ejercicio numerodocumento posicion.
+  ENDMETHOD.                    "get_table_alv
+
+  METHOD display_alv.
+    DATA: lo_alv        TYPE REF TO cl_salv_table,
+          lo_cols       TYPE REF TO cl_salv_columns_table,
+          lo_col        TYPE REF TO cl_salv_column,
+          lo_column     TYPE REF TO cl_salv_column_table,
+          lo_funcs      TYPE REF TO cl_salv_functions,
+          lo_selections TYPE REF TO cl_salv_selections,
+          ls_ref        TYPE salv_s_ddic_reference,
+          lo_events     TYPE REF TO cl_salv_events_table.
+
+    TRY.
+        CALL METHOD cl_salv_table=>factory
+          IMPORTING
+            r_salv_table = lo_alv
+          CHANGING
+            t_table      = mt_data.
+
+        lo_alv->set_screen_status(
+          pfstatus      = 'STANDARD_FULLSCREEN'
+          report        = sy-repid
+          set_functions = cl_salv_table=>c_functions_all ).
+
+        " Funciones
+        lo_funcs = lo_alv->get_functions( ).
+
+        " Columnas
+        lo_cols = lo_alv->get_columns( ).
+        lo_cols->set_optimize( 'X' ).
+
+        lo_selections = lo_alv->get_selections( ).
+        lo_selections->set_selection_mode( cl_salv_selections=>row_column ).
+
+        "Columnas clave fijas
+        lo_column ?= lo_cols->get_column( 'SOCIEDAD' ).
+        lo_column->set_key( abap_true )..
+
+        lo_column ?= lo_cols->get_column( 'EJERCICIO' ).
+        lo_column->set_key( abap_true ).
+
+        lo_column ?= lo_cols->get_column( 'NUMERODOCUMENTO' ).
+        lo_column->set_key( abap_true ).
+        lo_column->set_cell_type( if_salv_c_cell_type=>hotspot ).
+
+        lo_column ?= lo_cols->get_column( 'POSICION' ).
+        lo_column->set_key( abap_true ).
+
+        CALL METHOD lo_cols->set_key_fixation( value = abap_true ).
+
+        "Ayudas de búsqueda
+        CLEAR: ls_ref.
+        lo_column ?= lo_cols->get_column( 'CLASEDOCUMENTO' ).
+        ls_ref-table = 'BKPF'.
+        ls_ref-field = 'BLART'.
+        lo_column->set_ddic_reference( ls_ref ).
+        lo_column->set_f4( 'X' ).
+
+        CLEAR: ls_ref.
+        lo_column ?= lo_cols->get_column( 'ACREEDOR' ).
+        ls_ref-table = 'LFA1'.
+        ls_ref-field = 'LIFNR'.
+        lo_column->set_ddic_reference( ls_ref ).
+        lo_column->set_f4( 'X' ).
+
+        CLEAR: ls_ref.
+        lo_column ?= lo_cols->get_column( 'CLIENTE' ).
+        ls_ref-table = 'KNA1'.
+        ls_ref-field = 'KUNNR'.
+        lo_column->set_ddic_reference( ls_ref ).
+        lo_column->set_f4( 'X' ).
+
+        CLEAR: ls_ref.
+        lo_column ?= lo_cols->get_column( 'MONEDAMD' ).
+        ls_ref-table = 'BKPF'.
+        ls_ref-field = 'WAERS'.
+        lo_column->set_ddic_reference( ls_ref ).
+        lo_column->set_f4( 'X' ).
+
+        CLEAR: ls_ref.
+        lo_column ?= lo_cols->get_column( 'INDICADORIVA' ).
+        ls_ref-table = 'BSEG'.
+        ls_ref-field = 'MWSKZ'.
+        lo_column->set_ddic_reference( ls_ref ).
+        lo_column->set_f4( 'X' ).
+
+        CLEAR: ls_ref.
+        lo_column ?= lo_cols->get_column( 'USUARIOREGISTRO' ).
+        ls_ref-table = 'BKPF'.
+        ls_ref-field = 'USNAM'.
+        lo_column->set_ddic_reference( ls_ref ).
+        lo_column->set_f4( 'X' ).
+
+        CLEAR: ls_ref.
+        lo_column ?= lo_cols->get_column( 'CECO' ).
+        ls_ref-table = 'CSKS'.
+        ls_ref-field = 'KOSTL'.
+        lo_column->set_ddic_reference( ls_ref ).
+        lo_column->set_f4( 'X' ).
+
+        CLEAR: ls_ref.
+        lo_column ?= lo_cols->get_column( 'PAISTERCERO' ).
+        ls_ref-table = 'ADRC'.
+        ls_ref-field = 'COUNTRY'.
+        lo_column->set_ddic_reference( ls_ref ).
+        lo_column->set_f4( 'X' ).
+
+        CLEAR: ls_ref.
+        lo_column ?= lo_cols->get_column( 'CUENTAGASTO' ).
+        ls_ref-table = 'BSEG'.
+        ls_ref-field = 'HKONT'.
+        lo_column->set_ddic_reference( ls_ref ).
+        lo_column->set_f4( 'X' ).
+
+        CLEAR: ls_ref.
+        lo_column ?= lo_cols->get_column( 'CUENTAIVA' ).
+        ls_ref-table = 'BSEG'.
+        ls_ref-field = 'HKONT'.
+        lo_column->set_ddic_reference( ls_ref ).
+        lo_column->set_f4( 'X' ).
+
+        "Nombres custom
+        "Nuevo folio fiscal
+        lo_col = lo_cols->get_column( 'NUEVOFOLIOFISCAL' ).
+        lo_col->set_short_text( TEXT-101 ).
+        lo_col->set_medium_text( TEXT-001 ).
+        lo_col->set_long_text( TEXT-001 ).
+
+        "Nombre tercero
+        lo_col = lo_cols->get_column( 'NOMBRETERCERO' ).
+        lo_col->set_short_text( TEXT-103 ).
+        lo_col->set_medium_text( TEXT-003 ).
+        lo_col->set_long_text( TEXT-003 ).
+
+        "Importe IVA
+        lo_col = lo_cols->get_column( 'IMPORTEIVA' ).
+        lo_col->set_short_text( TEXT-104 ).
+        lo_col->set_medium_text( TEXT-004 ).
+        lo_col->set_long_text( TEXT-004 ).
+
+        "Cuenta IVA
+        lo_col = lo_cols->get_column( 'CUENTAIVA' ).
+        lo_col->set_short_text( TEXT-105 ).
+        lo_col->set_medium_text( TEXT-005 ).
+        lo_col->set_long_text( TEXT-005 ).
+
+        "Cuenta gasto
+        lo_col = lo_cols->get_column( 'CUENTAGASTO' ).
+        lo_col->set_short_text( TEXT-106 ).
+        lo_col->set_medium_text( TEXT-006 ).
+        lo_col->set_long_text( TEXT-006 ).
+*--Double_click---------------------------------------*
+        lo_events = lo_alv->get_event( ).
+        SET HANDLER link_click FOR lo_events.
+        SET HANDLER on_after_refresh FOR ALL INSTANCES.
+
+        lo_alv->display( ).
+
+      CATCH cx_salv_msg
+            cx_salv_not_found.
+        RAISE EXCEPTION TYPE lcx_mex_informe
+        EXPORTING
+          iv_msgid = 'ZMFI_MEX_INFORME_MSG'
+          iv_msgno = '002'
+*           iv_v1    =
+*           iv_v2    =
+*           iv_v3    =
+*           iv_v4    =
+        .
+    ENDTRY.
+  ENDMETHOD.                    "display_alv
+
+  METHOD link_click.
+    DATA: ls_data LIKE LINE OF  mt_data.
+
+    IF row NE 0.
+      READ TABLE mt_data
+      INTO ls_data
+      INDEX row.
+
+      IF sy-subrc = 0.
+        CASE column.
+          WHEN 'NUMERODOCUMENTO'.
+            SET PARAMETER ID: 'BUK' FIELD ls_data-sociedad,
+                              'GJR' FIELD ls_data-ejercicio,
+                              'BLN' FIELD ls_data-numerodocumento.
+            CALL TRANSACTION 'FB03' AND SKIP FIRST SCREEN.
+          WHEN OTHERS.
+        ENDCASE.
+      ENDIF.
+    ENDIF.
+  ENDMETHOD.                    "link_click
+
+  METHOD on_after_refresh.
+    " Solo la primera vez, ligamos el handler de on_user_command
+    IF grid_ref IS INITIAL.
+      grid_ref = sender.              " cl_gui_alv_grid
+      SET HANDLER on_user_command FOR grid_ref.
+    ENDIF.
+  ENDMETHOD.                    "on_after_refresh
+
+  METHOD on_user_command.
+    DATA: lo_excel        TYPE REF TO zcl_excel,
+          lo_excel_writer TYPE REF TO zcl_excel_writer_2007,
+          lo_worksheet    TYPE REF TO zcl_excel_worksheet,
+          lv_content      TYPE xstring,
+          lv_name         TYPE string,
+          lv_bytecount    TYPE i,
+          lt_file_tab     TYPE solix_tab,
+          lv_path         TYPE string,
+          lv_filename     TYPE string,
+          lv_fullpath     TYPE string,
+          lv_action       TYPE i.
+
+    CASE e_ucomm.
+      WHEN '&ZEXCEL'.
+
+        CREATE OBJECT lo_excel.
+        lo_worksheet = lo_excel->get_active_worksheet( ).
+        lo_worksheet->bind_table( mt_data ).
+        lo_worksheet->calculate_column_widths( ).
+
+        CREATE OBJECT lo_excel_writer.
+        lv_content = lo_excel_writer->zif_excel_writer~write_file( lo_excel ).
+
+        CALL METHOD cl_gui_frontend_services=>file_save_dialog
+          EXPORTING
+            window_title      = 'Descargar Excel'
+            default_extension = '.XLSX'
+          CHANGING
+            filename          = lv_filename
+            path              = lv_path
+            fullpath          = lv_fullpath
+            user_action       = lv_action.
+
+        IF lv_action <> cl_gui_frontend_services=>action_cancel.
+          CALL FUNCTION 'SCMS_XSTRING_TO_BINARY'
+            EXPORTING
+              buffer        = lv_content
+            IMPORTING
+              output_length = lv_bytecount
+            TABLES
+              binary_tab    = lt_file_tab.
+
+          CALL METHOD cl_gui_frontend_services=>gui_download
+            EXPORTING
+              bin_filesize = lv_bytecount
+              filename     = lv_filename
+              filetype     = 'BIN'
+            CHANGING
+              data_tab     = lt_file_tab.
+        ENDIF.
+
+        EXIT.
+
+      WHEN OTHERS.
+    ENDCASE.
+  ENDMETHOD.                    "on_user_command
+
+ENDCLASS.                    "lcl_mex_informe IMPLEMENTATION
+
+*&---------------------------------------------------------------------*
+*&  Include           ZMFI_MEX_INFORME_EVE
+*&---------------------------------------------------------------------*
+START-OF-SELECTION.
+
+  CREATE OBJECT go_app.
+  CALL METHOD go_app->run.
+
+TEXTOS
+001	Nuevo folio fiscal
+002	Tercero
+003	Nombre tercero
+004	Importe I.V.A.
+005	Cuenta I.V.A.
+006	Cuenta gasto
+101	Folio Fis.
+103	N. tercero
+104	I.V.A.
+105	Cta. I.V.A
+106	Cta. gasto
+S01	Parámetros de selección
