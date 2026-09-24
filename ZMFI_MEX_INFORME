@@ -1158,3 +1158,7 @@ TEXTOS
 105	Cta. I.V.A
 106	Cta. gasto
 S01	Parámetros de selección
+
+
+Description	Resource	Path	Location	Type
+The statement "INTERFACES IF_T100_DYN_MSG" can only be used once in a class and in its derived classes.	ZCX_MEX_INFORME (Class)	/DFI_200_luishin_es/.adt/classlib/classes/zcx_mex_informe	line 8	ABAP Activation Problem
