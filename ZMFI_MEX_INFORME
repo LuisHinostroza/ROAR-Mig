@@ -1162,3 +1162,133 @@ S01	Parámetros de selección
 
 Description	Resource	Path	Location	Type
 The statement "INTERFACES IF_T100_DYN_MSG" can only be used once in a class and in its derived classes.	ZCX_MEX_INFORME (Class)	/DFI_200_luishin_es/.adt/classlib/classes/zcx_mex_informe	line 8	ABAP Activation Problem
+
+
+@EndUserText.label: 'Informe FI México'
+@ObjectModel.query.implementedBy: 'ABAP:ZCL_MEX_INFORME_QUERY'
+@UI.headerInfo: {
+  typeName: 'Partida',
+  typeNamePlural: 'Partidas',
+  title: { type: #STANDARD, value: 'NumeroDocumento' }
+}
+define custom entity ZCE_MexInforme
+{
+      @UI.lineItem:       [{ position: 10 }]
+      @UI.selectionField: [{ position: 70 }]
+      @Consumption.valueHelpDefinition: [{ entity: { name: 'I_CompanyCodeStdVH', element: 'CompanyCode' } }]
+  key Sociedad             : bukrs;
+
+      @UI.lineItem:       [{ position: 20 }]
+  key Ejercicio            : gjahr;
+
+      @UI.lineItem:       [{ position: 30 }]
+      @UI.selectionField: [{ position: 20 }]
+  key NumeroDocumento      : belnr_d;
+
+      @UI.lineItem:       [{ position: 40 }]
+  key Posicion             : buzei;
+
+      @UI.lineItem:       [{ position: 50 }]
+      FechaDocumento       : bldat;
+
+      @UI.lineItem:       [{ position: 60 }]
+      @UI.selectionField: [{ position: 10 }]
+      @Consumption.filter: { selectionType: #INTERVAL, mandatory: true }
+      FechaContabilizacion : budat;
+
+      @UI.lineItem:       [{ position: 70 }]
+      Periodo              : monat;
+
+      @UI.lineItem:       [{ position: 80 }]
+      @UI.selectionField: [{ position: 30 }]
+      Referencia           : xblnr1;
+
+      @UI.lineItem:       [{ position: 90 }]
+      @UI.selectionField: [{ position: 60 }]
+      @EndUserText.label: 'Nuevo folio fiscal'
+      @EndUserText.quickInfo: 'Folio Fis.'
+      NuevoFolioFiscal     : abap.char(255);
+
+      @UI.lineItem:       [{ position: 100 }]
+      @Semantics.amount.currencyCode: 'MonedaMD'
+      ImporteMD            : wrbtr;
+
+      @UI.lineItem:       [{ position: 110 }]
+      @EndUserText.label: 'Moneda documento'
+      @Consumption.valueHelpDefinition: [{ entity: { name: 'I_Currency', element: 'Currency' } }]
+      MonedaMD             : waers;
+
+      @UI.lineItem:       [{ position: 120 }]
+      @Semantics.amount.currencyCode: 'MonedaML'
+      ImporteML            : dmbtr;
+
+      @EndUserText.label: 'Moneda local'
+      MonedaML             : waers;
+
+      @UI.lineItem:       [{ position: 130 }]
+      IndicadorIVA         : mwskz;
+
+      @UI.lineItem:       [{ position: 140 }]
+      @EndUserText.label: 'Importe I.V.A.'
+      @EndUserText.quickInfo: 'I.V.A.'
+      @Semantics.amount.currencyCode: 'MonedaMD'
+      ImporteIVA           : fwste;
+
+      @UI.lineItem:       [{ position: 150 }]
+      @Semantics.amount.currencyCode: 'MonedaMD'
+      Retenciones          : wt_wt1;
+
+      @UI.lineItem:       [{ position: 160 }]
+      DocCompensacion      : augbl;
+
+      @UI.lineItem:       [{ position: 170 }]
+      FechaCompensacion    : augdt;
+
+      @UI.lineItem:       [{ position: 180 }]
+      @Consumption.valueHelpDefinition: [{ entity: { name: 'I_AccountingDocumentType', element: 'AccountingDocumentType' } }]
+      ClaseDocumento       : blart;
+
+      @UI.lineItem:       [{ position: 190 }]
+      @UI.selectionField: [{ position: 40 }]
+      @Consumption.valueHelpDefinition: [{ entity: { name: 'I_Supplier_VH', element: 'Supplier' } }]
+      Acreedor             : lifnr;
+
+      @UI.lineItem:       [{ position: 200 }]
+      @UI.selectionField: [{ position: 50 }]
+      @Consumption.valueHelpDefinition: [{ entity: { name: 'I_Customer_VH', element: 'Customer' } }]
+      Cliente              : kunnr;
+
+      @UI.lineItem:       [{ position: 210 }]
+      NIFTercero           : stcd1;
+
+      @UI.lineItem:       [{ position: 220 }]
+      @EndUserText.label: 'Nombre tercero'
+      @EndUserText.quickInfo: 'N. tercero'
+      NombreTercero        : name1_gp;
+
+      @UI.lineItem:       [{ position: 230 }]
+      @Consumption.valueHelpDefinition: [{ entity: { name: 'I_Country', element: 'Country' } }]
+      PaisTercero          : land1_gp;
+
+      @UI.lineItem:       [{ position: 240 }]
+      CPTercero            : pstlz;
+
+      @UI.lineItem:       [{ position: 250 }]
+      @EndUserText.label: 'Cuenta gasto'
+      @EndUserText.quickInfo: 'Cta. gasto'
+      CuentaGasto          : hkont;
+
+      @UI.lineItem:       [{ position: 260 }]
+      @EndUserText.label: 'Cuenta I.V.A.'
+      @EndUserText.quickInfo: 'Cta. I.V.A'
+      CuentaIVA            : hkont;
+
+      @UI.lineItem:       [{ position: 270 }]
+      Texto                : sgtxt;
+
+      @UI.lineItem:       [{ position: 280 }]
+      CeCo                 : kostl;
+
+      @UI.lineItem:       [{ position: 290 }]
+      UsuarioRegistro      : usnam;
+}
