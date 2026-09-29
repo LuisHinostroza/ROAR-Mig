@@ -174,6 +174,63 @@ i18n.properties
 #XTIT: Application name
 appTitle=Contrapartida
 
+
+*&---------------------------------------------------------------------*
+*&      Form  DISPLAY_ALV
+*&---------------------------------------------------------------------*
+*  Muestra cualquier tabla interna en un ALV (CL_SALV_TABLE).
+*  Uso:  PERFORM display_alv USING lt_data.
+*&---------------------------------------------------------------------*
+FORM display_alv USING it_data TYPE STANDARD TABLE.
+
+  DATA: lo_alv        TYPE REF TO cl_salv_table,
+        lo_functions  TYPE REF TO cl_salv_functions_list,
+        lo_columns    TYPE REF TO cl_salv_columns_table,
+        lo_selections TYPE REF TO cl_salv_selections,
+        lo_display    TYPE REF TO cl_salv_display_settings,
+        lx_msg        TYPE REF TO cx_salv_msg,
+        lv_message    TYPE string.
+
+  FIELD-SYMBOLS <lt_data> TYPE STANDARD TABLE.
+
+  " La factory necesita la tabla como CHANGING, no como USING
+  ASSIGN it_data TO <lt_data>.
+  IF <lt_data> IS NOT ASSIGNED.
+    RETURN.
+  ENDIF.
+
+  TRY.
+      cl_salv_table=>factory(
+        IMPORTING
+          r_salv_table = lo_alv
+        CHANGING
+          t_table      = <lt_data> ).
+
+      " Todas las funciones estándar (filtrar, ordenar, exportar, layouts)
+      lo_functions = lo_alv->get_functions( ).
+      lo_functions->set_all( abap_true ).
+
+      " Optimizar ancho de columnas
+      lo_columns = lo_alv->get_columns( ).
+      lo_columns->set_optimize( abap_true ).
+
+      " Selección de filas y columnas
+      lo_selections = lo_alv->get_selections( ).
+      lo_selections->set_selection_mode( cl_salv_selections=>row_column ).
+
+      " Bandas de color y contador de registros
+      lo_display = lo_alv->get_display_settings( ).
+      lo_display->set_striped_pattern( abap_true ).
+      lo_display->set_list_header( |{ TEXT-t01 } ({ lines( <lt_data> ) })| ).
+
+      lo_alv->display( ).
+
+    CATCH cx_salv_msg INTO lx_msg.
+      lv_message = lx_msg->get_text( ).
+      MESSAGE lv_message TYPE 'E'.
+  ENDTRY.
+
+ENDFORM.
 #YDES: Application description
 appDescription=Contrapartida
 
