@@ -1742,3 +1742,87 @@ FORM print_by_doc.
                       ENDLOOP.
 ENDFORM.
 *----------------------------------------------------------------------*
+*&---------------------------------------------------------------------*
+*&      Form  GET_TAX_AMOUNT
+*&---------------------------------------------------------------------*
+FORM get_tax_amount TABLES p_x_wt_at_invoice LIKE x_wt_at_invoice[]
+                     USING VALUE(p_ext_wt)
+                           VALUE(p_bsik)  LIKE bsik
+                                 p_vdmbtr LIKE bset-hwste.
+
+  DATA: i_bseg LIKE bseg OCCURS 10 WITH HEADER LINE.
+  DATA: i_bset LIKE bset OCCURS 10 WITH HEADER LINE.
+  DATA: sum_dmbtr LIKE bsik-dmbtr,
+        h_dmbtr   LIKE bsik-dmbtr,
+        sum_hwste LIKE bset-hwste,
+        p_rate    TYPE f.
+
+  CLEAR p_vdmbtr.
+
+*===> (MOD) JLRA (RUBIOA2) - REVERSION ACDOCA -> BSEG - 30.09.2026 (BEGIN) <===
+* BSEG es tabla transparente en S/4HANA y sigue siendo la fuente correcta
+* para el prorrateo entre lineas de acreedor. ACDOCA duplica filas por
+* ledger (RLDNR) y falsea SUM_DMBTR.
+
+* Get complete document
+  SELECT * FROM bseg INTO TABLE i_bseg
+    WHERE bukrs = p_bsik-bukrs
+      AND belnr = p_bsik-belnr
+      AND gjahr = p_bsik-gjahr.
+
+* Add WT at invoice amounts
+  IF p_ext_wt = 'X'.
+    LOOP AT i_bseg WHERE koart = 'K'.
+      READ TABLE p_x_wt_at_invoice WITH KEY bukrs = i_bseg-bukrs
+                                            belnr = i_bseg-belnr
+                                            gjahr = i_bseg-gjahr
+                                            buzei = i_bseg-buzei.
+      IF p_x_wt_at_invoice-wt_qbshh < 0.
+        p_x_wt_at_invoice-wt_qbshh = p_x_wt_at_invoice-wt_qbshh * -1.
+      ENDIF.
+      i_bseg-dmbtr = i_bseg-dmbtr + p_x_wt_at_invoice-wt_qbshh.
+      MODIFY i_bseg.
+    ENDLOOP.
+  ENDIF.
+*<=== (MOD) JLRA (RUBIOA2) - REVERSION ACDOCA -> BSEG - 30.09.2026 (END) <===
+
+* Get tax information
+  SELECT * FROM bset INTO TABLE i_bset
+    WHERE bukrs = p_bsik-bukrs
+      AND belnr = p_bsik-belnr
+      AND gjahr = p_bsik-gjahr
+    ORDER BY PRIMARY KEY.
+
+* Determine relative contribution of current vendor line
+  CLEAR sum_dmbtr.
+  LOOP AT i_bseg WHERE koart = 'K'.
+
+    IF i_bseg-shkzg = 'H'.
+      i_bseg-dmbtr = i_bseg-dmbtr * -1.
+    ENDIF.
+
+    sum_dmbtr = sum_dmbtr + i_bseg-dmbtr.
+    IF i_bseg-buzei = p_bsik-buzei.
+      h_dmbtr = i_bseg-dmbtr.
+    ENDIF.
+
+  ENDLOOP.
+
+  IF sum_dmbtr <> 0.
+    p_rate = CONV decfloat34( h_dmbtr ) / CONV decfloat34( sum_dmbtr ).
+  ELSE.
+    p_rate = 0.
+  ENDIF.
+
+* Determine tax amount
+  CLEAR sum_hwste.
+  LOOP AT i_bset.
+    IF i_bset-shkzg = 'H'.
+      i_bset-hwste = i_bset-hwste * -1.
+    ENDIF.
+    sum_hwste = sum_hwste + i_bset-hwste.
+  ENDLOOP.
+
+  p_vdmbtr = CONV decfloat34( p_rate ) * CONV decfloat34( sum_hwste ).
+
+ENDFORM.                    " GET_TAX_AMOUNT
