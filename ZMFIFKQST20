@@ -1,0 +1,4706 @@
+****************************************************************************************Copia en S/4HANA copia del de Asistencia
+*&---------------------------------------------------------------------*
+*& Report ZMFIFKQST20
+*&---------------------------------------------------------------------*
+*&
+*&---------------------------------------------------------------------*
+REPORT zmfifkqst20 LINE-SIZE 132
+                   LINE-COUNT 65
+                   NO STANDARD PAGE HEADING
+                   MESSAGE-ID fr.
+
+*----------------------------------------------------------------------*
+*                            Data declaration                          *
+*----------------------------------------------------------------------*
+
+TABLES: bsik,
+        bkpf,
+        bseg,
+        bset,
+        bsec,
+        lfa1,
+        lfb1,
+        tbsl,
+        rfpdo,
+        rfkhelp,
+        t001,
+        t005u,
+        tline,
+        t059q,
+        bhdgd,
+        t001f,
+        t001g,
+        addr1_val,
+        sadr,
+        adrs,
+        itcpo,
+        adrc,
+        t001z,
+        t059g,
+        zmfit_forma,
+
+*       Extended withholding tax
+        t059p,
+        t059z,
+        t059zt,
+        t059minmax,
+        with_item.
+
+
+DATA: BEGIN OF adress,
+        name1     LIKE lfa1-name1,
+        stras(26) TYPE c,
+        pstlz     LIKE lfa1-pstlz,
+        ort01(25) TYPE c,
+      END OF adress,
+
+      BEGIN OF ktab OCCURS 50,
+        witht      LIKE with_item-witht,
+        qsskz      LIKE bsik-qsskz,
+        qsznr      LIKE bsik-qsznr,
+        budat      LIKE bsik-budat,
+        xblnr      LIKE bsik-xblnr,
+        belnr      LIKE bsik-belnr,
+        bschl      LIKE bsik-bschl,
+        umsks      LIKE bsik-umsks,
+        buzei      LIKE bsik-buzei,
+        blart      LIKE bsik-blart,
+        bldat      LIKE bsik-bldat,
+        augdt      LIKE bsik-augdt,
+        augbl      LIKE bsik-augbl,
+        waers      LIKE bsik-waers,
+* ------------------------- SAP COLOMBIA ------------------------------*
+* Author  : Diana del Pilar Rocha
+* Date    : December 14 / 2000
+* Subject : Overflow problems
+
+*        wdmbtr like bsik-dmbtr,
+*        wwrbtr like bsik-wrbtr,
+*        wqsshb like bsik-qsshb,
+*        wqbshb like bsik-qbshb,
+*        netto  like bsik-dmbtr,
+*        wqsfbt like bsik-qsfbt,
+
+        wdmbtr(10) TYPE p DECIMALS 2,
+        wwrbtr(10) TYPE p DECIMALS 2,
+        wqsshb(10) TYPE p DECIMALS 2,
+        wqbshb(10) TYPE p DECIMALS 2,
+        netto(10)  TYPE p DECIMALS 2,
+        wqsfbt(10) TYPE p DECIMALS 2,
+        monat      LIKE bsik-monat,
+* --------------------  END SAP COLOMBIA ------------------------------*
+      END OF ktab,
+
+      BEGIN OF etab OCCURS 10,
+        witht      LIKE with_item-witht,
+        qsskz      LIKE bsik-qsskz,
+* ------------------------- SAP COLOMBIA ------------------------------*
+* Author  : Diana del Pilar Rocha
+* Date    : December 14 / 2000
+* Subject : Overflow problems
+
+*       wdmbtr like bsik-dmbtr,
+*       wqsshb like bsik-qsshb,
+*       wqbshb like bsik-qbshb,
+*       netto  like bsik-dmbtr,
+*       wqsfbt like bsik-qsfbt,
+*      end of etab,
+
+        wdmbtr(10) TYPE p DECIMALS 2,
+        wqsshb(10) TYPE p DECIMALS 2,
+        wqbshb(10) TYPE p DECIMALS 2,
+        netto(10)  TYPE p DECIMALS 2,
+        wqsfbt(10) TYPE p DECIMALS 2,
+* ------------------------- SAP COLOMBIA ------------------------------*
+      END OF etab,
+
+      BEGIN OF stab OCCURS 10,
+        helpchar,
+* ------------------------- SAP COLOMBIA ------------------------------*
+* Author  : Diana del Pilar Rocha
+* Date    : December 14 / 2000
+* Subject : Overflow problems
+
+*       wdmbtr like bsik-dmbtr,
+*       wqsshb like bsik-qsshb,
+*       wqbshb like bsik-qbshb,
+*       netto  like bsik-dmbtr,
+*       wqsfbt like bsik-qsfbt,
+
+        wdmbtr(10) TYPE p DECIMALS 2,
+        wqsshb(10) TYPE p DECIMALS 2,
+        wqbshb(10) TYPE p DECIMALS 2,
+        netto(10)  TYPE p DECIMALS 2,
+        wqsfbt(10) TYPE p DECIMALS 2,
+      END OF stab,
+* --------------------- END SAP COLOMBIA ------------------------------*
+
+      BEGIN OF btab OCCURS 10,
+        augbl LIKE bsik-augbl,
+        qsznr LIKE bsik-qsznr,
+      END OF btab,
+
+*     Internal tables for extended withholding
+      x_with_item  LIKE with_item  OCCURS 1 WITH HEADER LINE,
+      i_with_item  LIKE with_item  OCCURS 1 WITH HEADER LINE,
+      x_t059p      LIKE t059p      OCCURS 1 WITH HEADER LINE,
+      x_t059z      LIKE t059z      OCCURS 1 WITH HEADER LINE,
+      x_t059zt     LIKE t059zt     OCCURS 1 WITH HEADER LINE,
+      x_t059minmax LIKE t059minmax OCCURS 1 WITH HEADER LINE,
+
+      BEGIN OF x_wt_at_invoice OCCURS 10,
+        bukrs    LIKE with_item-bukrs,
+        belnr    LIKE with_item-belnr,
+        gjahr    LIKE with_item-gjahr,
+        buzei    LIKE with_item-buzei,
+        wt_qbshh LIKE with_item-wt_qbshh,
+        wt_qbshb LIKE with_item-wt_qbshb,
+      END OF x_wt_at_invoice.
+
+DATA: BEGIN OF kopf.
+        INCLUDE STRUCTURE thead.
+DATA: END OF kopf.
+
+DATA: flag1(1)        TYPE n,
+      flag2(1)        TYPE n,
+      flag3(1)        TYPE n,
+      flag4(1)        TYPE n,
+      flag5(1)        TYPE n,
+      flag6(1)        TYPE c,
+      count2          TYPE p,
+
+
+      count3          TYPE p,
+      lfdnum(5)       TYPE n VALUE 0,
+      wtitle(40)      TYPE c,
+      string(132)     TYPE c,
+      x(40)           TYPE c,
+      y               LIKE bseg-dmbtr,
+      bisdt           TYPE d,
+      vondt           TYPE d,
+* ------------------------- SAP COLOMBIA ------------------------------*
+* Author  : Diana del Pilar Rocha
+* Date    : Enero 18 / 2001
+* Subject : Overflow problems
+
+*      wdmbtr like bsik-dmbtr,
+*      h_dmbtr like bsik-dmbtr,
+*      wwrbtr like bsik-dmbtr,
+*      wqsshb like bsik-qsshb,
+*      wqbshb like bsik-qbshb,
+*      wqsfbt like bsik-qsfbt,
+*      netto  like bsik-dmbtr,
+
+      wdmbtr(10)      TYPE p DECIMALS 2,
+      h_dmbtr(10)     TYPE p DECIMALS 2,
+      wwrbtr(10)      TYPE p DECIMALS 2,
+      wqsshb(10)      TYPE p DECIMALS 2,
+      wqbshb(10)      TYPE p DECIMALS 2,
+      wqsfbt(10)      TYPE p DECIMALS 2,
+      netto(10)       TYPE p DECIMALS 2,
+      lv_vdmbtr(10)   TYPE p DECIMALS 2, "===> (INS)   JLRA (RUBIOA2) - CORRECCIÓN - 02.07.2026
+      lv_dmbtr(10)    TYPE p DECIMALS 2, "===> (INS)   JLRA (RUBIOA2) - CORRECCIÓN - 02.07.2026
+      lv_wt_qbshh(10) TYPE p DECIMALS 2, "===> (INS)   JLRA (RUBIOA2) - CORRECCIÓN - 02.07.2026
+      lv_wt_qsshh(10) TYPE p DECIMALS 2, "===> (INS)   JLRA (RUBIOA2) - CORRECCIÓN - 02.07.2026
+      lv_wrbtr(10)    TYPE p DECIMALS 2, "===> (INS)   JLRA (RUBIOA2) - CORRECCIÓN - 02.07.2026
+* ------------------------- End SAP Colombia --------------------------*
+
+      vdmbtr          LIKE bset-hwste,
+*     Extended withholding tax
+      old_with        TYPE c,
+      new_with        TYPE c,
+      e_witht         LIKE with_item-witht,
+*     Currency conversion
+      rate            TYPE f,
+      inv_date        LIKE bkpf-wwert,                          " Invoice date
+      curr_inv        LIKE bsik-waers,                      " Invoice currency
+      rate_inv        LIKE bkpf-kursf,        " Manually given rate at invoice
+      pay_date        LIKE bkpf-wwert,                          " Payment date
+      curr_pay        LIKE bsik-waers,                      " Payment currency
+      rate_pay        LIKE bkpf-kursf,        " Manually given rate at payment
+      conv_date       LIKE bkpf-wwert,                        " Exchange date
+*     Conversion into alternative local currency
+      h_wdmbtr        LIKE bsik-dmbtr,                             " <--- Euro
+      alt_rate        TYPE f,                                      " <--- Euro
+      outputwaers     LIKE t001-waers,                          " <--- Euro2
+*     Adress data
+      wname1          LIKE bsec-name1,
+      wname2          LIKE bsec-name2,
+      wname3          LIKE bsec-name3,
+      wname4          LIKE bsec-name4,
+      wstras          LIKE bsec-stras,
+      wpfach          LIKE bsec-pfach,
+      wpstlz          LIKE bsec-pstlz,
+      wpstl2          LIKE bsec-pstl2,
+      wort01          LIKE bsec-ort01,
+      wstcd1          LIKE bsec-stcd1,                             "INSERT 65219
+      wregio          LIKE bsec-regio,
+      wland1          LIKE bsec-land1,
+      waers           LIKE t001-waers,
+      kursdat         LIKE bsik-augdt,
+      liefer(35)      TYPE c,
+      hilfe(47)       TYPE c,
+      h_zaehl         LIKE rfpdo-kqstcount,
+      h_lines         TYPE p,
+      answer          LIKE sy-tfill.
+DATA: toplength(2) TYPE n.
+*     SAPFORMS LIKE RSSCF-TDFORM.
+DATA: BEGIN OF t_repyear OCCURS 10,
+        bukrs   LIKE bsik-bukrs,
+        repyear LIKE rfkhelp-repyear,                  " Reporting year
+      END OF t_repyear.
+DATA: processing_flag TYPE c,
+      bukrs_adrs      LIKE addr1_sel.
+
+*------------------------Changes for Colombia -------------------------*
+* Author  : Diana Rocha
+* Subject : New Internal Tables
+
+DATA : BEGIN OF t_acum OCCURS 0,
+         numpr     LIKE bsik-monat,
+         despr(10) TYPE c,
+       END OF t_acum.
+
+DATA : BEGIN OF t_data OCCURS 0,
+         numpr     LIKE bsik-monat,
+         despr(10) TYPE c,
+         witht     LIKE with_item-witht,
+         qsskz     LIKE bsik-qsskz,
+         qekar     LIKE t059z-qekar,
+         qsatz     LIKE t059z-qsatz,
+         netto     LIKE bsik-dmbtr,
+         qbshb     LIKE bsik-qbshb,
+         qsshb     LIKE bsik-qsshb,
+       END OF t_data.
+
+DATA : period TYPE i.
+
+DATA : BEGIN OF w_data OCCURS 0,
+         numpr     LIKE bsik-monat,
+         despr(10) TYPE c,
+         qekar     LIKE t059z-qekar,
+         qsatz(9)  TYPE c,
+         netto     LIKE bsik-dmbtr,
+         qbshb     LIKE bsik-qbshb,
+         qsshb     LIKE bsik-qsshb,
+       END OF w_data.
+
+DATA : BEGIN OF y_data OCCURS 0,
+         belnr LIKE bsik-belnr,
+         budat LIKE bsik-budat,
+         xblnr LIKE bsik-xblnr,
+         witht LIKE with_item-witht,
+         qsskz LIKE bsik-qsskz,
+         qekar LIKE t059z-qekar,
+         qsatz LIKE t059z-qsatz,
+         netto LIKE bsik-dmbtr,
+         qbshb LIKE bsik-qbshb,
+         qsshb LIKE bsik-qsshb,
+       END OF y_data.
+
+DATA : BEGIN OF z_data OCCURS 0,
+         numpr     LIKE bsik-monat,
+         despr(10) TYPE c,
+         qekar     LIKE t059z-qekar,
+         netto     LIKE bsik-dmbtr,
+         qbshb     LIKE bsik-qbshb,
+* ----------------------------- SAP ------------------------------------
+* Author  : Diana Rocha
+* Date    : August 1/2002
+* Subject : Add Base Amount for ICA withholding tax
+         qsshb     LIKE bsik-qsshb,
+* --------------------------- END SAP ----------------------------------
+       END OF z_data.
+
+DATA : BEGIN OF x_data OCCURS 0,
+         witht LIKE with_item-witht,
+         qsskz LIKE bsik-qsskz,
+         qbshb LIKE bsik-qbshb,
+         qsshb LIKE bsik-qsshb,
+       END OF x_data.
+
+DATA: BEGIN OF daterec,
+        year(4)  TYPE c,
+        month(2) TYPE c,
+        day(2)   TYPE c,
+      END OF daterec.
+
+DATA : separator(1) VALUE '/'.
+
+*--------------------------- Colombia ---------------------------------*
+
+*----------------------------------------------------------------------*
+*               Definition of select options and parameters            *
+*----------------------------------------------------------------------*
+
+*-------------- Additional Selections: Block 1 -------------------------
+*begin_of_block 1.                                            "===> (DEL)   JLRA (RUBIOA2) - CORRECCION - 01.07.2026
+SELECTION-SCREEN BEGIN OF BLOCK b1 WITH FRAME TITLE TEXT-001. "===> (INS)   JLRA (RUBIOA2) - CORRECCION - 01.07.2026
+  SELECT-OPTIONS: belart  FOR bsik-blart,
+                  belnum  FOR bsik-belnr NO DATABASE SELECTION,
+                  augdat  FOR bsik-augdt NO-EXTENSION
+                                         NO DATABASE SELECTION,
+                  buchdt  FOR bsik-budat NO-EXTENSION
+                                         NO DATABASE SELECTION,
+                  witht   FOR with_item-witht,
+                  qstkz   FOR bsik-qsskz NO DATABASE SELECTION.
+
+*----------------------- Changes for Colombia -------------------------*
+* Author  : Diana Rocha
+* Subjecj : City where the Withholding tax is withheld (ICA)
+  PARAMETERS :    city(37) TYPE c.
+*----------------------------- Colombia -------------------------------*
+
+  PARAMETERS : unausgeg LIKE rfpdo-kqstxfel6,
+               umrechn  LIKE rfpdo2-kqstxfl8.
+
+* -------- Additional Selection: 'Alternative Local Currency' ---------
+  SELECTION-SCREEN: ULINE,                                    " <--- Euro
+  COMMENT /1(65) TEXT-112.                  " <--- Euro
+  PARAMETERS: altcurr LIKE t001-waers,                        " <--- Euro
+              convdat LIKE syst-datum.                        " <--- Euro
+*end_of_block 1.                  "===> (DEL)   JLRA (RUBIOA2) - CORRECCION - 01.07.2026
+SELECTION-SCREEN END OF BLOCK b1. "===> (INS)   JLRA (RUBIOA2) - CORRECCION - 01.07.2026
+
+*--------------- Additional Selections: Block 2 -----------------------
+*begin_of_block 2.                                            "===> (DEL)   JLRA (RUBIOA2) - CORRECCION - 01.07.2026
+SELECTION-SCREEN BEGIN OF BLOCK b2 WITH FRAME TITLE TEXT-002. "===> (INS)   JLRA (RUBIOA2) - CORRECCION - 01.07.2026
+  PARAMETERS: formular LIKE rfpdo-kqsuformrp DEFAULT 'X',
+*           testdrck like rfpdo-kqsttestd default '2',  " Testprint no.
+              testdrck LIKE rfpdo-kqsttestd,          " Testprint no.
+              p_forid  LIKE zmfit_forma-form_id,      " Form ID
+              p_print  LIKE rfpdo-fordpriz,           " Printer
+              p_immea  LIKE rfpdo1-allgsofz,          " Print immediately
+              p_copy   LIKE rfpdo-kqsuformrp.         " 2a. Copy
+  SELECTION-SCREEN: ULINE,
+  COMMENT /1(65) TEXT-111.
+  PARAMETERS: protokol LIKE rfpdo-kqstxfeld,
+              qstsumme LIKE rfpdo-kqstxfel2,
+              ktosumme LIKE rfpdo-kqstxfel3,
+              bkrsumme LIKE rfpdo-kqstxfel4,
+              einzelpo LIKE rfpdo-kqstxfel1,
+              summentb LIKE rfpdo-kqstxfel5,
+              listsepa LIKE rfpdo-kqstxfel7,
+              p_zaehl  LIKE rfpdo-kqstcount DEFAULT '1',
+              alt_ctry LIKE rfpdo-kqsttitle,
+              p_zutit  LIKE rfpdo-allgline.
+*end_of_block 2.                  "===> (DEL)   JLRA (RUBIOA2) - CORRECCION - 01.07.2026
+SELECTION-SCREEN END OF BLOCK b2. "===> (INS)   JLRA (RUBIOA2) - CORRECCION - 01.07.2026
+RANGES: buschl FOR bsik-bschl.
+
+*----------------------------------------------------------------------*
+*                 Definition of data extract                           *
+*----------------------------------------------------------------------*
+
+FIELD-GROUPS: header,
+              daten.
+
+INSERT bsik-bukrs
+      bsik-lifnr
+      liefer
+      e_witht
+      bsik-qsskz
+      bsik-budat
+      bsik-belnr
+      bsik-gjahr
+      bsik-bldat
+      bsik-xblnr
+      bsik-augdt
+      bsik-qsznr
+INTO header.
+
+INSERT wdmbtr
+       wwrbtr
+       wqsshb
+       wqbshb
+       netto
+       wqsfbt
+       bsik-bschl
+       bsik-umsks
+       bsik-buzei
+       bsik-blart
+       bsik-augbl
+       bsik-xzahl
+       bsik-xcpdd
+       bsik-waers
+       bsik-monat
+       wname1
+       wname2
+       wstras
+       wpstlz
+       wort01
+       wstcd1                                              "INSERT65219
+       wregio
+INTO daten.
+
+*----------------------------------------------------------------------*
+*                         Initialization                               *
+*----------------------------------------------------------------------*
+
+INITIALIZATION.
+*  get_frame_title: 1, 2."===> (DEL)   JLRA (RUBIOA2) - CORRECCION - 01.07.2026
+  PERFORM propose_current_year.
+
+*----------------------------------------------------------------------*
+*                          Header-Lines                                *
+*----------------------------------------------------------------------*
+
+TOP-OF-PAGE.
+  PERFORM top-italia.
+  MOVE 80 TO syst-linsz.
+
+
+*----------------------------------------------------------------------*
+*                         Checks at Selection Screen                   *
+*----------------------------------------------------------------------*
+
+* Old or new WT functionality?
+AT SELECTION-SCREEN ON kd_bukrs.
+
+  PERFORM check_company_codes.
+
+* New WT functionality: WT types
+AT SELECTION-SCREEN ON witht.
+
+  PERFORM check_wt_types. "Are choosen WT types defined in table T059P?
+
+* WT codes
+AT SELECTION-SCREEN ON qstkz.
+
+  IF qstkz NE space AND old_with = 'X'.          " Old WT functionality
+    PERFORM check_old_wt_codes.
+  ENDIF.
+
+  IF qstkz NE space AND new_with = 'X'.          " New WT functionality
+    PERFORM check_wt_codes.
+  ENDIF.
+
+* Alternative local currency
+AT SELECTION-SCREEN ON convdat.                             " <--- Euro
+
+  IF NOT altcurr IS INITIAL AND convdat IS INITIAL.         " <--- Euro
+    convdat = sy-datum.                                     " <--- Euro
+  ENDIF.                                                    " <--- Euro
+
+* ---------------------------------------------------------------------
+AT SELECTION-SCREEN.
+
+* In case of immediately printing: Is printer specified?
+  IF p_immea = 'X'
+    AND p_print EQ space.
+    MESSAGE e277.
+  ENDIF.
+
+* Configuration of country specific header line
+  MOVE TEXT-400 TO wtitle.
+  IF alt_ctry IS INITIAL.
+    REPLACE '$' WITH TEXT-410 INTO wtitle.
+  ELSE.
+    REPLACE '$' WITH alt_ctry INTO wtitle.
+  ENDIF.
+
+  toplength = 11.
+  MOVE '132' TO bhdgd-lines.
+
+  MOVE '0' TO bhdgd-inifl.
+  MOVE syst-uname   TO bhdgd-uname.
+  MOVE syst-repid   TO bhdgd-repid.
+  MOVE p_zutit      TO bhdgd-line2.
+  MOVE wtitle       TO bhdgd-line1.
+  MOVE listsepa     TO bhdgd-separ.
+  MOVE 'BSIK-BUKRS' TO bhdgd-domai.
+
+*---------- Define reporting period, printed in the sapscript form -----
+*---------- Belgium: Only WT base is relevant => open items are selected
+
+  MOVE: augdat-low  TO rfkhelp-vondt,
+        augdat-high TO rfkhelp-bisdt.
+
+*---------- Information: Exchange rate taken at invoice time -----------
+  IF umrechn = 'X'.
+    MESSAGE i453.
+  ENDIF.
+
+*---------- Commands for printing --------------------------------------
+  IF sy-batch = 'X'.
+    NEW-PAGE
+       NO-TITLE
+       NO-HEADING.
+* ------------------------ SAP --------------------------------------- *
+* Author  : Diana del Pilar Rocha
+* Date    : Noviembre 9 del 2000
+* Subject : Se coloca en comentario las siguientes líneas debido a que
+*           cuando se imprime en backgroung, el listado no muestra
+*           títulos.
+*       print on
+*         destination p_print
+*         immediately p_immea
+*         keep in spool ' '
+*         cover text wtitle
+*         line-size '132'
+*         line-count '65'
+*         new list identification 'X'
+*         no dialog.
+* ------------------------- END SAP -----------------------------------*
+  ELSE.
+    NEW-PAGE
+      NO-TITLE
+      NO-HEADING
+      PRINT ON
+        DESTINATION p_print
+        IMMEDIATELY p_immea
+        KEEP IN SPOOL ' '
+        COVER TEXT wtitle
+        LINE-SIZE '132'
+*     line-count '65'
+        NEW LIST IDENTIFICATION 'X'
+        NO DIALOG.
+    NEW-PAGE PRINT OFF.
+  ENDIF.
+
+*----------------------------------------------------------------------*
+*                                 Selection                            *
+*----------------------------------------------------------------------*
+
+START-OF-SELECTION.
+
+  COMMIT WORK.                          "PERFORMANCE INFORMIX
+
+*---------- Get relevant (xumsw = 'X') posting keys --------------------
+*===> (MOD)   JLRA (RUBIOA2) - CORRECCION S/4 HANA - 02.07.2026  (BEGIN) <===
+*  OLD CODE :
+*  SELECT * FROM tbsl
+*   WHERE xumsw = 'X'.
+*    buschl-low = tbsl-bschl.
+*    buschl-sign = 'I'.
+*    buschl-option = 'EQ'.
+*    APPEND buschl.
+*  ENDSELECT.
+*
+*  NEW CODE :
+CLEAR buschl[].
+
+SELECT
+  FROM tbsl
+  FIELDS
+    'I'      AS sign,
+    'EQ'     AS option,
+    bschl    AS low
+  WHERE xumsw = 'X'
+  ORDER BY PRIMARY KEY
+  INTO TABLE @buschl.
+* <=== (MOD)   JLRA (RUBIOA2) - CORRECCION S/4 HANA - 02.07.2026 (END) <===
+
+
+
+* Get BSIK data from LDB
+GET bsik.
+* CHECK BELART.
+* CHECK QSTKZ.
+  CHECK bsik-qsskz NE space.
+*----------- Exclude 'Merkposten' --------------------------------------
+  CHECK bsik-bstat NE 'S'.
+
+*----------- Get company code data -------------------------------------
+  IF bsik-bukrs NE t001-bukrs.
+    SELECT SINGLE * FROM t001
+      WHERE bukrs EQ bsik-bukrs.
+  ENDIF.
+
+*----------------------------------------------------------------------*
+*                      New Withholding Tax                             *
+*----------------------------------------------------------------------*
+  IF NOT new_with IS INITIAL.
+
+    CLEAR x_with_item[].
+
+*   Read WT data from with_item into x_with_item
+    CALL FUNCTION 'FI_WT_READ_WT_INFO'
+      EXPORTING
+        i_bukrs     = bsik-bukrs
+        i_belnr     = bsik-belnr
+        i_gjahr     = bsik-gjahr
+        i_buzei     = bsik-buzei  " Get WT data of complete doc.
+      TABLES
+        t_with_item = x_with_item
+      EXCEPTIONS
+        not_found   = 1
+        OTHERS      = 2.
+
+    CLEAR: bsik-qsskz.
+
+*   For calculation of VAT tax we need WT data of the total document
+
+    SELECT * FROM with_item INTO TABLE i_with_item
+                           WHERE bukrs  = bsik-bukrs
+                             AND belnr  = bsik-belnr
+                             AND gjahr  = bsik-gjahr
+                             AND buzei <> bsik-buzei.
+    LOOP AT i_with_item.
+      x_with_item = i_with_item.
+      APPEND x_with_item.
+    ENDLOOP.
+
+
+*   Determine total WT amount with posting at invoice time
+
+*   In the case that there are WT types with posting at invoice, the
+*   invoice amount in bsik (bsak) does not correspond to the total
+*   amount but is reduced by the total WT amount of all types with
+*   posting at invoice time. Thus, it is necessary first to loop over
+*   the with_item and to detect and to sum up all WT amount of posting
+*   at invoice types.
+    PERFORM get_total_wt_at_invoice TABLES x_with_item
+                                           x_t059p
+                                           x_wt_at_invoice
+                                     USING t001-land1.
+
+*   Convert WT amounts into local curr. depending on spec. exchange date
+    IF bsik-waers NE t001-waers AND
+       umrechn = 'X' AND
+       bsik-wrbtr NE 0.
+*      rate = bsik-dmbtr / bsik-wrbtr.                                      "===> (DEL)   JLRA (RUBIOA2) - CORRECCIÓN - 02.07.2026
+      rate = CONV decfloat34( bsik-dmbtr ) / CONV decfloat34( bsik-wrbtr ). "===> (INS)   JLRA (RUBIOA2) - CORRECCIÓN - 02.07.2026
+      LOOP AT x_wt_at_invoice.
+*        x_wt_at_invoice-wt_qbshh = x_wt_at_invoice-wt_qbshb * rate.                                      "===> (DEL)   JLRA (RUBIOA2) - CORRECCIÓN - 02.07.2026
+        x_wt_at_invoice-wt_qbshh = CONV decfloat34( x_wt_at_invoice-wt_qbshb ) * CONV decfloat34( rate ). "===> (INS)   JLRA (RUBIOA2) - CORRECCIÓN - 02.07.2026
+        MODIFY x_wt_at_invoice.
+      ENDLOOP.
+    ENDIF.
+
+*  Proceed WT data of current vendor line
+    LOOP AT x_with_item WHERE buzei = bsik-buzei.
+
+      IF NOT qstkz IS INITIAL.
+        CHECK x_with_item-wt_withcd IN qstkz.
+      ENDIF.
+
+      IF NOT witht IS INITIAL.
+        CHECK x_with_item-witht IN witht.
+      ENDIF.
+
+*   Convert WT amounts into local curr. depending on spec. exchange date
+      IF bsik-waers NE t001-waers AND
+         umrechn = 'X'            AND
+         x_with_item-wt_qsshb NE 0.
+
+*===> (MOD)   JLRA (RUBIOA2) - CORRECCIÓN - 02.07.2026  (BEGIN) <===
+* OLD CODE:
+*       rate = x_with_item-wt_qsshh / x_with_item-wt_qsshb.
+*       x_with_item-wt_qbshh = x_with_item-wt_qbshb * rate.
+* NEW CODE:
+        rate = CONV decfloat34( x_with_item-wt_qsshh ) /
+               CONV decfloat34( x_with_item-wt_qsshb ).
+
+        x_with_item-wt_qbshh = CONV decfloat34( x_with_item-wt_qbshb ) *
+                               CONV decfloat34( rate ).
+*<=== (INS)   JLRA (RUBIOA2) - CORRECCIÓN - 02.07.2026  (END) <===
+
+      ELSEIF bsik-waers NE t001-waers AND
+             umrechn = ' '            AND
+             x_with_item-wt_qbshb NE 0.
+
+*===> (MOD)   JLRA (RUBIOA2) - CORRECCIÓN - 02.07.2026  (BEGIN) <===
+* OLD CODE:
+*        rate = x_with_item-wt_qbshh / x_with_item-wt_qbshb.
+*        x_with_item-wt_qsshh = x_with_item-wt_qsshb * rate.
+*        bsik-dmbtr = bsik-wrbtr * rate.
+* NEW CODE:
+        rate = CONV decfloat34( x_with_item-wt_qbshh ) /
+               CONV decfloat34( x_with_item-wt_qbshb ).
+
+        x_with_item-wt_qsshh = CONV decfloat34( x_with_item-wt_qsshb ) *
+                               CONV decfloat34( rate ) .
+
+        bsik-dmbtr = CONV decfloat34( bsik-wrbtr ) *
+                     CONV decfloat34( rate ).
+*<=== (INS)   JLRA (RUBIOA2) - CORRECCIÓN - 02.07.2026  (END) <===
+
+
+      ENDIF.
+
+*   Add total WT at invoice to bsik-dmbtr to get total dmbtr
+      READ TABLE x_wt_at_invoice WITH KEY bukrs = bsik-bukrs
+                                          belnr = bsik-belnr
+                                          gjahr = bsik-gjahr
+                                          buzei = bsik-buzei.
+      IF x_wt_at_invoice-wt_qbshh < 0.
+        x_wt_at_invoice-wt_qbshh = x_wt_at_invoice-wt_qbshh * -1.
+      ENDIF.
+      lv_dmbtr    = CONV #( bsik-dmbtr ).               "===> (INS)   JLRA (RUBIOA2) - CORRECCIÓN - 02.07.2026
+      lv_wt_qbshh = CONV #( x_wt_at_invoice-wt_qbshh ). "===> (INS)   JLRA (RUBIOA2) - CORRECCIÓN - 02.07.2026
+*      h_dmbtr = bsik-dmbtr + x_wt_at_invoice-wt_qbshh. "===> (DEL)   JLRA (RUBIOA2) - CORRECCIÓN - 02.07.2026
+      h_dmbtr = lv_dmbtr + lv_wt_qbshh.                 "===> (INS)   JLRA (RUBIOA2) - CORRECCIÓN - 02.07.2026
+
+*     Filling of data extract fields according to country specific
+*     selection checks
+
+      PERFORM prep_data_extr_ext_wt_ctrgr_4 CHANGING processing_flag.
+
+      IF processing_flag = 'X'.
+
+*       Get CPD data from document
+        PERFORM get_cpd_data.
+
+        bsik-qsskz = x_with_item-wt_withcd.
+        e_witht    = x_with_item-witht.
+
+*       Convert amounts from local curr. into alternative local curr.
+        IF NOT altcurr IS INITIAL.                          " <--- Euro
+          PERFORM convert_into_alt_loc_curr.                " <--- Euro
+        ENDIF.                                              " <--- Euro
+
+        EXTRACT daten.
+
+      ENDIF.
+
+    ENDLOOP.                                 " Of loop over x_with_item
+
+*----------------------------------------------------------------------*
+*                      Old Withholding Tax                             *
+*----------------------------------------------------------------------*
+  ELSE.
+
+*---------- Read relevant exchange dates and rates from bkpf -----------
+    PERFORM get_curr_exchange_data
+          USING bsik-bukrs
+                bsik-belnr
+                bsik-augbl
+                bsik-augdt
+                bsik-gjahr
+*         changing
+               inv_date                       " Date of invoice booking
+               curr_inv                              " Invoice currency
+               rate_inv       " Manually given exchange rate at invoice
+               pay_date                       " Date of payment booking
+               curr_pay                              " Payment currency
+               rate_pay.      " Manually given exchange rate at payment
+
+*   Convert WT amounts into local curr. depending on spec. exchange date
+    PERFORM convert_into_loc_curr_old_wt.
+
+*   Filling of data extract fields according to country specific
+*   selection checks
+
+    PERFORM prep_data_extr_old_wt_ctrgr_4 CHANGING processing_flag.
+
+
+    IF processing_flag = 'X'.
+
+*     Get CPD data from document
+      PERFORM get_cpd_data.
+
+*     Convert amounts from local curr. into alternative local curr.
+      IF NOT altcurr IS INITIAL.                            " <--- Euro
+        PERFORM convert_into_alt_loc_curr.                  " <--- Euro
+      ENDIF.                                                " <--- Euro
+
+      EXTRACT daten.
+
+    ENDIF.
+
+  ENDIF.
+
+*----------------------------------------------------------------------*
+*               Country specific reports for listings                  *
+*----------------------------------------------------------------------*
+END-OF-SELECTION.
+
+  SORT.
+
+  PERFORM get_repyear TABLES t_repyear.
+
+*---------------------- Changes for Colombia ------------------------*
+* Author  : Diana Rocha
+
+  IF formular = 'X'.
+* Print by Vendor
+    IF belnum IS INITIAL.
+      PERFORM meldung_colombia.
+    ELSE.
+* Print by Document
+      PERFORM print_by_doc.
+    ENDIF.
+  ENDIF.
+* Print Log
+  IF protokol EQ 'X'.
+    PERFORM colombia.
+  ENDIF.
+*--------------------------- Colombia ---------------------------------*
+
+
+*---------------------------------------------------------------------*
+*       FORM PRINTDATA_1                                              *
+*---------------------------------------------------------------------*
+*       Data for SAPScript                                            *
+*---------------------------------------------------------------------*
+FORM printdata_1.
+
+  itcpo-tdcopies           = '1'.
+  itcpo-tddest             = p_print.
+  itcpo-tdpreview          = ' '.
+  itcpo-tdimmed            = p_immea.
+  itcpo-tdnewid            = 'X'.
+  itcpo-tdcover            = ' '.
+  itcpo-tdreceiver         = sy-uname.
+  itcpo-tddivision         = sy-prabt.
+* ITCPO-TDAUTORITY
+* ITCPO-TDARMOD
+  itcpo-tddataset          = 'SCRIPT'.
+  itcpo-tdsuffix1          = p_print.
+  itcpo-tdsuffix2          = sy-repid.
+  itcpo-tdsuffix2+8(1)     = '_'.
+  itcpo-tdsuffix2+9(3)     = sy-uname.
+* ITCPO-TDTITLE            =
+
+  IF NOT p_copy IS INITIAL.
+    rfkhelp-person = 'Expedido por Segunda vez'.
+  ELSE.
+    CLEAR rfkhelp-person.
+  ENDIF.
+ENDFORM.
+
+*---------------------------------------------------------------------*
+*       FORM PRINTDATA_2                                              *
+*---------------------------------------------------------------------*
+*       Data for SAPScript                                            *
+*---------------------------------------------------------------------*
+FORM printdata_2.
+
+  CLEAR itcpo-tdcovtitle.
+  itcpo-tdcovtitle         = TEXT-222.
+*  replace '&' with p_varia into itcpo-tdcovtitle.
+  REPLACE '&' WITH 'CO' INTO itcpo-tdcovtitle.
+
+  itcpo-tdcovtitle+63(4)   = bsik-bukrs.
+  CONDENSE itcpo-tdcovtitle.
+
+  SELECT SINGLE * FROM  zmfit_forma
+         WHERE  form_id      =  p_forid.
+
+  IF sy-subrc <> 0.
+    MESSAGE e702.
+  ENDIF.
+
+ENDFORM.
+
+*----------------------------------------------------------------------*
+*                                CPD data                              *
+*----------------------------------------------------------------------*
+
+*&---------------------------------------------------------------------*
+*&      Form  CHECK_OLD_WT_CODES
+*&---------------------------------------------------------------------*
+*       Checks whether the selected WT codes are defined in t059q
+*----------------------------------------------------------------------*
+FORM check_old_wt_codes.
+
+  SELECT * FROM t059q WHERE qsskz IN qstkz.
+  ENDSELECT.
+  IF sy-subrc NE '0'.
+    MESSAGE e151.
+  ENDIF.
+
+ENDFORM.
+
+*----------------------------------------------------------------------*
+*    Include für Meldung Italien                                       *
+*----------------------------------------------------------------------*
+INCLUDE zqst2001 .
+*----------------------------------------------------------------------*
+*    Include für Quellensteuerreport  Italien und Spanien              *
+*----------------------------------------------------------------------*
+INCLUDE zqst1001 .
+*----------------------------------------------------------------------*
+*    Include for extended functionality                                *
+*----------------------------------------------------------------------*
+INCLUDE ziwt0010 .
+*----------------------------------------------------------------------*
+*    Include for help routines withholding tax reports                 *
+*----------------------------------------------------------------------*
+INCLUDE ziwt0020.
+
+*----------------------------------------------------------------------*
+*    Include for fill Bimensual Periods for acumulates                 *
+*----------------------------------------------------------------------*
+INCLUDE zperiods.
+
+*&---------------------------------------------------------------------*
+*&      Form  CONVERT_INTO_ALT_LOC_CURR (EURO)
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*  -->  p1        text
+*  <--  p2        text
+*----------------------------------------------------------------------*
+FORM convert_into_alt_loc_curr.                             " <--- Euro
+
+  IF wdmbtr <> 0.                                     " <--- Euro
+    h_wdmbtr = wdmbtr.                                " <--- Euro
+    CALL FUNCTION 'CONVERT_TO_FOREIGN_CURRENCY'       " <--- Euro
+      EXPORTING
+        date             = convdat         " <--- Euro
+        foreign_currency = altcurr         " <--- Euro
+        local_amount     = wdmbtr          " <--- Euro
+        local_currency   = t001-waers      " <--- Euro
+*       rate             = ???            " <--- Euro
+        type_of_rate     = 'M'             " <--- Euro
+      IMPORTING
+        foreign_amount   = wdmbtr.         " <--- Euro
+*    alt_rate = wdmbtr / h_wdmbtr.                                       " <--- Euro "===> (DEL)   JLRA (RUBIOA2) - CORRECCIÓN - 02.07.2026
+    alt_rate = CONV decfloat34( wdmbtr ) / CONV decfloat34( h_wdmbtr ) . " <--- Euro "===> (INS)   JLRA (RUBIOA2) - CORRECCIÓN - 02.07.2026
+    wqsshb = alt_rate * wqsshb.                       " <--- Euro
+    wqbshb = alt_rate * wqbshb.                       " <--- Euro
+    wqsfbt = alt_rate * wqsfbt.                       " <--- Euro
+    netto  = alt_rate * netto.                        " <--- Euro
+  ENDIF.                                              " <--- Euro
+
+ENDFORM.                    " CONVERT_INTO_ALT_LOC_CURR     " <--- Euro
+
+*&---------------------------------------------------------------------*
+*&      Form  CONVERT_INTO_LOC_CURR_OLD_WT
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*  -->  p1        text
+*  <--  p2        text
+*----------------------------------------------------------------------*
+FORM convert_into_loc_curr_old_wt.
+
+*---------------- Conversion at invoice time ---------------------------
+  IF umrechn = 'X'.
+
+*     Converts WT base of old WT
+
+*     Invoice currency -> local currency at clearing date
+
+*    wqsshb = bsik-qsshb.  " Intermediate value: WT base in inv. curr.            "===> (DEL)   JLRA (RUBIOA2) - CORRECCIÓN - 02.07.2026
+    wqsshb = CONV #( bsik-qsshb ).  " Intermediate value: WT base in inv. curr.   "===> (INS)   JLRA (RUBIOA2) - CORRECCIÓN - 02.07.2026
+
+    IF curr_inv NE t001-waers.
+      CALL FUNCTION 'CONVERT_TO_LOCAL_CURRENCY'
+        EXPORTING
+          date             = inv_date
+          foreign_currency = curr_inv
+          local_currency   = t001-waers
+          foreign_amount   = bsik-qsshb
+          rate             = rate_inv
+          type_of_rate     = 'M'
+        IMPORTING
+          local_amount     = bsik-qsshb.
+    ENDIF.
+
+*     WT amount and base from clr. curr. -> local curr. at inv. date
+    IF curr_pay NE t001-waers.
+      IF curr_pay = curr_inv.
+        CALL FUNCTION 'CONVERT_TO_LOCAL_CURRENCY'
+          EXPORTING
+            date             = inv_date
+            foreign_amount   = bsik-qbshb
+            foreign_currency = curr_pay
+            local_currency   = t001-waers
+            rate             = rate_inv
+            type_of_rate     = 'M'
+          IMPORTING
+            local_amount     = bsik-qbshb.
+      ELSE.
+        CALL FUNCTION 'CONVERT_TO_LOCAL_CURRENCY'
+          EXPORTING
+            date             = inv_date
+            foreign_amount   = bsik-qbshb
+            foreign_currency = curr_pay
+            local_currency   = t001-waers
+*                        rate from tcurr
+            type_of_rate     = 'M'
+          IMPORTING
+            local_amount     = bsik-qbshb.
+      ENDIF.
+    ENDIF.
+
+*     Converts invoice amount into local currency
+    IF wqsshb NE 0.
+*===> (MOD)   JLRA (RUBIOA2) - CORRECCIÓN - 02.07.2026  (BEGIN) <===
+* OLD CODE :
+*      rate = bsik-qsshb / wqsshb.
+*      bsik-dmbtr = bsik-wrbtr * rate.
+*
+* NEW CODE :
+      rate = CONV decfloat34( bsik-qsshb )  /
+             CONV decfloat34( wqsshb ).
+      bsik-dmbtr = CONV decfloat34( bsik-wrbtr ) * CONV decfloat34( rate ).
+*<=== (MOD)   JLRA (RUBIOA2) - CORRECCIÓN - 02.07.2026 (END) <===
+
+      CLEAR: wqsshb,
+             rate.
+    ENDIF.
+
+*---------------- Conversion at payment time ---------------------------
+  ELSE.
+
+*     Converts WT base of old WT
+
+    IF curr_inv NE t001-waers.
+
+*      wqsshb = bsik-qsshb.          "===> (DEL)   JLRA (RUBIOA2) - CORRECCIÓN - 02.07.2026
+      wqsshb = CONV #( bsik-qsshb ). "===> (INS)   JLRA (RUBIOA2) - CORRECCIÓN - 02.07.2026
+
+      IF curr_inv = curr_pay.
+        CALL FUNCTION 'CONVERT_TO_LOCAL_CURRENCY'
+          EXPORTING
+            date             = pay_date
+            foreign_currency = curr_inv
+            local_currency   = t001-waers
+            foreign_amount   = bsik-qsshb
+            rate             = rate_pay
+            type_of_rate     = 'M'
+          IMPORTING
+            local_amount     = bsik-qsshb.
+      ELSE.
+        CALL FUNCTION 'CONVERT_TO_LOCAL_CURRENCY'
+          EXPORTING
+            date             = pay_date
+            foreign_currency = curr_inv
+            local_currency   = t001-waers
+            foreign_amount   = bsik-qsshb
+*                        rate from tcurr
+            type_of_rate     = 'M'
+          IMPORTING
+            local_amount     = bsik-qsshb.
+      ENDIF.
+
+*       Converts invoice amount
+      IF wqsshb NE 0.
+
+*===> (MOD)   JLRA (RUBIOA2) - CORRECCIÓN - 02.07.2026  (BEGIN) <===
+* OLD CODE:
+*        rate = bsik-qsshb / wqsshb.
+*        bsik-dmbtr = bsik-wrbtr * rate.
+*
+* NEW CODE:
+        rate = CONV decfloat34( bsik-qsshb ) /
+               CONV decfloat34( wqsshb ).
+
+        bsik-dmbtr = CONV decfloat34( bsik-wrbtr ) * CONV decfloat34( rate ).
+*<=== (INS)   JLRA (RUBIOA2) - CORRECCIÓN - 02.07.2026  (END) <===
+
+
+        CLEAR: wqsshb,
+               rate.
+      ENDIF.
+    ENDIF.
+
+*     Converts WT amount of old WT
+    IF curr_pay NE t001-waers.
+      CALL FUNCTION 'CONVERT_TO_LOCAL_CURRENCY'
+        EXPORTING
+          date             = pay_date
+          foreign_currency = curr_pay
+          local_currency   = t001-waers
+          foreign_amount   = bsik-qbshb
+          rate             = rate_pay
+          type_of_rate     = 'M'
+        IMPORTING
+          local_amount     = bsik-qbshb.
+    ENDIF.
+
+  ENDIF.                                          " End of conversion
+
+ENDFORM.                    " CONVERT_INTO_LOC_CURR_OLD_WT
+
+*&---------------------------------------------------------------------*
+*&      Form  PREP_DATA_EXTR_EXT_WT_CTRGR_4
+*&---------------------------------------------------------------------*
+*                   Form 'prep_data_extract_ext_wt_ctrgr_4'            *
+*                   Performs several selection checks and fills        *
+*                   the fields of the data extract.                    *
+*                   The selection checks are specific for the          *
+*                   country group (ctrgr).                             *
+*                   Country group 1 is currently used for:             *
+*                   CO, MX                                             *
+*----------------------------------------------------------------------*
+*  -->  p1        text
+*  <--  p2        text
+*----------------------------------------------------------------------*
+FORM prep_data_extr_ext_wt_ctrgr_4 CHANGING p_processing_flag.
+
+  CLEAR p_processing_flag.
+
+  CHECK belnum.
+  CHECK buchdt.
+  IF bsik-umsks = ' '.
+    CHECK bsik-bschl IN buschl.
+  ENDIF.
+
+*      case bsik-umsks.
+*        when ' '.
+*          check bsik-augbl ne space.  "estaba comentariado
+*          check augdat.               "estaba comentariado
+*          check bsik-bschl in buschl.
+*        when 'A'.
+*          check buchdt.               "estaba comentariado
+*          if bsik-shkzg eq 'S'.
+*            move  'H' to bsik-shkzg.
+*          else.
+*            move  'S' to bsik-shkzg.
+*          endif.
+*
+*         ------------------- Switch sign of WT in case of down payment
+*          x_with_item-wt_qsshh = x_with_item-wt_qsshh * -1.
+*          x_with_item-wt_qbshh = x_with_item-wt_qbshh * -1.
+*        when others.
+*          reject.
+*      endcase.
+
+  IF bsik-shkzg EQ 'H'.
+    wdmbtr = h_dmbtr.
+
+*===> (MOD)   JLRA (RUBIOA2) - CORRECCIÓN - 02.07.2026  (BEGIN) <===
+* OLD CODE :
+*    wwrbtr = bsik-wrbtr.
+*    wqsshb = x_with_item-wt_qsshh * -1.
+*    wqbshb = x_with_item-wt_qbshh * -1.
+*  ELSE.
+*    wdmbtr = h_dmbtr * -1.
+*    wwrbtr = bsik-wrbtr * -1.
+*    wqsshb = x_with_item-wt_qsshh * -1.
+*    wqbshb = x_with_item-wt_qbshh * -1.
+*
+* NEW CODE :
+    wwrbtr = CONV #( bsik-wrbtr ).
+    lv_wt_qbshh = CONV #( x_with_item-wt_qbshh ).
+    lv_wt_qsshh = CONV #( x_with_item-wt_qsshh ).
+
+    wqsshb = - lv_wt_qsshh .
+    wqbshb = - lv_wt_qbshh .
+  ELSE.
+    lv_dmbtr    = CONV #( h_dmbtr ).
+    lv_wrbtr    = CONV #( bsik-wrbtr ).
+    lv_wt_qbshh = CONV #( x_with_item-wt_qbshh ).
+    lv_wt_qsshh = CONV #( x_with_item-wt_qsshh ).
+
+    wdmbtr = - lv_dmbtr .
+    wwrbtr = - lv_wrbtr .
+    wqsshb = - lv_wt_qsshh .
+    wqbshb = - lv_wt_qbshh .
+*<=== (MOD)   JLRA (RUBIOA2) - CORRECCIÓN - 02.07.2026 (END) <===
+
+  ENDIF.
+
+*     Net amount with respect to WT base
+  wqsfbt = wdmbtr - wqsshb.
+
+*     Net amount with respect to VAT tax
+*     netto  = wdmbtr - wqbshb.
+  PERFORM get_tax_amount TABLES x_wt_at_invoice
+                          USING 'X'                        " New WT
+                                bsik
+                                vdmbtr.
+
+  lv_vdmbtr = CONV #( vdmbtr ). "===> (INS)   JLRA (RUBIOA2) - CORRECCIÓN - 02.07.2026
+*  netto  = wdmbtr - vdmbtr.    "===> (DEL)   JLRA (RUBIOA2) - CORRECCIÓN - 02.07.2026
+  netto  = wdmbtr - lv_vdmbtr.  "===> (INS)   JLRA (RUBIOA2) - CORRECCIÓN - 02.07.2026
+
+  p_processing_flag = 'X'.
+
+ENDFORM.                    " PREP_DATA_EXTR_EXT_WT_CTRGR_4
+
+*&---------------------------------------------------------------------*
+*&      Form  PREP_DATA_EXTR_OLD_WT_CTRGR_4
+*&---------------------------------------------------------------------*
+*                   Form 'prep_data_extract_old_wt_ctrgr_4'            *
+*                   Performs several selection checks and fills        *
+*                   the fields of the data extract.                    *
+*                   The selection checks are specific for the          *
+*                   country group (ctrgr).                             *
+*                   Country group 1 is currently used for:             *
+*                   CO, MX                                             *
+*----------------------------------------------------------------------*
+*  -->  p1        text
+*  <--  p2        text
+*----------------------------------------------------------------------*
+FORM prep_data_extr_old_wt_ctrgr_4 CHANGING p_processing_flag.
+
+  CLEAR p_processing_flag.
+
+  CHECK belnum.
+  CHECK buchdt.                    " insert for colombia and mexico
+  IF bsik-umsks = ' '.
+    CHECK bsik-bschl IN buschl.
+  ENDIF.
+
+*      case bsik-umsks.
+*        when ' '.
+*          check bsik-augbl ne space. "Estaba comentariado
+*         check augdat.               "Estaba comentariado
+*          check bsik-bschl in buschl.
+*        when 'A'.
+*          check buchdt.              "Estaba comentariado
+*          if bsik-shkzg eq 'S'.
+*            move  'H' to bsik-shkzg.
+*          else.
+*            move  'S' to bsik-shkzg.
+*          endif.
+*        when others.
+*          reject.
+*      endcase.
+
+  IF bsik-shkzg EQ 'H'.
+*===> (MOD)   JLRA (RUBIOA2) - CORRECCIÓN - 02.07.2026  (BEGIN) <===
+* OLD CODE :
+*    wdmbtr = bsik-dmbtr.
+*    wwrbtr = bsik-wrbtr.
+*    wqsshb = bsik-qsshb.
+*    wqbshb = bsik-qbshb.
+*
+* NEW CODE :
+    wdmbtr = CONV #( bsik-dmbtr ).
+    wwrbtr = CONV #( bsik-wrbtr ).
+    wqsshb = CONV #( bsik-qsshb ).
+    wqbshb = CONV #( bsik-qbshb ).
+
+*<=== (MOD)   JLRA (RUBIOA2) - CORRECCIÓN - 02.07.2026 (END) <===
+
+  ELSE.
+
+*===> (MOD)   JLRA (RUBIOA2) - CORRECCIÓN - 02.07.2026  (BEGIN) <===
+* OLD CODE :
+*    wdmbtr = bsik-dmbtr * -1.
+*    wwrbtr = bsik-wrbtr * -1.
+*    wqsshb = bsik-qsshb * -1.
+*    wqbshb = bsik-qbshb * -1.
+*
+* NEW CODE :
+    lv_dmbtr    = CONV #( bsik-dmbtr ).
+    lv_wrbtr    = CONV #( bsik-wrbtr ).
+    lv_wt_qsshh = CONV #( bsik-qsshb ).
+    lv_wt_qbshh = CONV #( bsik-qbshb ).
+
+    wdmbtr = - lv_dmbtr .
+    wwrbtr = - lv_wrbtr .
+    wqsshb = - lv_wt_qsshh .
+    wqbshb = - lv_wt_qbshh .
+
+*<=== (MOD)   JLRA (RUBIOA2) - CORRECCIÓN - 02.07.2026 (END) <===
+  ENDIF.
+
+*     Net amount with respect to WT base
+  wqsfbt = wdmbtr - wqsshb.
+
+*     Net amount with respect to VAT tax
+*     netto  = wdmbtr - wqbshb.
+  PERFORM get_tax_amount TABLES x_wt_at_invoice
+                          USING ' '                        " Old WT
+                                bsik
+                                vdmbtr.
+  lv_vdmbtr = CONV #( vdmbtr ). "===> (INS)   JLRA (RUBIOA2) - CORRECCIÓN - 02.07.2026
+*  netto  = wdmbtr - vdmbtr.    "===> (DEL)   JLRA (RUBIOA2) - CORRECCIÓN - 02.07.2026
+  netto  = wdmbtr - lv_vdmbtr.  "===> (INS)   JLRA (RUBIOA2) - CORRECCIÓN - 02.07.2026
+
+  p_processing_flag = 'X'.
+
+ENDFORM.                    " PREP_DATA_EXTR_OLD_WT_CTRGR_4
+
+*&---------------------------------------------------------------------*
+*&      Form  GET_REPYEAR
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*      -->P_H_REPYEAR  text
+*----------------------------------------------------------------------*
+FORM get_repyear TABLES i_repyear LIKE t_repyear[].
+
+  DATA: current_index TYPE i,
+        lower_budat   LIKE bsik-budat.
+
+  CLEAR   i_repyear.
+  REFRESH i_repyear.
+
+  LOOP.
+
+    AT NEW bsik-bukrs.
+      i_repyear-bukrs   = bsik-bukrs.
+      i_repyear-repyear = bsik-gjahr.
+      APPEND i_repyear.
+      current_index = sy-tabix.
+      lower_budat = bsik-budat.
+    ENDAT.
+
+    IF bsik-budat <  lower_budat AND
+       bsik-gjahr <> i_repyear-repyear.
+      i_repyear-repyear = bsik-gjahr.
+      MODIFY i_repyear INDEX current_index.
+    ENDIF.
+
+  ENDLOOP.
+
+ENDFORM.                    " GET_REPYEAR
+
+*&---------------------------------------------------------------------*
+*&      Form  GET_TAX_AMOUNT
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*      -->P_WDMBTR  text
+*      -->P_VDMBTR  text
+*----------------------------------------------------------------------*
+FORM get_tax_amount TABLES p_x_wt_at_invoice LIKE x_wt_at_invoice[]
+                     USING VALUE(p_ext_wt)
+                           VALUE(p_bsik)  LIKE bsik
+                                 p_vdmbtr LIKE bset-hwste.
+
+  DATA: i_bseg LIKE bseg OCCURS 10 WITH HEADER LINE.
+  DATA: i_bset LIKE bset OCCURS 10 WITH HEADER LINE.
+  DATA: sum_dmbtr LIKE bsik-dmbtr,
+        h_dmbtr   LIKE bsik-dmbtr,
+        sum_hwste LIKE bset-hwste,
+        p_rate    TYPE f.
+
+  CLEAR p_vdmbtr.
+
+* Get complete document
+*===> (MOD)   JLRA (RUBIOA2) - CORRECCIÓN S/4 - 02.07.2026  (BEGIN) <===
+* OLD CODE :
+*  SELECT * FROM bseg INTO TABLE i_bseg WHERE bukrs = p_bsik-bukrs
+*                                         AND belnr = p_bsik-belnr
+*                                         AND gjahr = p_bsik-gjahr.
+** Add WT at invoice amounts
+*  IF p_ext_wt = 'X'.
+*    LOOP AT i_bseg WHERE koart = 'K'.
+**     Read total WT at invoice
+*      READ TABLE p_x_wt_at_invoice WITH KEY bukrs = i_bseg-bukrs
+*                                            belnr = i_bseg-belnr
+*                                            gjahr = i_bseg-gjahr
+*                                            buzei = i_bseg-buzei.
+*      IF p_x_wt_at_invoice-wt_qbshh < 0.
+*        p_x_wt_at_invoice-wt_qbshh = p_x_wt_at_invoice-wt_qbshh * -1.
+*      ENDIF.
+*      i_bseg-dmbtr = i_bseg-dmbtr + p_x_wt_at_invoice-wt_qbshh.
+*      MODIFY i_bseg.
+*    ENDLOOP.
+*  ENDIF.
+*
+* NEW CODE :
+  SELECT *
+    FROM acdoca
+    INTO TABLE @DATA(lt_acdoca)
+    WHERE rbukrs = @p_bsik-bukrs
+      AND belnr  = @p_bsik-belnr
+      AND gjahr  = @p_bsik-gjahr
+    ORDER BY PRIMARY KEY.
+  IF sy-subrc EQ 0.
+* Add WT at invoice amounts
+    IF p_ext_wt = 'X'.
+      LOOP AT lt_acdoca ASSIGNING FIELD-SYMBOL(<lfs_acdoca>)
+        WHERE koart = 'K'.
+*     Read total WT at invoice
+        READ TABLE p_x_wt_at_invoice WITH KEY bukrs = <lfs_acdoca>-rbukrs
+                                              belnr = <lfs_acdoca>-belnr
+                                              gjahr = <lfs_acdoca>-gjahr
+                                              buzei = <lfs_acdoca>-buzei.
+        IF p_x_wt_at_invoice-wt_qbshh < 0.
+          p_x_wt_at_invoice-wt_qbshh = p_x_wt_at_invoice-wt_qbshh * -1.
+        ENDIF.
+        <lfs_acdoca>-hsl = <lfs_acdoca>-hsl + p_x_wt_at_invoice-wt_qbshh.
+      ENDLOOP.
+    ENDIF.
+  ENDIF.
+*<=== (MOD)   JLRA (RUBIOA2) - CORRECCIÓN S/4 - 02.07.2026 (END) <===
+
+* Get tax information
+  SELECT * FROM bset INTO TABLE i_bset WHERE bukrs = p_bsik-bukrs
+                                         AND belnr = p_bsik-belnr
+                                         AND gjahr = p_bsik-gjahr
+    ORDER BY PRIMARY KEY. "===> (INS)   JLRA (RUBIOA2) - CORRECCIÓN - 02.07.2026
+
+* Determine relative contribution of current vendor line
+  CLEAR sum_dmbtr.
+*===> (MOD)   JLRA (RUBIOA2) - CORRECCIÓN - 02.07.2026  (BEGIN) <===
+* OLD CODE :
+*  LOOP AT i_bseg WHERE koart = 'K'.
+*
+*    IF i_bseg-shkzg = 'H'.
+*      i_bseg-dmbtr = i_bseg-dmbtr * -1.
+*    ENDIF.
+*
+*    sum_dmbtr = sum_dmbtr + i_bseg-dmbtr.
+*    IF i_bseg-buzei = p_bsik-buzei.
+*      h_dmbtr = i_bseg-dmbtr.
+*    ENDIF.
+*
+*  ENDLOOP.
+*
+* NEW CODE :
+  LOOP AT lt_acdoca ASSIGNING <lfs_acdoca>
+    WHERE koart = 'K'.
+
+    sum_dmbtr = sum_dmbtr + <lfs_acdoca>-hsl.
+    IF <lfs_acdoca>-buzei = p_bsik-buzei.
+      h_dmbtr = <lfs_acdoca>-hsl.
+    ENDIF.
+
+  ENDLOOP.
+*<=== (MOD)   JLRA (RUBIOA2) - CORRECCIÓN - 02.07.2026 (END) <===
+
+
+  IF sum_dmbtr <> 0.
+*    p_rate = h_dmbtr / sum_dmbtr.                                     "===> (DEL)   JLRA (RUBIOA2) - CORRECCIÓN - 02.07.2026
+    p_rate = CONV decfloat34( h_dmbtr ) / CONV decfloat34( sum_dmbtr )."===> (INS)   JLRA (RUBIOA2) - CORRECCIÓN - 02.07.2026
+  ELSE.
+    p_rate = 0.
+  ENDIF.
+
+* Determine tax amount
+  CLEAR sum_hwste.
+  LOOP AT i_bset.
+    IF i_bset-shkzg = 'H'.
+      i_bset-hwste = i_bset-hwste * -1.
+    ENDIF.
+    sum_hwste = sum_hwste + i_bset-hwste.
+  ENDLOOP.
+
+*  p_vdmbtr = p_rate * sum_hwste.                                      "===> (DEL)   JLRA (RUBIOA2) - CORRECCIÓN - 02.07.2026
+  p_vdmbtr = CONV decfloat34( p_rate ) * CONV decfloat34( sum_hwste ). "===> (INS)   JLRA (RUBIOA2) - CORRECCIÓN - 02.07.2026
+
+ENDFORM.                    " GET_TAX_AMOUNT
+
+*&---------------------------------------------------------------------*
+*&      Form  GET_TOTAL_WT_AT_INVOICE
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*      -->P_X_WITH_ITEM  text
+*      -->P_X_T059P  text
+*      -->P_X_WT_AT_INVOICE  text
+*----------------------------------------------------------------------*
+FORM get_total_wt_at_invoice
+                  TABLES p_x_with_item STRUCTURE with_item
+                         p_x_t059p STRUCTURE t059p
+                         p_x_wt_at_invoice LIKE x_wt_at_invoice[]
+                   USING VALUE(p_land1) LIKE t001-land1.
+
+  CLEAR   p_x_wt_at_invoice.        " Set accumulation values to zero
+  REFRESH p_x_wt_at_invoice.
+
+  LOOP AT p_x_with_item.                         " Loop over WT types
+
+*     WT type with posting at invoice or at payment?
+    PERFORM read_t059p TABLES p_x_t059p
+                        USING p_land1
+                              p_x_with_item-witht.
+
+*     If Withholding tax at invoice, accumulate the WT amounts.
+    IF p_x_t059p-wt_postm = '1'.
+      p_x_wt_at_invoice-bukrs    = p_x_with_item-bukrs.
+      p_x_wt_at_invoice-belnr    = p_x_with_item-belnr.
+      p_x_wt_at_invoice-gjahr    = p_x_with_item-gjahr.
+      p_x_wt_at_invoice-buzei    = p_x_with_item-buzei.
+      p_x_wt_at_invoice-wt_qbshh = p_x_with_item-wt_qbshh.
+      p_x_wt_at_invoice-wt_qbshb = p_x_with_item-wt_qbshb.
+      COLLECT p_x_wt_at_invoice.
+    ENDIF.
+
+  ENDLOOP.                                         " at p_x_with_item
+
+ENDFORM.                    " GET_TOTAL_WT_AT_INVOICE
+*&---------------------------------------------------------------------*
+*&      Form  GET_CPD_DATA
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*  -->  p1        text
+*  <--  p2        text
+*----------------------------------------------------------------------*
+FORM get_cpd_data.
+
+  IF bsik-xcpdd EQ ' '.
+    MOVE bsik-lifnr TO liefer.
+  ELSE.
+    SELECT SINGLE * FROM bsec
+      WHERE bukrs EQ bsik-bukrs
+      AND   belnr EQ bsik-belnr
+      AND   gjahr EQ bsik-gjahr
+      AND   buzei EQ bsik-buzei.
+    MOVE bsik-lifnr TO liefer+0(10).
+    MOVE bsec-name1 TO liefer+10(10).
+    MOVE bsec-stras TO liefer+20(8).
+    MOVE bsec-pstlz TO liefer+28(7).
+    MOVE bsec-name1 TO wname1.
+    MOVE bsec-name2 TO wname2.
+    MOVE bsec-name3 TO wname3.
+    MOVE bsec-name4 TO wname4.
+    MOVE bsec-stras TO wstras.
+    MOVE bsec-pfach TO wpfach.
+    MOVE bsec-pstlz TO wpstlz.
+    MOVE bsec-pstl2 TO wpstl2.
+    MOVE bsec-ort01 TO wort01.
+    MOVE bsec-regio TO wregio.
+    MOVE bsec-stcd1 TO wstcd1.                           "INSERT65219
+    MOVE bsec-land1 TO wland1.
+  ENDIF.
+ENDFORM.                    " GET_CPD_DATA
+
+************************ASISTENCIA¨********************************** ZRFKQST20
+
+REPORT RFKQST20 LINE-SIZE 132
+                LINE-COUNT 65
+                NO STANDARD PAGE HEADING
+                MESSAGE-ID FR.
+
+*----------------------------------------------------------------------*
+*                            Data declaration                          *
+*----------------------------------------------------------------------*
+
+TABLES: BSIK,
+        BKPF,
+        BSEG,
+        BSET,
+        BSEC,
+        LFA1,
+        LFB1,
+        TBSL,
+        RFPDO,
+        RFKHELP,
+        T001,
+        T005U,
+        TLINE,
+        T059Q,
+        BHDGD,
+        T001F,
+        T001G,
+        ADDR1_VAL,
+        SADR,
+        ADRS,
+        ITCPO,
+        ADRC,
+        T001Z,
+        T059G,
+        ZFORMA,
+
+*       Extended withholding tax
+        T059P,
+        T059Z,
+        T059ZT,
+        T059MINMAX,
+        WITH_ITEM.
+
+
+ DATA: BEGIN OF ADRESS,
+       NAME1 LIKE LFA1-NAME1,
+       STRAS(26) TYPE C,
+       PSTLZ LIKE LFA1-PSTLZ,
+       ORT01(25) TYPE C,
+      END OF ADRESS,
+
+       BEGIN OF KTAB OCCURS 50,
+         WITHT LIKE WITH_ITEM-WITHT,
+         QSSKZ LIKE BSIK-QSSKZ,
+         QSZNR LIKE BSIK-QSZNR,
+         BUDAT LIKE BSIK-BUDAT,
+         XBLNR LIKE BSIK-XBLNR,
+         BELNR LIKE BSIK-BELNR,
+         BSCHL LIKE BSIK-BSCHL,
+         UMSKS LIKE BSIK-UMSKS,
+         BUZEI LIKE BSIK-BUZEI,
+         BLART LIKE BSIK-BLART,
+         BLDAT LIKE BSIK-BLDAT,
+         AUGDT LIKE BSIK-AUGDT,
+         AUGBL LIKE BSIK-AUGBL,
+         WAERS LIKE BSIK-WAERS,
+* ------------------------- SAP COLOMBIA ------------------------------*
+* Author  : Diana del Pilar Rocha
+* Date    : December 14 / 2000
+* Subject : Overflow problems
+
+*        wdmbtr like bsik-dmbtr,
+*        wwrbtr like bsik-wrbtr,
+*        wqsshb like bsik-qsshb,
+*        wqbshb like bsik-qbshb,
+*        netto  like bsik-dmbtr,
+*        wqsfbt like bsik-qsfbt,
+
+         WDMBTR(10) TYPE P DECIMALS 2,
+         WWRBTR(10) TYPE P DECIMALS 2,
+         WQSSHB(10) TYPE P DECIMALS 2,
+         WQBSHB(10) TYPE P DECIMALS 2,
+         NETTO(10) TYPE P DECIMALS 2,
+         WQSFBT(10) TYPE P DECIMALS 2,
+         MONAT  LIKE BSIK-MONAT,
+* --------------------  END SAP COLOMBIA ------------------------------*
+      END OF KTAB,
+
+      BEGIN OF ETAB OCCURS 10,
+       WITHT LIKE WITH_ITEM-WITHT,
+       QSSKZ LIKE BSIK-QSSKZ,
+* ------------------------- SAP COLOMBIA ------------------------------*
+* Author  : Diana del Pilar Rocha
+* Date    : December 14 / 2000
+* Subject : Overflow problems
+
+*       wdmbtr like bsik-dmbtr,
+*       wqsshb like bsik-qsshb,
+*       wqbshb like bsik-qbshb,
+*       netto  like bsik-dmbtr,
+*       wqsfbt like bsik-qsfbt,
+*      end of etab,
+
+       WDMBTR(10) TYPE P DECIMALS 2,
+       WQSSHB(10) TYPE P DECIMALS 2,
+       WQBSHB(10) TYPE P DECIMALS 2,
+       NETTO(10) TYPE P DECIMALS 2,
+       WQSFBT(10) TYPE P DECIMALS 2,
+* ------------------------- SAP COLOMBIA ------------------------------*
+      END OF ETAB,
+
+      BEGIN OF STAB OCCURS 10,
+       HELPCHAR,
+* ------------------------- SAP COLOMBIA ------------------------------*
+* Author  : Diana del Pilar Rocha
+* Date    : December 14 / 2000
+* Subject : Overflow problems
+
+*       wdmbtr like bsik-dmbtr,
+*       wqsshb like bsik-qsshb,
+*       wqbshb like bsik-qbshb,
+*       netto  like bsik-dmbtr,
+*       wqsfbt like bsik-qsfbt,
+
+       WDMBTR(10) TYPE P DECIMALS 2,
+       WQSSHB(10) TYPE P DECIMALS 2,
+       WQBSHB(10) TYPE P DECIMALS 2,
+       NETTO(10)  TYPE P DECIMALS 2,
+       WQSFBT(10) TYPE P DECIMALS 2,
+      END OF STAB,
+* --------------------- END SAP COLOMBIA ------------------------------*
+
+      BEGIN OF BTAB OCCURS 10,
+       AUGBL LIKE BSIK-AUGBL,
+       QSZNR LIKE BSIK-QSZNR,
+      END OF BTAB,
+
+*     Internal tables for extended withholding
+      X_WITH_ITEM  LIKE WITH_ITEM  OCCURS 1 WITH HEADER LINE,
+      I_WITH_ITEM  LIKE WITH_ITEM  OCCURS 1 WITH HEADER LINE,
+      X_T059P      LIKE T059P      OCCURS 1 WITH HEADER LINE,
+      X_T059Z      LIKE T059Z      OCCURS 1 WITH HEADER LINE,
+      X_T059ZT     LIKE T059ZT     OCCURS 1 WITH HEADER LINE,
+      X_T059MINMAX LIKE T059MINMAX OCCURS 1 WITH HEADER LINE,
+
+      BEGIN OF X_WT_AT_INVOICE OCCURS 10,
+        BUKRS LIKE WITH_ITEM-BUKRS,
+        BELNR LIKE WITH_ITEM-BELNR,
+        GJAHR LIKE WITH_ITEM-GJAHR,
+        BUZEI LIKE WITH_ITEM-BUZEI,
+        WT_QBSHH LIKE WITH_ITEM-WT_QBSHH,
+        WT_QBSHB LIKE WITH_ITEM-WT_QBSHB,
+      END OF X_WT_AT_INVOICE.
+
+DATA: BEGIN OF KOPF.
+        INCLUDE STRUCTURE THEAD.
+DATA: END OF KOPF.
+
+DATA: FLAG1(1) TYPE N,
+      FLAG2(1) TYPE N,
+      FLAG3(1) TYPE N,
+      FLAG4(1) TYPE N,
+      FLAG5(1) TYPE N,
+      FLAG6(1) TYPE C,
+      COUNT2   TYPE P,
+
+
+      COUNT3   TYPE P,
+      LFDNUM(5) TYPE N VALUE 0,
+      WTITLE(40) TYPE C,
+      STRING(132) TYPE C,
+      X(40) TYPE C,
+      Y     LIKE BSEG-DMBTR,
+      BISDT TYPE D,
+      VONDT TYPE D,
+* ------------------------- SAP COLOMBIA ------------------------------*
+* Author  : Diana del Pilar Rocha
+* Date    : Enero 18 / 2001
+* Subject : Overflow problems
+
+*      wdmbtr like bsik-dmbtr,
+*      h_dmbtr like bsik-dmbtr,
+*      wwrbtr like bsik-dmbtr,
+*      wqsshb like bsik-qsshb,
+*      wqbshb like bsik-qbshb,
+*      wqsfbt like bsik-qsfbt,
+*      netto  like bsik-dmbtr,
+
+      WDMBTR(10) TYPE P DECIMALS 2,
+      H_DMBTR(10) TYPE P DECIMALS 2,
+      WWRBTR(10) TYPE P DECIMALS 2,
+      WQSSHB(10) TYPE P DECIMALS 2,
+      WQBSHB(10) TYPE P DECIMALS 2,
+      WQSFBT(10) TYPE P DECIMALS 2,
+      NETTO(10) TYPE P DECIMALS 2,
+* ------------------------- End SAP Colombia --------------------------*
+
+      VDMBTR LIKE BSET-HWSTE,
+*     Extended withholding tax
+      OLD_WITH    TYPE C,
+      NEW_WITH    TYPE C,
+      E_WITHT LIKE WITH_ITEM-WITHT,
+*     Currency conversion
+      RATE TYPE F,
+      INV_DATE LIKE BKPF-WWERT,                          " Invoice date
+      CURR_INV LIKE BSIK-WAERS,                      " Invoice currency
+      RATE_INV LIKE BKPF-KURSF,        " Manually given rate at invoice
+      PAY_DATE LIKE BKPF-WWERT,                          " Payment date
+      CURR_PAY LIKE BSIK-WAERS,                      " Payment currency
+      RATE_PAY LIKE BKPF-KURSF,        " Manually given rate at payment
+      CONV_DATE LIKE BKPF-WWERT,                        " Exchange date
+*     Conversion into alternative local currency
+      H_WDMBTR LIKE BSIK-DMBTR,                             " <--- Euro
+      ALT_RATE TYPE F,                                      " <--- Euro
+      OUTPUTWAERS LIKE T001-WAERS,                          " <--- Euro2
+*     Adress data
+      WNAME1 LIKE BSEC-NAME1,
+      WNAME2 LIKE BSEC-NAME2,
+      WNAME3 LIKE BSEC-NAME3,
+      WNAME4 LIKE BSEC-NAME4,
+      WSTRAS LIKE BSEC-STRAS,
+      WPFACH LIKE BSEC-PFACH,
+      WPSTLZ LIKE BSEC-PSTLZ,
+      WPSTL2 LIKE BSEC-PSTL2,
+      WORT01 LIKE BSEC-ORT01,
+      WSTCD1 LIKE BSEC-STCD1,                             "INSERT 65219
+      WREGIO LIKE BSEC-REGIO,
+      WLAND1 LIKE BSEC-LAND1,
+      WAERS  LIKE T001-WAERS,
+      KURSDAT LIKE BSIK-AUGDT,
+      LIEFER(35) TYPE C,
+      HILFE(47) TYPE C,
+      H_ZAEHL  LIKE RFPDO-KQSTCOUNT,
+      H_LINES  TYPE P,
+      ANSWER LIKE SY-TFILL.
+DATA: TOPLENGTH(2) TYPE N.
+*     SAPFORMS LIKE RSSCF-TDFORM.
+DATA: BEGIN OF T_REPYEAR OCCURS 10,
+        BUKRS   LIKE BSIK-BUKRS,
+        REPYEAR LIKE RFKHELP-REPYEAR,                  " Reporting year
+      END OF T_REPYEAR.
+DATA: PROCESSING_FLAG TYPE C,
+      BUKRS_ADRS LIKE ADDR1_SEL.
+
+*------------------------Changes for Colombia -------------------------*
+* Author  : Diana Rocha
+* Subject : New Internal Tables
+
+DATA : BEGIN OF T_ACUM OCCURS 0,
+        NUMPR LIKE BSIK-MONAT,
+        DESPR(10) TYPE C,
+       END OF T_ACUM.
+
+DATA : BEGIN OF T_DATA OCCURS 0,
+         NUMPR  LIKE BSIK-MONAT,
+         DESPR(10) TYPE C,
+         WITHT  LIKE WITH_ITEM-WITHT,
+         QSSKZ  LIKE BSIK-QSSKZ,
+         QEKAR  LIKE T059Z-QEKAR,
+         QSATZ  LIKE T059Z-QSATZ,
+         NETTO  LIKE BSIK-DMBTR,
+         QBSHB  LIKE BSIK-QBSHB,
+         QSSHB  LIKE BSIK-QSSHB,
+       END OF T_DATA.
+
+DATA : PERIOD TYPE I.
+
+DATA : BEGIN OF W_DATA OCCURS 0,
+         NUMPR  LIKE BSIK-MONAT,
+         DESPR(10) TYPE C,
+         QEKAR  LIKE T059Z-QEKAR,
+         QSATZ(9)  TYPE C,
+         NETTO  LIKE BSIK-DMBTR,
+         QBSHB  LIKE BSIK-QBSHB,
+         QSSHB  LIKE BSIK-QSSHB,
+       END OF W_DATA.
+
+DATA : BEGIN OF Y_DATA OCCURS 0,
+         BELNR  LIKE BSIK-BELNR,
+         BUDAT  LIKE BSIK-BUDAT,
+         XBLNR  LIKE BSIK-XBLNR,
+         WITHT  LIKE WITH_ITEM-WITHT,
+         QSSKZ  LIKE BSIK-QSSKZ,
+         QEKAR  LIKE T059Z-QEKAR,
+         QSATZ  LIKE T059Z-QSATZ,
+         NETTO  LIKE BSIK-DMBTR,
+         QBSHB  LIKE BSIK-QBSHB,
+         QSSHB  LIKE BSIK-QSSHB,
+       END OF Y_DATA.
+
+DATA : BEGIN OF Z_DATA OCCURS 0,
+         NUMPR  LIKE BSIK-MONAT,
+         DESPR(10) TYPE C,
+         QEKAR  LIKE T059Z-QEKAR,
+         NETTO  LIKE BSIK-DMBTR,
+         QBSHB  LIKE BSIK-QBSHB,
+* ----------------------------- SAP ------------------------------------
+* Author  : Diana Rocha
+* Date    : August 1/2002
+* Subject : Add Base Amount for ICA withholding tax
+         QSSHB  LIKE BSIK-QSSHB,
+* --------------------------- END SAP ----------------------------------
+       END OF Z_DATA.
+
+DATA : BEGIN OF X_DATA OCCURS 0,
+         WITHT  LIKE WITH_ITEM-WITHT,
+         QSSKZ  LIKE BSIK-QSSKZ,
+         QBSHB  LIKE BSIK-QBSHB,
+         QSSHB  LIKE BSIK-QSSHB,
+       END OF X_DATA.
+
+DATA: BEGIN OF DATEREC,
+        YEAR(4)  TYPE C,
+        MONTH(2) TYPE C,
+        DAY(2)   TYPE C,
+      END OF DATEREC.
+
+DATA : SEPARATOR(1) VALUE '/'.
+
+*--------------------------- Colombia ---------------------------------*
+
+*----------------------------------------------------------------------*
+*               Definition of select options and parameters            *
+*----------------------------------------------------------------------*
+
+*-------------- Additional Selections: Block 1 -------------------------
+BEGIN_OF_BLOCK 1.
+SELECT-OPTIONS: BELART  FOR BSIK-BLART,
+                BELNUM  FOR BSIK-BELNR NO DATABASE SELECTION,
+                AUGDAT  FOR BSIK-AUGDT NO-EXTENSION
+                                       NO DATABASE SELECTION,
+                BUCHDT  FOR BSIK-BUDAT NO-EXTENSION
+                                       NO DATABASE SELECTION,
+                WITHT   FOR WITH_ITEM-WITHT,
+                QSTKZ   FOR BSIK-QSSKZ NO DATABASE SELECTION.
+
+*----------------------- Changes for Colombia -------------------------*
+* Author  : Diana Rocha
+* Subjecj : City where the Withholding tax is withheld (ICA)
+ PARAMETERS :    CITY(37) TYPE C.
+*----------------------------- Colombia -------------------------------*
+
+ PARAMETERS : UNAUSGEG LIKE RFPDO-KQSTXFEL6,
+              UMRECHN  LIKE RFPDO2-KQSTXFL8.
+
+* -------- Additional Selection: 'Alternative Local Currency' ---------
+SELECTION-SCREEN: ULINE,                                    " <--- Euro
+                  COMMENT /1(65) TEXT-112.                  " <--- Euro
+PARAMETERS: ALTCURR LIKE T001-WAERS,                        " <--- Euro
+            CONVDAT LIKE SYST-DATUM.                        " <--- Euro
+END_OF_BLOCK 1.
+
+*--------------- Additional Selections: Block 2 -----------------------
+BEGIN_OF_BLOCK 2.
+PARAMETERS: FORMULAR LIKE RFPDO-KQSUFORMRP DEFAULT 'X',
+*           testdrck like rfpdo-kqsttestd default '2',  " Testprint no.
+            TESTDRCK LIKE RFPDO-KQSTTESTD,          " Testprint no.
+            P_FORID  LIKE ZFORMA-FORM_ID,           " Form ID
+            P_PRINT  LIKE RFPDO-FORDPRIZ,           " Printer
+            P_IMMEA  LIKE RFPDO1-ALLGSOFZ,          " Print immediately
+            P_COPY   LIKE RFPDO-KQSUFORMRP.         " 2a. Copy
+SELECTION-SCREEN: ULINE,
+                  COMMENT /1(65) TEXT-111.
+PARAMETERS: PROTOKOL LIKE RFPDO-KQSTXFELD,
+            QSTSUMME LIKE RFPDO-KQSTXFEL2,
+            KTOSUMME LIKE RFPDO-KQSTXFEL3,
+            BKRSUMME LIKE RFPDO-KQSTXFEL4,
+            EINZELPO LIKE RFPDO-KQSTXFEL1,
+            SUMMENTB LIKE RFPDO-KQSTXFEL5,
+            LISTSEPA LIKE RFPDO-KQSTXFEL7,
+            P_ZAEHL  LIKE RFPDO-KQSTCOUNT DEFAULT '1',
+            ALT_CTRY LIKE RFPDO-KQSTTITLE,
+            P_ZUTIT  LIKE RFPDO-ALLGLINE.
+END_OF_BLOCK 2.
+
+RANGES: BUSCHL FOR BSIK-BSCHL.
+
+*----------------------------------------------------------------------*
+*                 Definition of data extract                           *
+*----------------------------------------------------------------------*
+
+  FIELD-GROUPS: HEADER,
+                DATEN.
+
+ INSERT BSIK-BUKRS
+       BSIK-LIFNR
+       LIEFER
+       E_WITHT
+       BSIK-QSSKZ
+       BSIK-BUDAT
+       BSIK-BELNR
+       BSIK-GJAHR
+       BSIK-BLDAT
+       BSIK-XBLNR
+       BSIK-AUGDT
+       BSIK-QSZNR
+ INTO HEADER.
+
+INSERT WDMBTR
+       WWRBTR
+       WQSSHB
+       WQBSHB
+       NETTO
+       WQSFBT
+       BSIK-BSCHL
+       BSIK-UMSKS
+       BSIK-BUZEI
+       BSIK-BLART
+       BSIK-AUGBL
+       BSIK-XZAHL
+       BSIK-XCPDD
+       BSIK-WAERS
+       BSIK-MONAT
+       WNAME1
+       WNAME2
+       WSTRAS
+       WPSTLZ
+       WORT01
+       WSTCD1                                              "INSERT65219
+       WREGIO
+INTO DATEN.
+
+*----------------------------------------------------------------------*
+*                         Initialization                               *
+*----------------------------------------------------------------------*
+
+INITIALIZATION.
+  GET_FRAME_TITLE: 1, 2.
+  PERFORM PROPOSE_CURRENT_YEAR.
+
+*----------------------------------------------------------------------*
+*                          Header-Lines                                *
+*----------------------------------------------------------------------*
+
+ TOP-OF-PAGE.
+  PERFORM TOP-ITALIA.
+  MOVE 80 TO SYST-LINSZ.
+
+
+*----------------------------------------------------------------------*
+*                         Checks at Selection Screen                   *
+*----------------------------------------------------------------------*
+
+* Old or new WT functionality?
+AT SELECTION-SCREEN ON KD_BUKRS.
+
+   PERFORM CHECK_COMPANY_CODES.
+
+* New WT functionality: WT types
+AT SELECTION-SCREEN ON WITHT.
+
+   PERFORM CHECK_WT_TYPES. "Are choosen WT types defined in table T059P?
+
+* WT codes
+AT SELECTION-SCREEN ON QSTKZ.
+
+  IF QSTKZ NE SPACE AND OLD_WITH = 'X'.          " Old WT functionality
+    PERFORM CHECK_OLD_WT_CODES.
+  ENDIF.
+
+  IF QSTKZ NE SPACE AND NEW_WITH = 'X'.          " New WT functionality
+    PERFORM CHECK_WT_CODES.
+  ENDIF.
+
+* Alternative local currency
+AT SELECTION-SCREEN ON CONVDAT.                             " <--- Euro
+
+  IF NOT ALTCURR IS INITIAL AND CONVDAT IS INITIAL.         " <--- Euro
+    CONVDAT = SY-DATUM.                                     " <--- Euro
+  ENDIF.                                                    " <--- Euro
+
+* ---------------------------------------------------------------------
+AT SELECTION-SCREEN.
+
+* In case of immediately printing: Is printer specified?
+  IF P_IMMEA = 'X'
+    AND P_PRINT EQ SPACE.
+    MESSAGE E277.
+  ENDIF.
+
+* Configuration of country specific header line
+  MOVE TEXT-400 TO WTITLE.
+  IF ALT_CTRY IS INITIAL.
+     REPLACE '$' WITH TEXT-410 INTO WTITLE.
+  ELSE.
+     REPLACE '$' WITH ALT_CTRY INTO WTITLE.
+  ENDIF.
+
+  TOPLENGTH = 11.
+  MOVE '132' TO BHDGD-LINES.
+
+  MOVE '0' TO BHDGD-INIFL.
+  MOVE SYST-UNAME   TO BHDGD-UNAME.
+  MOVE SYST-REPID   TO BHDGD-REPID.
+  MOVE P_ZUTIT      TO BHDGD-LINE2.
+  MOVE WTITLE       TO BHDGD-LINE1.
+  MOVE LISTSEPA     TO BHDGD-SEPAR.
+  MOVE 'BSIK-BUKRS' TO BHDGD-DOMAI.
+
+*---------- Define reporting period, printed in the sapscript form -----
+*---------- Belgium: Only WT base is relevant => open items are selected
+
+  MOVE: AUGDAT-LOW  TO RFKHELP-VONDT,
+        AUGDAT-HIGH TO RFKHELP-BISDT.
+
+*---------- Information: Exchange rate taken at invoice time -----------
+  IF UMRECHN = 'X'.
+    MESSAGE I453.
+  ENDIF.
+
+*---------- Commands for printing --------------------------------------
+  IF SY-BATCH = 'X'.
+    NEW-PAGE
+       NO-TITLE
+       NO-HEADING.
+* ------------------------ SAP --------------------------------------- *
+* Author  : Diana del Pilar Rocha
+* Date    : Noviembre 9 del 2000
+* Subject : Se coloca en comentario las siguientes líneas debido a que
+*           cuando se imprime en backgroung, el listado no muestra
+*           títulos.
+*       print on
+*         destination p_print
+*         immediately p_immea
+*         keep in spool ' '
+*         cover text wtitle
+*         line-size '132'
+*         line-count '65'
+*         new list identification 'X'
+*         no dialog.
+* ------------------------- END SAP -----------------------------------*
+  ELSE.
+    NEW-PAGE
+      NO-TITLE
+      NO-HEADING
+      PRINT ON
+        DESTINATION P_PRINT
+        IMMEDIATELY P_IMMEA
+        KEEP IN SPOOL ' '
+        COVER TEXT WTITLE
+        LINE-SIZE '132'
+*     line-count '65'
+        NEW LIST IDENTIFICATION 'X'
+        NO DIALOG.
+    NEW-PAGE PRINT OFF.
+  ENDIF.
+
+*----------------------------------------------------------------------*
+*                                 Selection                            *
+*----------------------------------------------------------------------*
+
+START-OF-SELECTION.
+
+  COMMIT WORK.                          "PERFORMANCE INFORMIX
+
+*---------- Get relevant (xumsw = 'X') posting keys --------------------
+  SELECT * FROM TBSL
+   WHERE XUMSW = 'X'.
+    BUSCHL-LOW = TBSL-BSCHL.
+    BUSCHL-SIGN = 'I'.
+    BUSCHL-OPTION = 'EQ'.
+    APPEND BUSCHL.
+  ENDSELECT.
+
+* Get BSIK data from LDB
+  GET BSIK.
+* CHECK BELART.
+* CHECK QSTKZ.
+  CHECK BSIK-QSSKZ NE SPACE.
+*----------- Exclude 'Merkposten' --------------------------------------
+  CHECK BSIK-BSTAT NE 'S'.
+
+*----------- Get company code data -------------------------------------
+  IF BSIK-BUKRS NE T001-BUKRS.
+    SELECT SINGLE * FROM T001
+      WHERE BUKRS EQ BSIK-BUKRS.
+  ENDIF.
+
+*----------------------------------------------------------------------*
+*                      New Withholding Tax                             *
+*----------------------------------------------------------------------*
+  IF NOT NEW_WITH IS INITIAL.
+
+    CLEAR X_WITH_ITEM[].
+
+*   Read WT data from with_item into x_with_item
+    CALL FUNCTION 'FI_WT_READ_WT_INFO'
+         EXPORTING
+              I_BUKRS     = BSIK-BUKRS
+              I_BELNR     = BSIK-BELNR
+              I_GJAHR     = BSIK-GJAHR
+              I_BUZEI     = BSIK-BUZEI  " Get WT data of complete doc.
+         TABLES
+              T_WITH_ITEM = X_WITH_ITEM
+         EXCEPTIONS
+              NOT_FOUND   = 1
+              OTHERS      = 2.
+
+    CLEAR: BSIK-QSSKZ.
+
+*   For calculation of VAT tax we need WT data of the total document
+
+      SELECT * FROM WITH_ITEM INTO TABLE I_WITH_ITEM
+                             WHERE BUKRS  = BSIK-BUKRS
+                               AND BELNR  = BSIK-BELNR
+                               AND GJAHR  = BSIK-GJAHR
+                               AND BUZEI <> BSIK-BUZEI.
+      LOOP AT I_WITH_ITEM.
+        X_WITH_ITEM = I_WITH_ITEM.
+        APPEND X_WITH_ITEM.
+      ENDLOOP.
+
+
+*   Determine total WT amount with posting at invoice time
+
+*   In the case that there are WT types with posting at invoice, the
+*   invoice amount in bsik (bsak) does not correspond to the total
+*   amount but is reduced by the total WT amount of all types with
+*   posting at invoice time. Thus, it is necessary first to loop over
+*   the with_item and to detect and to sum up all WT amount of posting
+*   at invoice types.
+    PERFORM GET_TOTAL_WT_AT_INVOICE TABLES X_WITH_ITEM
+                                           X_T059P
+                                           X_WT_AT_INVOICE
+                                     USING T001-LAND1.
+
+*   Convert WT amounts into local curr. depending on spec. exchange date
+    IF BSIK-WAERS NE T001-WAERS AND
+       UMRECHN = 'X' AND
+       BSIK-WRBTR NE 0.
+      RATE = BSIK-DMBTR / BSIK-WRBTR.
+      LOOP AT X_WT_AT_INVOICE.
+        X_WT_AT_INVOICE-WT_QBSHH = X_WT_AT_INVOICE-WT_QBSHB * RATE.
+        MODIFY X_WT_AT_INVOICE.
+      ENDLOOP.
+    ENDIF.
+
+*  Proceed WT data of current vendor line
+   LOOP AT X_WITH_ITEM WHERE BUZEI = BSIK-BUZEI.
+
+     IF NOT QSTKZ IS INITIAL.
+       CHECK X_WITH_ITEM-WT_WITHCD IN QSTKZ.
+     ENDIF.
+
+     IF NOT WITHT IS INITIAL.
+       CHECK X_WITH_ITEM-WITHT IN WITHT.
+     ENDIF.
+
+*   Convert WT amounts into local curr. depending on spec. exchange date
+    IF BSIK-WAERS NE T001-WAERS AND
+       UMRECHN = 'X'            AND
+       X_WITH_ITEM-WT_QSSHB NE 0.
+             RATE = X_WITH_ITEM-WT_QSSHH / X_WITH_ITEM-WT_QSSHB.
+             X_WITH_ITEM-WT_QBSHH = X_WITH_ITEM-WT_QBSHB * RATE.
+    ELSEIF BSIK-WAERS NE T001-WAERS AND
+           UMRECHN = ' '            AND
+           X_WITH_ITEM-WT_QBSHB NE 0.
+             RATE = X_WITH_ITEM-WT_QBSHH / X_WITH_ITEM-WT_QBSHB.
+             X_WITH_ITEM-WT_QSSHH = X_WITH_ITEM-WT_QSSHB * RATE.
+             BSIK-DMBTR = BSIK-WRBTR * RATE.
+    ENDIF.
+
+*   Add total WT at invoice to bsik-dmbtr to get total dmbtr
+    READ TABLE X_WT_AT_INVOICE WITH KEY BUKRS = BSIK-BUKRS
+                                        BELNR = BSIK-BELNR
+                                        GJAHR = BSIK-GJAHR
+                                        BUZEI = BSIK-BUZEI.
+    IF X_WT_AT_INVOICE-WT_QBSHH < 0.
+      X_WT_AT_INVOICE-WT_QBSHH = X_WT_AT_INVOICE-WT_QBSHH * -1.
+    ENDIF.
+    H_DMBTR = BSIK-DMBTR + X_WT_AT_INVOICE-WT_QBSHH.
+
+*     Filling of data extract fields according to country specific
+*     selection checks
+
+      PERFORM PREP_DATA_EXTR_EXT_WT_CTRGR_4 CHANGING PROCESSING_FLAG.
+
+      IF PROCESSING_FLAG = 'X'.
+
+*       Get CPD data from document
+        PERFORM GET_CPD_DATA.
+
+        BSIK-QSSKZ = X_WITH_ITEM-WT_WITHCD.
+        E_WITHT    = X_WITH_ITEM-WITHT.
+
+*       Convert amounts from local curr. into alternative local curr.
+        IF NOT ALTCURR IS INITIAL.                          " <--- Euro
+          PERFORM CONVERT_INTO_ALT_LOC_CURR.                " <--- Euro
+        ENDIF.                                              " <--- Euro
+
+        EXTRACT DATEN.
+
+      ENDIF.
+
+    ENDLOOP.                                 " Of loop over x_with_item
+
+*----------------------------------------------------------------------*
+*                      Old Withholding Tax                             *
+*----------------------------------------------------------------------*
+  ELSE.
+
+*---------- Read relevant exchange dates and rates from bkpf -----------
+    PERFORM GET_CURR_EXCHANGE_DATA
+          USING BSIK-BUKRS
+                BSIK-BELNR
+                BSIK-AUGBL
+                BSIK-AUGDT
+                BSIK-GJAHR
+*         changing
+               INV_DATE                       " Date of invoice booking
+               CURR_INV                              " Invoice currency
+               RATE_INV       " Manually given exchange rate at invoice
+               PAY_DATE                       " Date of payment booking
+               CURR_PAY                              " Payment currency
+               RATE_PAY.      " Manually given exchange rate at payment
+
+*   Convert WT amounts into local curr. depending on spec. exchange date
+    PERFORM CONVERT_INTO_LOC_CURR_OLD_WT.
+
+*   Filling of data extract fields according to country specific
+*   selection checks
+
+    PERFORM PREP_DATA_EXTR_OLD_WT_CTRGR_4 CHANGING PROCESSING_FLAG.
+
+
+    IF PROCESSING_FLAG = 'X'.
+
+*     Get CPD data from document
+      PERFORM GET_CPD_DATA.
+
+*     Convert amounts from local curr. into alternative local curr.
+      IF NOT ALTCURR IS INITIAL.                            " <--- Euro
+        PERFORM CONVERT_INTO_ALT_LOC_CURR.                  " <--- Euro
+      ENDIF.                                                " <--- Euro
+
+      EXTRACT DATEN.
+
+    ENDIF.
+
+  ENDIF.
+
+*----------------------------------------------------------------------*
+*               Country specific reports for listings                  *
+*----------------------------------------------------------------------*
+END-OF-SELECTION.
+
+  SORT.
+
+  PERFORM GET_REPYEAR TABLES T_REPYEAR.
+
+*---------------------- Changes for Colombia ------------------------*
+* Author  : Diana Rocha
+
+  IF FORMULAR = 'X'.
+* Print by Vendor
+     IF BELNUM IS INITIAL.
+        PERFORM MELDUNG_COLOMBIA.
+     ELSE.
+* Print by Document
+        PERFORM PRINT_BY_DOC.
+     ENDIF.
+  ENDIF.
+* Print Log
+  IF PROTOKOL EQ 'X'.
+     PERFORM COLOMBIA.
+  ENDIF.
+*--------------------------- Colombia ---------------------------------*
+
+
+*---------------------------------------------------------------------*
+*       FORM PRINTDATA_1                                              *
+*---------------------------------------------------------------------*
+*       Data for SAPScript                                            *
+*---------------------------------------------------------------------*
+FORM PRINTDATA_1.
+
+  ITCPO-TDCOPIES           = '1'.
+  ITCPO-TDDEST             = P_PRINT.
+  ITCPO-TDPREVIEW          = ' '.
+  ITCPO-TDIMMED            = P_IMMEA.
+  ITCPO-TDNEWID            = 'X'.
+  ITCPO-TDCOVER            = ' '.
+  ITCPO-TDRECEIVER         = SY-UNAME.
+  ITCPO-TDDIVISION         = SY-PRABT.
+* ITCPO-TDAUTORITY
+* ITCPO-TDARMOD
+  ITCPO-TDDATASET          = 'SCRIPT'.
+  ITCPO-TDSUFFIX1          = P_PRINT.
+  ITCPO-TDSUFFIX2          = SY-REPID.
+  ITCPO-TDSUFFIX2+8(1)     = '_'.
+  ITCPO-TDSUFFIX2+9(3)     = SY-UNAME.
+* ITCPO-TDTITLE            =
+
+  IF NOT P_COPY IS INITIAL.
+     RFKHELP-PERSON = 'Expedido por Segunda vez'.
+  ELSE.
+     CLEAR RFKHELP-PERSON.
+  ENDIF.
+ENDFORM.
+
+*---------------------------------------------------------------------*
+*       FORM PRINTDATA_2                                              *
+*---------------------------------------------------------------------*
+*       Data for SAPScript                                            *
+*---------------------------------------------------------------------*
+FORM PRINTDATA_2.
+
+  CLEAR ITCPO-TDCOVTITLE.
+  ITCPO-TDCOVTITLE         = TEXT-222.
+*  replace '&' with p_varia into itcpo-tdcovtitle.
+  REPLACE '&' WITH 'CO' INTO ITCPO-TDCOVTITLE.
+
+  ITCPO-TDCOVTITLE+63(4)   = BSIK-BUKRS.
+  CONDENSE ITCPO-TDCOVTITLE.
+
+  SELECT SINGLE * FROM  ZFORMA
+         WHERE  FORM_ID      =  P_FORID.
+
+  IF SY-SUBRC <> 0.
+    MESSAGE E702.
+  ENDIF.
+
+ENDFORM.
+
+*----------------------------------------------------------------------*
+*                                CPD data                              *
+*----------------------------------------------------------------------*
+
+*&---------------------------------------------------------------------*
+*&      Form  CHECK_OLD_WT_CODES
+*&---------------------------------------------------------------------*
+*       Checks whether the selected WT codes are defined in t059q
+*----------------------------------------------------------------------*
+FORM CHECK_OLD_WT_CODES.
+
+  SELECT * FROM T059Q WHERE QSSKZ IN QSTKZ.
+  ENDSELECT.
+  IF SY-SUBRC NE '0'.
+    MESSAGE E151.
+  ENDIF.
+
+ENDFORM.
+
+*----------------------------------------------------------------------*
+*    Include für Meldung Italien                                       *
+*----------------------------------------------------------------------*
+INCLUDE ZQST2001 .
+*----------------------------------------------------------------------*
+*    Include für Quellensteuerreport  Italien und Spanien              *
+*----------------------------------------------------------------------*
+INCLUDE ZQST1001 .
+*----------------------------------------------------------------------*
+*    Include for extended functionality                                *
+*----------------------------------------------------------------------*
+INCLUDE ZIWT0010 .
+*----------------------------------------------------------------------*
+*    Include for help routines withholding tax reports                 *
+*----------------------------------------------------------------------*
+INCLUDE ZIWT0020.
+
+*----------------------------------------------------------------------*
+*    Include for fill Bimensual Periods for acumulates                 *
+*----------------------------------------------------------------------*
+INCLUDE ZPERIODS.
+
+*&---------------------------------------------------------------------*
+*&      Form  CONVERT_INTO_ALT_LOC_CURR (EURO)
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*  -->  p1        text
+*  <--  p2        text
+*----------------------------------------------------------------------*
+FORM CONVERT_INTO_ALT_LOC_CURR.                             " <--- Euro
+
+        IF WDMBTR <> 0.                                     " <--- Euro
+          H_WDMBTR = WDMBTR.                                " <--- Euro
+          CALL FUNCTION 'CONVERT_TO_FOREIGN_CURRENCY'       " <--- Euro
+               EXPORTING DATE             = CONVDAT         " <--- Euro
+                         FOREIGN_CURRENCY = ALTCURR         " <--- Euro
+                         LOCAL_AMOUNT     = WDMBTR          " <--- Euro
+                         LOCAL_CURRENCY   = T001-WAERS      " <--- Euro
+*                         rate             = ???            " <--- Euro
+                         TYPE_OF_RATE     = 'M'             " <--- Euro
+               IMPORTING FOREIGN_AMOUNT   = WDMBTR.         " <--- Euro
+          ALT_RATE = WDMBTR / H_WDMBTR.                     " <--- Euro
+          WQSSHB = ALT_RATE * WQSSHB.                       " <--- Euro
+          WQBSHB = ALT_RATE * WQBSHB.                       " <--- Euro
+          WQSFBT = ALT_RATE * WQSFBT.                       " <--- Euro
+          NETTO  = ALT_RATE * NETTO.                        " <--- Euro
+        ENDIF.                                              " <--- Euro
+
+ENDFORM.                    " CONVERT_INTO_ALT_LOC_CURR     " <--- Euro
+
+*&---------------------------------------------------------------------*
+*&      Form  CONVERT_INTO_LOC_CURR_OLD_WT
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*  -->  p1        text
+*  <--  p2        text
+*----------------------------------------------------------------------*
+FORM CONVERT_INTO_LOC_CURR_OLD_WT.
+
+*---------------- Conversion at invoice time ---------------------------
+    IF UMRECHN = 'X'.
+
+*     Converts WT base of old WT
+
+*     Invoice currency -> local currency at clearing date
+      WQSSHB = BSIK-QSSHB.  " Intermediate value: WT base in inv. curr.
+      IF CURR_INV NE T001-WAERS.
+        CALL FUNCTION 'CONVERT_TO_LOCAL_CURRENCY'
+             EXPORTING DATE             = INV_DATE
+                       FOREIGN_CURRENCY = CURR_INV
+                       LOCAL_CURRENCY   = T001-WAERS
+                       FOREIGN_AMOUNT   = BSIK-QSSHB
+                       RATE             = RATE_INV
+                       TYPE_OF_RATE     = 'M'
+             IMPORTING LOCAL_AMOUNT     = BSIK-QSSHB.
+      ENDIF.
+
+*     WT amount and base from clr. curr. -> local curr. at inv. date
+      IF CURR_PAY NE T001-WAERS.
+        IF CURR_PAY = CURR_INV.
+          CALL FUNCTION 'CONVERT_TO_LOCAL_CURRENCY'
+               EXPORTING DATE             = INV_DATE
+                         FOREIGN_AMOUNT   = BSIK-QBSHB
+                         FOREIGN_CURRENCY = CURR_PAY
+                         LOCAL_CURRENCY   = T001-WAERS
+                         RATE             = RATE_INV
+                         TYPE_OF_RATE     = 'M'
+               IMPORTING LOCAL_AMOUNT     = BSIK-QBSHB.
+        ELSE.
+          CALL FUNCTION 'CONVERT_TO_LOCAL_CURRENCY'
+               EXPORTING DATE             = INV_DATE
+                         FOREIGN_AMOUNT   = BSIK-QBSHB
+                         FOREIGN_CURRENCY = CURR_PAY
+                         LOCAL_CURRENCY   = T001-WAERS
+*                        rate from tcurr
+                         TYPE_OF_RATE     = 'M'
+               IMPORTING LOCAL_AMOUNT     = BSIK-QBSHB.
+        ENDIF.
+      ENDIF.
+
+*     Converts invoice amount into local currency
+      IF WQSSHB NE 0.
+         RATE = BSIK-QSSHB / WQSSHB.
+         BSIK-DMBTR = BSIK-WRBTR * RATE.
+         CLEAR: WQSSHB,
+                RATE.
+      ENDIF.
+
+*---------------- Conversion at payment time ---------------------------
+    ELSE.
+
+*     Converts WT base of old WT
+
+      IF CURR_INV NE T001-WAERS.
+        WQSSHB = BSIK-QSSHB.
+        IF CURR_INV = CURR_PAY.
+        CALL FUNCTION 'CONVERT_TO_LOCAL_CURRENCY'
+             EXPORTING DATE             = PAY_DATE
+                       FOREIGN_CURRENCY = CURR_INV
+                       LOCAL_CURRENCY   = T001-WAERS
+                       FOREIGN_AMOUNT   = BSIK-QSSHB
+                       RATE             = RATE_PAY
+                       TYPE_OF_RATE     = 'M'
+             IMPORTING LOCAL_AMOUNT     = BSIK-QSSHB.
+        ELSE.
+          CALL FUNCTION 'CONVERT_TO_LOCAL_CURRENCY'
+               EXPORTING DATE             = PAY_DATE
+                         FOREIGN_CURRENCY = CURR_INV
+                         LOCAL_CURRENCY   = T001-WAERS
+                         FOREIGN_AMOUNT   = BSIK-QSSHB
+*                        rate from tcurr
+                         TYPE_OF_RATE     = 'M'
+               IMPORTING LOCAL_AMOUNT     = BSIK-QSSHB.
+        ENDIF.
+
+*       Converts invoice amount
+        IF WQSSHB NE 0.
+          RATE = BSIK-QSSHB / WQSSHB.
+          BSIK-DMBTR = BSIK-WRBTR * RATE.
+          CLEAR: WQSSHB,
+                 RATE.
+        ENDIF.
+      ENDIF.
+
+*     Converts WT amount of old WT
+      IF CURR_PAY NE T001-WAERS.
+        CALL FUNCTION 'CONVERT_TO_LOCAL_CURRENCY'
+             EXPORTING DATE             = PAY_DATE
+                       FOREIGN_CURRENCY = CURR_PAY
+                       LOCAL_CURRENCY   = T001-WAERS
+                       FOREIGN_AMOUNT   = BSIK-QBSHB
+                       RATE             = RATE_PAY
+                       TYPE_OF_RATE     = 'M'
+             IMPORTING LOCAL_AMOUNT     = BSIK-QBSHB.
+      ENDIF.
+
+    ENDIF.                                          " End of conversion
+
+ENDFORM.                    " CONVERT_INTO_LOC_CURR_OLD_WT
+
+*&---------------------------------------------------------------------*
+*&      Form  PREP_DATA_EXTR_EXT_WT_CTRGR_4
+*&---------------------------------------------------------------------*
+*                   Form 'prep_data_extract_ext_wt_ctrgr_4'            *
+*                   Performs several selection checks and fills        *
+*                   the fields of the data extract.                    *
+*                   The selection checks are specific for the          *
+*                   country group (ctrgr).                             *
+*                   Country group 1 is currently used for:             *
+*                   CO, MX                                             *
+*----------------------------------------------------------------------*
+*  -->  p1        text
+*  <--  p2        text
+*----------------------------------------------------------------------*
+FORM PREP_DATA_EXTR_EXT_WT_CTRGR_4 CHANGING P_PROCESSING_FLAG.
+
+      CLEAR P_PROCESSING_FLAG.
+
+      CHECK BELNUM.
+      CHECK BUCHDT.
+      IF BSIK-UMSKS = ' '.
+         CHECK BSIK-BSCHL IN BUSCHL.
+      ENDIF.
+
+*      case bsik-umsks.
+*        when ' '.
+*          check bsik-augbl ne space.  "estaba comentariado
+*          check augdat.               "estaba comentariado
+*          check bsik-bschl in buschl.
+*        when 'A'.
+*          check buchdt.               "estaba comentariado
+*          if bsik-shkzg eq 'S'.
+*            move  'H' to bsik-shkzg.
+*          else.
+*            move  'S' to bsik-shkzg.
+*          endif.
+*
+*         ------------------- Switch sign of WT in case of down payment
+*          x_with_item-wt_qsshh = x_with_item-wt_qsshh * -1.
+*          x_with_item-wt_qbshh = x_with_item-wt_qbshh * -1.
+*        when others.
+*          reject.
+*      endcase.
+
+      IF BSIK-SHKZG EQ 'H'.
+        WDMBTR = H_DMBTR.
+        WWRBTR = BSIK-WRBTR.
+        WQSSHB = X_WITH_ITEM-WT_QSSHH * -1.
+        WQBSHB = X_WITH_ITEM-WT_QBSHH * -1.
+      ELSE.
+        WDMBTR = H_DMBTR * -1.
+        WWRBTR = BSIK-WRBTR * -1.
+        WQSSHB = X_WITH_ITEM-WT_QSSHH * -1.
+        WQBSHB = X_WITH_ITEM-WT_QBSHH * -1.
+      ENDIF.
+
+*     Net amount with respect to WT base
+      WQSFBT = WDMBTR - WQSSHB.
+
+*     Net amount with respect to VAT tax
+*     netto  = wdmbtr - wqbshb.
+      PERFORM GET_TAX_AMOUNT TABLES X_WT_AT_INVOICE
+                              USING 'X'                        " New WT
+                                    BSIK
+                                    VDMBTR.
+      NETTO  = WDMBTR - VDMBTR.
+
+      P_PROCESSING_FLAG = 'X'.
+
+ENDFORM.                    " PREP_DATA_EXTR_EXT_WT_CTRGR_4
+
+*&---------------------------------------------------------------------*
+*&      Form  PREP_DATA_EXTR_OLD_WT_CTRGR_4
+*&---------------------------------------------------------------------*
+*                   Form 'prep_data_extract_old_wt_ctrgr_4'            *
+*                   Performs several selection checks and fills        *
+*                   the fields of the data extract.                    *
+*                   The selection checks are specific for the          *
+*                   country group (ctrgr).                             *
+*                   Country group 1 is currently used for:             *
+*                   CO, MX                                             *
+*----------------------------------------------------------------------*
+*  -->  p1        text
+*  <--  p2        text
+*----------------------------------------------------------------------*
+FORM PREP_DATA_EXTR_OLD_WT_CTRGR_4 CHANGING P_PROCESSING_FLAG.
+
+      CLEAR P_PROCESSING_FLAG.
+
+      CHECK BELNUM.
+      CHECK BUCHDT.                    " insert for colombia and mexico
+      IF BSIK-UMSKS = ' '.
+         CHECK BSIK-BSCHL IN BUSCHL.
+      ENDIF.
+
+*      case bsik-umsks.
+*        when ' '.
+*          check bsik-augbl ne space. "Estaba comentariado
+*         check augdat.               "Estaba comentariado
+*          check bsik-bschl in buschl.
+*        when 'A'.
+*          check buchdt.              "Estaba comentariado
+*          if bsik-shkzg eq 'S'.
+*            move  'H' to bsik-shkzg.
+*          else.
+*            move  'S' to bsik-shkzg.
+*          endif.
+*        when others.
+*          reject.
+*      endcase.
+
+      IF BSIK-SHKZG EQ 'H'.
+        WDMBTR = BSIK-DMBTR.
+        WWRBTR = BSIK-WRBTR.
+        WQSSHB = BSIK-QSSHB.
+        WQBSHB = BSIK-QBSHB.
+      ELSE.
+        WDMBTR = BSIK-DMBTR * -1.
+        WWRBTR = BSIK-WRBTR * -1.
+        WQSSHB = BSIK-QSSHB * -1.
+        WQBSHB = BSIK-QBSHB * -1.
+      ENDIF.
+
+*     Net amount with respect to WT base
+      WQSFBT = WDMBTR - WQSSHB.
+
+*     Net amount with respect to VAT tax
+*     netto  = wdmbtr - wqbshb.
+      PERFORM GET_TAX_AMOUNT TABLES X_WT_AT_INVOICE
+                              USING ' '                        " Old WT
+                                    BSIK
+                                    VDMBTR.
+      NETTO  = WDMBTR - VDMBTR.
+
+      P_PROCESSING_FLAG = 'X'.
+
+ENDFORM.                    " PREP_DATA_EXTR_OLD_WT_CTRGR_4
+
+*&---------------------------------------------------------------------*
+*&      Form  GET_REPYEAR
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*      -->P_H_REPYEAR  text
+*----------------------------------------------------------------------*
+FORM GET_REPYEAR TABLES I_REPYEAR LIKE T_REPYEAR[].
+
+DATA: CURRENT_INDEX TYPE I,
+      LOWER_BUDAT LIKE BSIK-BUDAT.
+
+  CLEAR   I_REPYEAR.
+  REFRESH I_REPYEAR.
+
+  LOOP.
+
+    AT NEW BSIK-BUKRS.
+      I_REPYEAR-BUKRS   = BSIK-BUKRS.
+      I_REPYEAR-REPYEAR = BSIK-GJAHR.
+      APPEND I_REPYEAR.
+      CURRENT_INDEX = SY-TABIX.
+      LOWER_BUDAT = BSIK-BUDAT.
+    ENDAT.
+
+    IF BSIK-BUDAT <  LOWER_BUDAT AND
+       BSIK-GJAHR <> I_REPYEAR-REPYEAR.
+      I_REPYEAR-REPYEAR = BSIK-GJAHR.
+      MODIFY I_REPYEAR INDEX CURRENT_INDEX.
+    ENDIF.
+
+  ENDLOOP.
+
+ENDFORM.                    " GET_REPYEAR
+
+*&---------------------------------------------------------------------*
+*&      Form  GET_TAX_AMOUNT
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*      -->P_WDMBTR  text
+*      -->P_VDMBTR  text
+*----------------------------------------------------------------------*
+FORM GET_TAX_AMOUNT TABLES P_X_WT_AT_INVOICE LIKE X_WT_AT_INVOICE[]
+                     USING VALUE(P_EXT_WT)
+                           VALUE(P_BSIK)  LIKE BSIK
+                                 P_VDMBTR LIKE BSET-HWSTE.
+
+DATA: I_BSEG LIKE BSEG OCCURS 10 WITH HEADER LINE.
+DATA: I_BSET LIKE BSET OCCURS 10 WITH HEADER LINE.
+DATA: SUM_DMBTR LIKE BSIK-DMBTR,
+      H_DMBTR   LIKE BSIK-DMBTR,
+      SUM_HWSTE LIKE BSET-HWSTE,
+      P_RATE TYPE F.
+
+  CLEAR P_VDMBTR.
+
+* Get complete document
+  SELECT * FROM BSEG INTO TABLE I_BSEG WHERE BUKRS = P_BSIK-BUKRS
+                                         AND BELNR = P_BSIK-BELNR
+                                         AND GJAHR = P_BSIK-GJAHR.
+
+* Add WT at invoice amounts
+  IF P_EXT_WT = 'X'.
+    LOOP AT I_BSEG WHERE KOART = 'K'.
+*     Read total WT at invoice
+      READ TABLE P_X_WT_AT_INVOICE WITH KEY BUKRS = I_BSEG-BUKRS
+                                            BELNR = I_BSEG-BELNR
+                                            GJAHR = I_BSEG-GJAHR
+                                            BUZEI = I_BSEG-BUZEI.
+      IF P_X_WT_AT_INVOICE-WT_QBSHH < 0.
+        P_X_WT_AT_INVOICE-WT_QBSHH = P_X_WT_AT_INVOICE-WT_QBSHH * -1.
+      ENDIF.
+      I_BSEG-DMBTR = I_BSEG-DMBTR + P_X_WT_AT_INVOICE-WT_QBSHH.
+      MODIFY I_BSEG.
+    ENDLOOP.
+  ENDIF.
+
+* Get tax information
+  SELECT * FROM BSET INTO TABLE I_BSET WHERE BUKRS = P_BSIK-BUKRS
+                                         AND BELNR = P_BSIK-BELNR
+                                         AND GJAHR = P_BSIK-GJAHR.
+
+* Determine relative contribution of current vendor line
+  CLEAR SUM_DMBTR.
+  LOOP AT I_BSEG WHERE KOART = 'K'.
+
+    IF I_BSEG-SHKZG = 'H'.
+      I_BSEG-DMBTR = I_BSEG-DMBTR * -1.
+    ENDIF.
+
+    SUM_DMBTR = SUM_DMBTR + I_BSEG-DMBTR.
+    IF I_BSEG-BUZEI = P_BSIK-BUZEI.
+      H_DMBTR = I_BSEG-DMBTR.
+    ENDIF.
+
+  ENDLOOP.
+
+  IF SUM_DMBTR <> 0.
+    P_RATE = H_DMBTR / SUM_DMBTR.
+  ELSE.
+    P_RATE = 0.
+  ENDIF.
+
+* Determine tax amount
+  CLEAR SUM_HWSTE.
+  LOOP AT I_BSET.
+    IF I_BSET-SHKZG = 'H'.
+      I_BSET-HWSTE = I_BSET-HWSTE * -1.
+    ENDIF.
+    SUM_HWSTE = SUM_HWSTE + I_BSET-HWSTE.
+  ENDLOOP.
+
+  P_VDMBTR = P_RATE * SUM_HWSTE.
+
+ENDFORM.                    " GET_TAX_AMOUNT
+
+*&---------------------------------------------------------------------*
+*&      Form  GET_TOTAL_WT_AT_INVOICE
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*      -->P_X_WITH_ITEM  text
+*      -->P_X_T059P  text
+*      -->P_X_WT_AT_INVOICE  text
+*----------------------------------------------------------------------*
+FORM GET_TOTAL_WT_AT_INVOICE
+                  TABLES P_X_WITH_ITEM STRUCTURE WITH_ITEM
+                         P_X_T059P STRUCTURE T059P
+                         P_X_WT_AT_INVOICE LIKE X_WT_AT_INVOICE[]
+                   USING VALUE(P_LAND1) LIKE T001-LAND1.
+
+    CLEAR   P_X_WT_AT_INVOICE.        " Set accumulation values to zero
+    REFRESH P_X_WT_AT_INVOICE.
+
+    LOOP AT P_X_WITH_ITEM.                         " Loop over WT types
+
+*     WT type with posting at invoice or at payment?
+      PERFORM READ_T059P TABLES P_X_T059P
+                          USING P_LAND1
+                                P_X_WITH_ITEM-WITHT.
+
+*     If Withholding tax at invoice, accumulate the WT amounts.
+      IF P_X_T059P-WT_POSTM = '1'.
+        P_X_WT_AT_INVOICE-BUKRS    = P_X_WITH_ITEM-BUKRS.
+        P_X_WT_AT_INVOICE-BELNR    = P_X_WITH_ITEM-BELNR.
+        P_X_WT_AT_INVOICE-GJAHR    = P_X_WITH_ITEM-GJAHR.
+        P_X_WT_AT_INVOICE-BUZEI    = P_X_WITH_ITEM-BUZEI.
+        P_X_WT_AT_INVOICE-WT_QBSHH = P_X_WITH_ITEM-WT_QBSHH.
+        P_X_WT_AT_INVOICE-WT_QBSHB = P_X_WITH_ITEM-WT_QBSHB.
+        COLLECT P_X_WT_AT_INVOICE.
+      ENDIF.
+
+    ENDLOOP.                                         " at p_x_with_item
+
+ENDFORM.                    " GET_TOTAL_WT_AT_INVOICE
+*&---------------------------------------------------------------------*
+*&      Form  GET_CPD_DATA
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*  -->  p1        text
+*  <--  p2        text
+*----------------------------------------------------------------------*
+FORM GET_CPD_DATA.
+
+    IF BSIK-XCPDD EQ ' '.
+      MOVE BSIK-LIFNR TO LIEFER.
+    ELSE.
+      SELECT SINGLE * FROM BSEC
+        WHERE BUKRS EQ BSIK-BUKRS
+        AND   BELNR EQ BSIK-BELNR
+        AND   GJAHR EQ BSIK-GJAHR
+        AND   BUZEI EQ BSIK-BUZEI.
+      MOVE BSIK-LIFNR TO LIEFER+0(10).
+      MOVE BSEC-NAME1 TO LIEFER+10(10).
+      MOVE BSEC-STRAS TO LIEFER+20(8).
+      MOVE BSEC-PSTLZ TO LIEFER+28(7).
+      MOVE BSEC-NAME1 TO WNAME1.
+      MOVE BSEC-NAME2 TO WNAME2.
+      MOVE BSEC-NAME3 TO WNAME3.
+      MOVE BSEC-NAME4 TO WNAME4.
+      MOVE BSEC-STRAS TO WSTRAS.
+      MOVE BSEC-PFACH TO WPFACH.
+      MOVE BSEC-PSTLZ TO WPSTLZ.
+      MOVE BSEC-PSTL2 TO WPSTL2.
+      MOVE BSEC-ORT01 TO WORT01.
+      MOVE BSEC-REGIO TO WREGIO.
+      MOVE BSEC-STCD1 TO WSTCD1.                           "INSERT65219
+      MOVE BSEC-LAND1 TO WLAND1.
+    ENDIF.
+ENDFORM.                    " GET_CPD_DATA
+*************************************************** Reporte Estandar S4HANA RFKQST20
+REPORT RFKQST20 LINE-SIZE 132
+                LINE-COUNT 65
+                NO STANDARD PAGE HEADING
+                MESSAGE-ID FR.
+
+*----------------------------------------------------------------------*
+*                            Data declaration                          *
+*----------------------------------------------------------------------*
+
+TABLES: BSIK,
+        BKPF,
+        BSEG,
+        BSET,
+        BSEC,
+        LFA1,
+        LFB1,
+        TBSL,
+        RFPDO,
+        RFKHELP,
+        T001,
+        T005U,
+        TLINE,
+        T059Q,
+        BHDGD,
+        T001F,
+        T001G,
+        ADDR1_VAL,
+        adrs,
+        ITCPO,
+*       Extended withholding tax
+        T059P,
+        T059Z,
+        T059ZT,
+        T059MINMAX,
+        WITH_ITEM.
+
+DATA: BEGIN OF ADRESS,
+       NAME1 LIKE LFA1-NAME1,
+       STRAS(26) TYPE C,
+       PSTLZ LIKE LFA1-PSTLZ,
+       ORT01(25) TYPE C,
+      END OF ADRESS,
+
+      BEGIN OF KTAB OCCURS 50,
+       WITHT LIKE WITH_ITEM-WITHT,
+       QSSKZ LIKE BSIK-QSSKZ,
+       QSZNR LIKE BSIK-QSZNR,
+       BUDAT LIKE BSIK-BUDAT,
+       XBLNR LIKE BSIK-XBLNR,
+       BELNR LIKE BSIK-BELNR,
+       BSCHL LIKE BSIK-BSCHL,
+       UMSKS LIKE BSIK-UMSKS,
+       BUZEI LIKE BSIK-BUZEI,
+       BLART LIKE BSIK-BLART,
+       BLDAT LIKE BSIK-BLDAT,
+       AUGDT LIKE BSIK-AUGDT,
+       AUGBL LIKE BSIK-AUGBL,
+       WAERS LIKE BSIK-WAERS,
+       WDMBTR LIKE BSIK-DMBTR,
+       WWRBTR LIKE BSIK-WRBTR,
+       WQSSHB LIKE BSIK-QSSHB,
+       WQBSHB LIKE BSIK-QBSHB,
+       NETTO  LIKE BSIK-DMBTR,
+       WQSFBT LIKE BSIK-QSFBT,
+      END OF KTAB,
+
+      BEGIN OF ETAB OCCURS 10,
+       WITHT LIKE WITH_ITEM-WITHT,
+       QSSKZ LIKE BSIK-QSSKZ,
+       WDMBTR LIKE BSIK-DMBTR,
+       WQSSHB LIKE BSIK-QSSHB,
+       WQBSHB LIKE BSIK-QBSHB,
+       NETTO  LIKE BSIK-DMBTR,
+       WQSFBT LIKE BSIK-QSFBT,
+      END OF ETAB,
+
+      BEGIN OF STAB OCCURS 10,
+       HELPCHAR,
+       WDMBTR LIKE BSIK-DMBTR,
+       WQSSHB LIKE BSIK-QSSHB,
+       WQBSHB LIKE BSIK-QBSHB,
+       NETTO  LIKE BSIK-DMBTR,
+       WQSFBT LIKE BSIK-QSFBT,
+      END OF STAB,
+
+      BEGIN OF BTAB OCCURS 10,
+       AUGBL LIKE BSIK-AUGBL,
+       QSZNR LIKE BSIK-QSZNR,
+      END OF BTAB,
+
+*     Internal tables for extended withholding
+      X_WITH_ITEM  LIKE WITH_ITEM  OCCURS 1 WITH HEADER LINE,
+      I_WITH_ITEM  LIKE WITH_ITEM  OCCURS 1 WITH HEADER LINE,
+      X_T059P      LIKE T059P      OCCURS 1 WITH HEADER LINE,
+      X_T059Z      LIKE T059Z      OCCURS 1 WITH HEADER LINE,
+      X_T059ZT     LIKE T059ZT     OCCURS 1 WITH HEADER LINE,
+      X_T059MINMAX LIKE T059MINMAX OCCURS 1 WITH HEADER LINE,
+
+      BEGIN OF X_WT_AT_INVOICE OCCURS 10,
+        BUKRS LIKE WITH_ITEM-BUKRS,
+        BELNR LIKE WITH_ITEM-BELNR,
+        GJAHR LIKE WITH_ITEM-GJAHR,
+        BUZEI LIKE WITH_ITEM-BUZEI,
+        WT_QBSHH LIKE WITH_ITEM-WT_QBSHH,
+        WT_QBSHB LIKE WITH_ITEM-WT_QBSHB,
+      END OF X_WT_AT_INVOICE.
+
+DATA: BEGIN OF KOPF.
+        INCLUDE STRUCTURE THEAD.
+DATA: END OF KOPF.
+
+*------- Output control                                          -------
+DATA: FLAG1(1) TYPE N,                 "Art der Kopfzeile
+      FLAG2(1) TYPE N,                 "Anzeige Adresse auf neuer Seite
+      FLAG3(1) TYPE N,                 "Ob Ausgabe der Qsttabelle nötig
+      FLAG4(1) TYPE N,         "Ob es sich um eine Anzahlung handelt
+      FLAG5(1) TYPE N,         "Anzeige Qsskz-Info auf neuer Seite
+      FLAG6(1) TYPE C,                 "Fuer AT SELECTION-SCREEN
+      COUNT2   TYPE P,         "Summe Qskz nur bei mehr als 1 Posten
+                               "Summe QST-Tab bei mehr als 1 Posten
+                                       "Index für DO-Schleife
+      COUNT3   TYPE P,         "Summe lifnr nur bei mehr als 1 Posten
+      LFDNUM(5) TYPE N VALUE 0, "Ausgabe laufende Nr. für Lieferant
+      WTITLE(40) TYPE C,               "Überschrift
+      STRING(132) TYPE C,              "Textstring fuer QST-Angaben
+      X(40) TYPE C,                    "Füllfelder fuer Probedruck
+      Y     LIKE BSEG-DMBTR.            "       -"-
+
+DATA:
+      BISDT TYPE D,
+      VONDT TYPE D,
+      WDMBTR LIKE BSIK-DMBTR,
+      H_DMBTR LIKE BSIK-DMBTR,
+      WWRBTR LIKE BSIK-DMBTR,
+      WQSSHB LIKE BSIK-QSSHB,
+      WQBSHB LIKE BSIK-QBSHB,
+      WQSFBT LIKE BSIK-QSFBT,
+      NETTO  LIKE BSIK-DMBTR,
+      VDMBTR LIKE BSET-HWSTE.
+
+*------- Extended withholding tax                                -------
+DATA:
+      OLD_WITH    TYPE C,
+      NEW_WITH    TYPE C,
+      E_WITHT LIKE WITH_ITEM-WITHT.
+RANGES:
+      QSTKZ_EXT for T059Z-WT_WITHCD.
+
+*------- Currency conversion                                     -------
+DATA:
+      RATE TYPE F,
+      INV_DATE LIKE BKPF-WWERT,                          " Invoice date
+      CURR_INV LIKE BSIK-WAERS,                      " Invoice currency
+      RATE_INV LIKE BKPF-KURSF,        " Manually given rate at invoice
+      PAY_DATE LIKE BKPF-WWERT,                          " Payment date
+      CURR_PAY LIKE BSIK-WAERS,                      " Payment currency
+      RATE_PAY LIKE BKPF-KURSF,        " Manually given rate at payment
+      CONV_DATE LIKE BKPF-WWERT.                        " Exchange date
+
+*------- Conversion into alternative local currency (Euro)       -------
+DATA:
+      H_WDMBTR LIKE BSIK-DMBTR,
+      ALT_RATE TYPE F,
+      OUTPUTWAERS LIKE T001-WAERS.
+
+*------- Adress data                                             -------
+DATA:
+      WNAME1 LIKE BSEC-NAME1,
+      WNAME2 LIKE BSEC-NAME2,
+      WNAME3 LIKE BSEC-NAME3,
+      WNAME4 LIKE BSEC-NAME4,
+      WSTRAS LIKE BSEC-STRAS,
+      WPFACH LIKE BSEC-PFACH,
+      WPSTLZ LIKE BSEC-PSTLZ,
+      WPSTL2 LIKE BSEC-PSTL2,
+      WORT01 LIKE BSEC-ORT01,
+      WORT02 LIKE BSEC-ORT01,
+      WSTCD1 LIKE BSEC-STCD1,
+      WREGIO LIKE BSEC-REGIO,
+      WLAND1 LIKE BSEC-LAND1,
+      WSPRAS LIKE BSEC-SPRAS,
+      WAERS  LIKE T001-WAERS,
+      KURSDAT LIKE BSIK-AUGDT,
+      LIEFER(35) TYPE C,
+      HILFE(47) TYPE C,
+      H_ZAEHL  LIKE RFPDO-KQSTCOUNT,
+      H_LINES  TYPE P,
+      ANSWER LIKE SY-TFILL.
+
+DATA: TOPLENGTH(2) TYPE N.
+*     SAPFORMS LIKE RSSCF-TDFORM.
+DATA: BEGIN OF T_REPYEAR OCCURS 10,
+        BUKRS   LIKE BSIK-BUKRS,
+        REPYEAR LIKE RFKHELP-REPYEAR,                  " Reporting year
+      END OF T_REPYEAR.
+DATA: PROCESSING_FLAG TYPE C,
+      BUKRS_ADRS LIKE ADDR1_SEL.
+
+RANGES: BUSCHL FOR BSIK-BSCHL.
+
+
+*----------------------------------------------------------------------*
+*               Definition of select options and parameters            *
+*----------------------------------------------------------------------*
+
+*-------------- Additional Selections: Block 1 -------------------------
+BEGIN_OF_BLOCK 1.
+SELECT-OPTIONS: BELART  FOR BSIK-BLART,
+                BELNUM  FOR BSIK-BELNR NO DATABASE SELECTION,
+                AUGDAT  FOR BSIK-AUGDT NO-EXTENSION
+                                       NO DATABASE SELECTION,
+                BUCHDT  FOR BSIK-BUDAT NO-EXTENSION
+                                       NO DATABASE SELECTION,
+                WITHT   FOR WITH_ITEM-WITHT,
+* Notes 178383 and 205823: QSTKZ DECLARING IS OK
+                QSTKZ   FOR BSIK-QSSKZ NO DATABASE SELECTION.
+
+PARAMETERS: P_VARIA  LIKE RFPDO-KQSTVAR02 OBLIGATORY,
+            UNAUSGEG LIKE RFPDO-KQSTXFEL6,
+            UMRECHN  LIKE RFPDO2-KQSTXFL8.
+
+* -------- Additional Selection: 'Alternative Local Currency' ---------
+SELECTION-SCREEN: ULINE,
+                  COMMENT /1(65) TEXT-112.
+PARAMETERS: ALTCURR LIKE T001-WAERS,
+            CONVDAT LIKE SYST-DATUM.
+END_OF_BLOCK 1.
+
+*--------------- Additional Selections: Block 2 -----------------------
+BEGIN_OF_BLOCK 2.
+PARAMETERS: FORMULAR LIKE RFPDO-KQSUFORMRP DEFAULT 'X',
+            TESTDRCK LIKE RFPDO-KQSTTESTD DEFAULT '2',  " Testprint no.
+            P_FORID  LIKE RFPDO1-ALLGEVFO,          " Form ID
+            P_ADRID  LIKE RFPDO1-ALLGEVST,          " Adress ID
+            P_PRINT  LIKE RFPDO-FORDPRIZ,           " Printer
+            P_IMMEA  LIKE RFPDO1-ALLGSOFZ.          " Print immediately
+SELECTION-SCREEN: ULINE,
+                  COMMENT /1(65) TEXT-111.
+PARAMETERS: PROTOKOL LIKE RFPDO-KQSTXFELD,
+            QSTSUMME LIKE RFPDO-KQSTXFEL2,
+            KTOSUMME LIKE RFPDO-KQSTXFEL3,
+            BKRSUMME LIKE RFPDO-KQSTXFEL4,
+            EINZELPO LIKE RFPDO-KQSTXFEL1,
+            SUMMENTB LIKE RFPDO-KQSTXFEL5,
+            LISTSEPA LIKE RFPDO-KQSTXFEL7,
+            P_ZAEHL  LIKE RFPDO-KQSTCOUNT DEFAULT '1',
+            ALT_CTRY LIKE RFPDO-KQSTTITLE,
+            P_ZUTIT  LIKE RFPDO-ALLGLINE.
+END_OF_BLOCK 2.
+
+
+*----------------------------------------------------------------------*
+*                 Definition of data extract                           *
+*----------------------------------------------------------------------*
+
+FIELD-GROUPS: HEADER,
+              DATEN.
+
+INSERT BSIK-BUKRS
+       BSIK-LIFNR
+       LIEFER
+       E_WITHT
+       BSIK-QSSKZ
+       BSIK-BUDAT
+       BSIK-BELNR
+       BSIK-GJAHR
+       BSIK-BLDAT
+       BSIK-XBLNR
+       BSIK-AUGDT
+       BSIK-QSZNR
+INTO HEADER.
+
+INSERT WDMBTR
+       WWRBTR
+       WQSSHB
+       WQBSHB
+       NETTO
+       WQSFBT
+       BSIK-BSCHL
+       BSIK-UMSKS
+       BSIK-BUZEI
+       BSIK-BLART
+       BSIK-AUGBL
+       BSIK-XZAHL
+       BSIK-XCPDD
+       BSIK-WAERS
+       WNAME1
+       WNAME2
+       WNAME3
+       WNAME4
+       WSTRAS
+       WPSTLZ
+       WPSTL2
+       WPFACH
+       WORT01
+       WORT02
+       WSTCD1
+       WLAND1
+       WREGIO
+       WSPRAS
+INTO DATEN.
+
+
+*----------------------------------------------------------------------*
+*                         Initialisierung                              *
+*----------------------------------------------------------------------*
+INITIALIZATION.
+cl_fins=>object_obsolete( exporting iv_tcode = sy-tcode
+                                    iv_progname = sy-repid ).
+
+  GET_FRAME_TITLE: 1, 2.
+  PERFORM PROPOSE_CURRENT_YEAR.
+
+
+*----------------------------------------------------------------------*
+*                          Header-Lines                                *
+*----------------------------------------------------------------------*
+
+TOP-OF-PAGE.
+  CASE P_VARIA.
+    WHEN 'IT'.
+      PERFORM TOP-ITALIA.
+    WHEN 'ES'.
+      PERFORM TOP-ITALIA.
+    WHEN 'FR'.
+      PERFORM TOP-FRANCE.
+    WHEN 'BE'.
+      PERFORM TOP-FRANCE.
+    WHEN 'CZ'.
+      PERFORM TOP-ITALIA.
+    WHEN 'CO'.
+      PERFORM TOP-ITALIA.
+    WHEN 'MX'.
+      PERFORM TOP-ITALIA.
+  ENDCASE.
+
+*----------------------------------------------------------------------*
+*                         Checks at Selection Screen                   *
+*----------------------------------------------------------------------*
+
+AT SELECTION-SCREEN ON P_VARIA.
+
+* Check whether the choosen country variant is supported by the report.
+  IF P_VARIA NE 'IT'
+    AND P_VARIA NE 'FR'
+    AND P_VARIA NE 'BE'
+    AND P_VARIA NE 'ES'
+    AND P_VARIA NE 'CZ'
+    AND P_VARIA NE 'MX'
+    AND P_VARIA NE 'CO'.
+    MESSAGE E152.
+  ENDIF.
+
+  IF P_VARIA NE 'IT'
+    AND P_VARIA NE 'ES'
+    AND P_VARIA NE 'CZ'.
+    MOVE 80 TO SYST-LINSZ.
+  ENDIF.
+
+* Czechia requires conversion of foreign curr. at invoice date
+  IF P_VARIA = 'CZ'.
+    UMRECHN = 'X'.
+  ENDIF.
+
+** Determines the correct country form
+*  CASE P_VARIA.
+*    WHEN 'IT' OR 'ES' OR 'CZ'.
+*      P_FORID = 'I '.
+*    WHEN 'BE'.
+*      P_FORID = 'B '.
+*    WHEN 'FR'.
+*      P_FORID = 'F '.
+*    WHEN 'MX'.
+*      P_FORID = 'M '.
+*    WHEN 'CO'.
+*      P_FORID = 'C '.
+*  ENDCASE.
+
+* Old or new WT functionality?
+AT SELECTION-SCREEN ON KD_BUKRS.
+
+  PERFORM CHECK_COMPANY_CODES.
+
+* New WT functionality: WT types
+AT SELECTION-SCREEN ON WITHT.
+
+  PERFORM CHECK_WT_TYPES. "Are choosen WT types defined in table T059P?
+
+* WT codes
+AT SELECTION-SCREEN ON QSTKZ.
+
+  IF QSTKZ NE SPACE AND OLD_WITH = 'X'.          " Old WT functionality
+    PERFORM CHECK_OLD_WT_CODES.
+  ENDIF.
+
+  IF QSTKZ NE SPACE AND NEW_WITH = 'X'.          " New WT functionality
+    PERFORM CHECK_WT_CODES.
+    QSTKZ_EXT   = QSTKZ.
+    QSTKZ_EXT[] = QSTKZ[].
+  ENDIF.
+
+*------- Alternative local currency (Euro)                       -------
+AT SELECTION-SCREEN ON CONVDAT.
+
+  IF NOT ALTCURR IS INITIAL AND CONVDAT IS INITIAL.
+    CONVDAT = SY-DATUM.
+  ENDIF.
+
+* ---------------------------------------------------------------------
+AT SELECTION-SCREEN.
+
+* In case of immediately printing: Is printer specified?
+  IF P_IMMEA = 'X'
+    AND P_PRINT EQ SPACE.
+    MESSAGE E277.
+  ENDIF.
+
+** Determines country specific printing form
+*  SELECT SINGLE * FROM  T001F
+*         WHERE  BUKRS       = '    '
+*         AND    PROGRAMM    = SY-REPID
+*         AND    EVENT       = P_FORID
+*         AND    KOART       = ' '.
+*
+*  IF SY-SUBRC NE 0.
+*    SELECT        * FROM  T001
+*           WHERE  BUKRS       IN KD_BUKRS.
+*      SELECT SINGLE * FROM  T001F
+*             WHERE  BUKRS       = T001-BUKRS
+*             AND    PROGRAMM    = SY-REPID
+*             AND    EVENT       = P_FORID
+*             AND    KOART       = ' '.
+*      IF SY-SUBRC NE 0.
+*        MESSAGE E276 WITH T001-BUKRS SY-REPID P_FORID.
+*      ENDIF.
+*    ENDSELECT.
+*  ENDIF.
+*
+** Determines Adress ID
+*  SELECT SINGLE * FROM  T001G
+*         WHERE  BUKRS       = '    '
+*         AND    PROGRAMM    = SY-REPID
+*         AND    TXTID       = P_ADRID.
+*  IF SY-SUBRC NE 0.
+*    SELECT        * FROM  T001
+*           WHERE  BUKRS       IN KD_BUKRS.
+*      SELECT SINGLE * FROM  T001G
+*             WHERE  BUKRS       = T001-BUKRS
+*             AND    PROGRAMM    = SY-REPID
+*             AND    TXTID       = P_ADRID.
+*      IF SY-SUBRC NE 0.
+*        FLAG6 = 'X'.
+*      ENDIF.
+*    ENDSELECT.
+*    IF FLAG6 = 'X'.
+*      MESSAGE W275.
+*    ENDIF.
+*  ENDIF.
+
+* Configuration of country specific header line
+  MOVE TEXT-400 TO WTITLE.
+  IF ALT_CTRY IS INITIAL.
+    CASE P_VARIA.
+      WHEN 'IT'.
+        REPLACE '$' WITH TEXT-401 INTO WTITLE.
+      WHEN 'FR'.
+        REPLACE '$' WITH TEXT-403 INTO WTITLE.
+      WHEN 'BE'.
+        REPLACE '$' WITH TEXT-404 INTO WTITLE.
+      WHEN 'ES'.
+        REPLACE '$' WITH TEXT-402 INTO WTITLE.
+      WHEN 'CZ'.
+        REPLACE '$' WITH TEXT-407 INTO WTITLE.
+      WHEN 'MX'.
+        REPLACE '$' WITH TEXT-409 INTO WTITLE.
+      WHEN 'CO'.
+        REPLACE '$' WITH TEXT-410 INTO WTITLE.
+    ENDCASE.
+  ELSE.
+    REPLACE '$' WITH ALT_CTRY INTO WTITLE.
+  ENDIF.
+
+  CASE P_VARIA.
+    WHEN 'IT'.
+      TOPLENGTH = 11.
+    WHEN 'ES'.
+      TOPLENGTH = 10.
+    WHEN 'FR'.
+      TOPLENGTH = 11.
+    WHEN 'BE'.
+      TOPLENGTH = 11.
+    WHEN 'CZ'.
+      TOPLENGTH = 11.
+    WHEN 'MX'.
+      TOPLENGTH = 11.
+    WHEN 'CO'.
+      TOPLENGTH = 11.
+  ENDCASE.
+
+  IF   P_VARIA EQ 'FR'
+    OR P_VARIA EQ 'BE'.
+    MOVE '80' TO BHDGD-LINES.
+  ELSEIF P_VARIA EQ 'IT'
+    OR P_VARIA EQ 'ES'
+    OR P_VARIA EQ 'CZ'
+    OR P_VARIA EQ 'MX'
+    OR P_VARIA EQ 'CO'.
+    MOVE '132' TO BHDGD-LINES.
+  ENDIF.
+
+  MOVE '0' TO BHDGD-INIFL.
+  MOVE SYST-UNAME   TO BHDGD-UNAME.
+  MOVE SYST-REPID   TO BHDGD-REPID.
+  MOVE P_ZUTIT      TO BHDGD-LINE2.
+  MOVE WTITLE       TO BHDGD-LINE1.
+  MOVE LISTSEPA     TO BHDGD-SEPAR.
+  MOVE 'BSIK-BUKRS' TO BHDGD-DOMAI.
+
+*---------- Define reporting period, printed in the sapscript form -----
+*---------- Belgium: Only WT base is relevant => open items are selected
+  IF P_VARIA EQ 'BE'.
+    MOVE: BUCHDT-LOW  TO RFKHELP-VONDT,
+          BUCHDT-HIGH TO RFKHELP-BISDT.
+*---------- Other countries: WT has to be reported => clearing date
+  ELSE.
+    MOVE: AUGDAT-LOW  TO RFKHELP-VONDT,
+          AUGDAT-HIGH TO RFKHELP-BISDT.
+  ENDIF.
+
+*---------- In Belgium open items have to be taken into account. -------
+  IF P_VARIA = 'BE' AND UNAUSGEG NE 'X'.
+    MESSAGE W385 WITH P_VARIA.
+  ENDIF.
+
+*---------- Information: Exchange rate taken at invoice time -----------
+  IF UMRECHN = 'X'.
+    MESSAGE I453.
+  ENDIF.
+
+*---------- Commands for printing --------------------------------------
+  IF SY-BATCH = 'X'.
+    NEW-PAGE
+      NO-TITLE
+      NO-HEADING
+      PRINT ON
+        DESTINATION P_PRINT
+        IMMEDIATELY P_IMMEA
+        KEEP IN SPOOL ' '
+        COVER TEXT WTITLE
+        LINE-SIZE '132'
+        LINE-COUNT '65'
+        NEW LIST IDENTIFICATION 'X'
+        NO DIALOG.
+  ELSE.
+    NEW-PAGE
+      NO-TITLE
+      NO-HEADING
+      PRINT ON
+        DESTINATION P_PRINT
+        IMMEDIATELY P_IMMEA
+        KEEP IN SPOOL ' '
+        COVER TEXT WTITLE
+        LINE-SIZE '132'
+        NEW LIST IDENTIFICATION 'X'
+        NO DIALOG.
+    NEW-PAGE PRINT OFF.
+  ENDIF.
+
+*----------------------------------------------------------------------*
+*                                 Selection                            *
+*----------------------------------------------------------------------*
+
+START-OF-SELECTION.
+
+  COMMIT WORK.                          "PERFORMANCE INFORMIX
+
+*---------- Get relevant (xumsw = 'X') posting keys --------------------
+  SELECT * FROM TBSL
+   WHERE XUMSW = 'X'.
+    BUSCHL-LOW = TBSL-BSCHL.
+    BUSCHL-SIGN = 'I'.
+    BUSCHL-OPTION = 'EQ'.
+    APPEND BUSCHL.
+  ENDSELECT.
+
+  GET BSIK.
+
+*------- In case of classical or old WT, exclude items without QSSKZ ---
+  if old_with = 'X'.
+    CHECK BSIK-QSSKZ NE SPACE.
+  endif.
+
+*----------- Exclude 'Merkposten' --------------------------------------
+  CHECK BSIK-BSTAT NE 'S'.
+
+*----------- Get company code data -------------------------------------
+  IF BSIK-BUKRS NE T001-BUKRS.
+    SELECT SINGLE * FROM T001
+      WHERE BUKRS EQ BSIK-BUKRS.
+  ENDIF.
+
+*----------------------------------------------------------------------*
+*                      New Withholding Tax                             *
+*----------------------------------------------------------------------*
+  IF NOT NEW_WITH IS INITIAL.
+
+    CLEAR X_WITH_ITEM[].
+
+*   Read WT data from with_item into x_with_item
+    CALL FUNCTION 'FI_WT_READ_WT_INFO'
+         EXPORTING
+              I_BUKRS     = BSIK-BUKRS
+              I_BELNR     = BSIK-BELNR
+              I_GJAHR     = BSIK-GJAHR
+              I_BUZEI     = BSIK-BUZEI  " Get WT data of complete doc.
+         TABLES
+              T_WITH_ITEM = X_WITH_ITEM
+         EXCEPTIONS
+              NOT_FOUND   = 1
+              OTHERS      = 2.
+
+    CLEAR: BSIK-QSSKZ.
+
+*   For calculation of VAT tax we need WT data of the total document
+    IF P_VARIA = 'CO' OR P_VARIA = 'MX'.
+      SELECT * FROM WITH_ITEM INTO TABLE I_WITH_ITEM
+                             WHERE BUKRS  = BSIK-BUKRS
+                               AND BELNR  = BSIK-BELNR
+                               AND GJAHR  = BSIK-GJAHR
+                               AND BUZEI <> BSIK-BUZEI.
+      LOOP AT I_WITH_ITEM.
+        X_WITH_ITEM = I_WITH_ITEM.
+        APPEND X_WITH_ITEM.
+      ENDLOOP.
+    ENDIF.
+
+*   Determine total WT amount with posting at invoice time
+
+*   In the case that there are WT types with posting at invoice, the
+*   invoice amount in bsik (bsak) does not correspond to the total
+*   amount but is reduced by the total WT amount of all types with
+*   posting at invoice time. Thus, it is necessary first to loop over
+*   the with_item and to detect and to sum up all WT amount of posting
+*   at invoice types.
+    PERFORM GET_TOTAL_WT_AT_INVOICE TABLES X_WITH_ITEM
+                                           X_T059P
+                                           X_WT_AT_INVOICE
+                                     USING T001-LAND1.
+
+*   Convert WT amounts into local curr. depending on spec. exchange date
+    IF BSIK-WAERS NE T001-WAERS AND
+       UMRECHN = 'X' AND
+       BSIK-WRBTR NE 0.
+      RATE = BSIK-DMBTR / BSIK-WRBTR.
+      LOOP AT X_WT_AT_INVOICE.
+        X_WT_AT_INVOICE-WT_QBSHH = X_WT_AT_INVOICE-WT_QBSHB * RATE.
+        MODIFY X_WT_AT_INVOICE.
+      ENDLOOP.
+    ENDIF.
+
+*  Proceed WT data of current vendor line
+   LOOP AT X_WITH_ITEM WHERE BUZEI = BSIK-BUZEI.
+
+     IF NOT QSTKZ_EXT IS INITIAL.
+       CHECK X_WITH_ITEM-WT_WITHCD IN QSTKZ_EXT.
+     ENDIF.
+
+     IF NOT WITHT IS INITIAL.
+       CHECK X_WITH_ITEM-WITHT IN WITHT.
+     ENDIF.
+
+*   Convert WT amounts into local curr. depending on spec. exchange date
+    IF BSIK-WAERS NE T001-WAERS AND
+       UMRECHN = 'X'            AND
+       X_WITH_ITEM-WT_QSSHB NE 0.
+             RATE = X_WITH_ITEM-WT_QSSHH / X_WITH_ITEM-WT_QSSHB.
+             X_WITH_ITEM-WT_QBSHH = X_WITH_ITEM-WT_QBSHB * RATE.
+    ELSEIF BSIK-WAERS NE T001-WAERS AND
+           UMRECHN = ' '            AND
+           X_WITH_ITEM-WT_QBSHB NE 0.
+             RATE = X_WITH_ITEM-WT_QBSHH / X_WITH_ITEM-WT_QBSHB.
+             X_WITH_ITEM-WT_QSSHH = X_WITH_ITEM-WT_QSSHB * RATE.
+             BSIK-DMBTR = BSIK-WRBTR * RATE.
+    ENDIF.
+
+*   Add total WT at invoice to bsik-dmbtr to get total dmbtr
+    READ TABLE X_WT_AT_INVOICE WITH KEY BUKRS = BSIK-BUKRS
+                                        BELNR = BSIK-BELNR
+                                        GJAHR = BSIK-GJAHR
+                                        BUZEI = BSIK-BUZEI.
+    IF X_WT_AT_INVOICE-WT_QBSHH < 0.
+      X_WT_AT_INVOICE-WT_QBSHH = X_WT_AT_INVOICE-WT_QBSHH * -1.
+    ENDIF.
+    H_DMBTR = BSIK-DMBTR + X_WT_AT_INVOICE-WT_QBSHH.
+
+*     Filling of data extract fields according to country specific
+*     selection checks
+
+*     Italy, Spain, Czechia, Colombia, Mexico
+      IF   P_VARIA EQ 'IT'
+        OR P_VARIA EQ 'ES'
+        OR P_VARIA EQ 'CZ'.
+        PERFORM PREP_DATA_EXTR_EXT_WT_CTRGR_1 CHANGING PROCESSING_FLAG.
+      ENDIF.
+
+*     France
+      IF P_VARIA = 'FR'.
+        PERFORM PREP_DATA_EXTR_EXT_WT_CTRGR_2 CHANGING PROCESSING_FLAG.
+      ENDIF.
+
+*     Belgium
+      IF P_VARIA = 'BE'.
+        PERFORM PREP_DATA_EXTR_EXT_WT_CTRGR_3 CHANGING PROCESSING_FLAG.
+      ENDIF.
+
+*     Colombia
+      IF P_VARIA = 'CO' OR
+         P_VARIA = 'MX'.
+        PERFORM PREP_DATA_EXTR_EXT_WT_CTRGR_4 CHANGING PROCESSING_FLAG.
+      ENDIF.
+
+      IF PROCESSING_FLAG = 'X'.
+
+*       Get CPD data from document
+        PERFORM GET_CPD_DATA.
+
+        BSIK-QSSKZ = X_WITH_ITEM-WT_WITHCD.
+        E_WITHT    = X_WITH_ITEM-WITHT.
+
+*       Convert amounts from local curr. into alternative local curr.
+        IF NOT ALTCURR IS INITIAL.
+          PERFORM CONVERT_INTO_ALT_LOC_CURR.
+        ENDIF.
+
+        EXTRACT DATEN.
+
+      ENDIF.
+
+    ENDLOOP.                                 " Of loop over x_with_item
+
+*----------------------------------------------------------------------*
+*                      Old Withholding Tax                             *
+*----------------------------------------------------------------------*
+  ELSE.
+
+*---------- Read relevant exchange dates and rates from bkpf -----------
+    PERFORM GET_CURR_EXCHANGE_DATA
+          USING BSIK-BUKRS
+                BSIK-BELNR
+                BSIK-AUGBL
+                BSIK-AUGDT
+                BSIK-GJAHR
+*         changing
+               INV_DATE                       " Date of invoice booking
+               CURR_INV                              " Invoice currency
+               RATE_INV       " Manually given exchange rate at invoice
+               PAY_DATE                       " Date of payment booking
+               CURR_PAY                              " Payment currency
+               RATE_PAY.      " Manually given exchange rate at payment
+
+*   Convert WT amounts into local curr. depending on spec. exchange date
+    PERFORM CONVERT_INTO_LOC_CURR_OLD_WT.
+
+*   Filling of data extract fields according to country specific
+*   selection checks
+
+*   Italy, Spain, Czechia, Colombia. Mexico
+    IF P_VARIA EQ 'IT'
+      OR P_VARIA EQ 'ES'
+      OR P_VARIA EQ 'CZ'.
+      PERFORM PREP_DATA_EXTR_OLD_WT_CTRGR_1 CHANGING PROCESSING_FLAG.
+    ENDIF.
+
+*   France
+    IF P_VARIA = 'FR'.
+      PERFORM PREP_DATA_EXTR_OLD_WT_CTRGR_2 CHANGING PROCESSING_FLAG.
+    ENDIF.
+
+*   Belgium
+    IF P_VARIA = 'BE'.
+      PERFORM PREP_DATA_EXTR_OLD_WT_CTRGR_3 CHANGING PROCESSING_FLAG.
+    ENDIF.
+
+*   Colombia, Mexico
+    IF P_VARIA = 'CO' OR
+       P_VARIA = 'MX'.
+      PERFORM PREP_DATA_EXTR_OLD_WT_CTRGR_4 CHANGING PROCESSING_FLAG.
+    ENDIF.
+
+    IF PROCESSING_FLAG = 'X'.
+
+*     Get CPD data from document
+      PERFORM GET_CPD_DATA.
+
+*     Convert amounts from local curr. into alternative local curr.
+      IF NOT ALTCURR IS INITIAL.
+        PERFORM CONVERT_INTO_ALT_LOC_CURR.
+      ENDIF.
+
+      EXTRACT DATEN.
+
+    ENDIF.
+
+  ENDIF.
+
+*----------------------------------------------------------------------*
+*               Country specific reports for listings                  *
+*----------------------------------------------------------------------*
+END-OF-SELECTION.
+
+  SORT.
+
+  PERFORM GET_REPYEAR TABLES T_REPYEAR.
+
+  CASE P_VARIA.
+
+    WHEN 'IT'.                                         " Italy
+      IF FORMULAR = 'X'.
+        PERFORM MELDUNG_ITALIA.
+      ENDIF.
+      IF PROTOKOL EQ 'X'.
+        PERFORM ITALIA.
+      ENDIF.
+
+    WHEN 'ES'.                                        " Spain
+      IF FORMULAR = 'X'.
+        PERFORM MELDUNG_ITALIA.
+      ENDIF.
+      IF PROTOKOL EQ 'X'.
+        PERFORM ITALIA.
+      ENDIF.
+
+    WHEN 'CZ'.                                       " Czechia
+      IF FORMULAR = 'X'.
+        PERFORM MELDUNG_ITALIA.
+      ENDIF.
+      IF PROTOKOL EQ 'X'.
+        PERFORM ITALIA.
+      ENDIF.
+
+    WHEN 'MX'.                                       " Mexico
+      IF FORMULAR = 'X'.
+        PERFORM MELDUNG_MEXICO.
+      ENDIF.
+      IF PROTOKOL EQ 'X'.
+        PERFORM ITALIA.
+      ENDIF.
+
+    WHEN 'CO'.                                       " Columbia
+      IF FORMULAR = 'X'.
+        PERFORM MELDUNG_ITALIA.
+      ENDIF.
+      IF PROTOKOL EQ 'X'.
+        PERFORM ITALIA.
+      ENDIF.
+
+    WHEN 'FR'.                                       " France
+      IF FORMULAR = 'X'.
+        PERFORM MELDUNG_FRANCE.
+      ENDIF.
+      IF PROTOKOL EQ 'X'.
+        PERFORM FRANCE.
+      ENDIF.
+
+    WHEN 'BE'.                                      " Belgium
+      IF FORMULAR = 'X'.
+        PERFORM MELDUNG_FRANCE.
+      ENDIF.
+      IF PROTOKOL EQ 'X'.
+        PERFORM FRANCE.
+      ENDIF.
+
+  ENDCASE.
+
+
+
+*---------------------------------------------------------------------*
+*       FORM PRINTDATA_1                                              *
+*---------------------------------------------------------------------*
+*       Data for SAPScript                                            *
+*---------------------------------------------------------------------*
+FORM PRINTDATA_1.
+
+  ITCPO-TDCOPIES           = '1'.
+  ITCPO-TDDEST             = P_PRINT.
+  ITCPO-TDPREVIEW          = ' '.
+  ITCPO-TDIMMED            = P_IMMEA.
+  ITCPO-TDNEWID            = 'X'.
+  ITCPO-TDCOVER            = 'X'.
+  ITCPO-TDRECEIVER         = SY-UNAME.
+  ITCPO-TDDIVISION         = SY-PRABT.
+  ITCPO-TDDATASET          = 'SCRIPT'.
+  ITCPO-TDSUFFIX1          = P_PRINT.
+  ITCPO-TDSUFFIX2          = SY-REPID.
+  ITCPO-TDSUFFIX2+8(1)     = '_'.
+  ITCPO-TDSUFFIX2+9(3)     = SY-UNAME.
+
+ENDFORM.
+
+*---------------------------------------------------------------------*
+*       FORM PRINTDATA_2                                              *
+*---------------------------------------------------------------------*
+*       Data for SAPScript                                            *
+*---------------------------------------------------------------------*
+FORM PRINTDATA_2.
+
+  CLEAR ITCPO-TDCOVTITLE.
+  ITCPO-TDCOVTITLE         = TEXT-222.
+  REPLACE '&' WITH P_VARIA INTO ITCPO-TDCOVTITLE.
+  ITCPO-TDCOVTITLE+63(4)   = BSIK-BUKRS.
+  CONDENSE ITCPO-TDCOVTITLE.
+
+  SELECT SINGLE * FROM  T001F
+         WHERE  BUKRS       = BSIK-BUKRS
+         AND    PROGRAMM    = SY-REPID
+         AND    EVENT       = P_FORID
+         AND    KOART       = ' '.
+
+  IF SY-SUBRC NE 0.
+    SELECT SINGLE * FROM  T001F
+           WHERE  BUKRS       = '    '
+           AND    PROGRAMM    = SY-REPID
+           AND    EVENT       = P_FORID
+           AND    KOART       = ' '.
+  ENDIF.
+
+  SELECT SINGLE * FROM  T001G
+         WHERE  BUKRS       = BSIK-BUKRS
+         AND    PROGRAMM    = SY-REPID
+         AND    TXTID       = P_ADRID.
+
+  IF SY-SUBRC NE 0.
+    SELECT SINGLE * FROM  T001G
+           WHERE  BUKRS       = '    '
+           AND    PROGRAMM    = SY-REPID
+           AND    TXTID       = P_ADRID.
+  ENDIF.
+
+ENDFORM.
+
+*----------------------------------------------------------------------*
+*                                CPD data                              *
+*----------------------------------------------------------------------*
+FORM GET_CPD_DATA.
+
+    IF BSIK-XCPDD EQ ' '.
+      MOVE BSIK-LIFNR TO LIEFER.
+    ELSE.
+      SELECT SINGLE * FROM BSEC
+        WHERE BUKRS EQ BSIK-BUKRS
+        AND   BELNR EQ BSIK-BELNR
+        AND   GJAHR EQ BSIK-GJAHR
+        AND   BUZEI EQ BSIK-BUZEI.
+      MOVE BSIK-LIFNR TO LIEFER+0(10).
+      MOVE BSEC-NAME1 TO LIEFER+10(10).
+      MOVE BSEC-STRAS TO LIEFER+20(8).
+      MOVE BSEC-PSTLZ TO LIEFER+28(7).
+      MOVE BSEC-NAME1 TO WNAME1.
+      MOVE BSEC-NAME2 TO WNAME2.
+      MOVE BSEC-NAME3 TO WNAME3.
+      MOVE BSEC-NAME4 TO WNAME4.
+      MOVE BSEC-STRAS TO WSTRAS.
+      MOVE BSEC-PFACH TO WPFACH.
+      MOVE BSEC-PSTLZ TO WPSTLZ.
+      MOVE BSEC-PSTL2 TO WPSTL2.
+      MOVE BSEC-ORT01 TO WORT01.
+      CLEAR WORT02.
+      MOVE BSEC-REGIO TO WREGIO.
+      MOVE BSEC-STCD1 TO WSTCD1.
+      MOVE BSEC-LAND1 TO WLAND1.
+    ENDIF.
+
+ENDFORM.
+
+*&---------------------------------------------------------------------*
+*&      Form  CHECK_OLD_WT_CODES
+*&---------------------------------------------------------------------*
+*       Checks whether the selected WT codes are defined in t059q
+*----------------------------------------------------------------------*
+FORM CHECK_OLD_WT_CODES.
+
+  SELECT * FROM T059Q WHERE QSSKZ IN QSTKZ.
+  ENDSELECT.
+  IF SY-SUBRC NE '0'.
+    MESSAGE E151.
+  ENDIF.
+
+ENDFORM.
+
+*----------------------------------------------------------------------*
+*                   Form 'prep_data_extract_ext_wt_ctrgr_1'            *
+*                   Performs several selection checks and fills        *
+*                   the fields of the data extract.                    *
+*                   The selection checks are specific for the          *
+*                   country group (ctrgr).                             *
+*                   Country group 1 is currently used for:             *
+*                   IT, ES, CZ                                         *
+*----------------------------------------------------------------------*
+FORM PREP_DATA_EXTR_EXT_WT_CTRGR_1 CHANGING P_PROCESSING_FLAG.
+
+      CLEAR P_PROCESSING_FLAG.
+
+      CHECK BELNUM.
+      CASE BSIK-UMSKS.
+        WHEN ' '.
+          CHECK BSIK-AUGBL NE SPACE.
+          CHECK AUGDAT.
+          CHECK BSIK-BSCHL IN BUSCHL.
+        WHEN 'A'.
+          CHECK BUCHDT.
+          IF BSIK-SHKZG EQ 'S'.
+            MOVE  'H' TO BSIK-SHKZG.
+          ELSE.
+            MOVE  'S' TO BSIK-SHKZG.
+          ENDIF.
+*         ------------------- Switch sign of WT in case of down payment
+          X_WITH_ITEM-WT_QSSHH = X_WITH_ITEM-WT_QSSHH * -1.
+          X_WITH_ITEM-WT_QBSHH = X_WITH_ITEM-WT_QBSHH * -1.
+        WHEN OTHERS.
+          REJECT.
+      ENDCASE.
+
+      IF BSIK-SHKZG EQ 'H'.
+        WDMBTR = H_DMBTR.
+        WWRBTR = BSIK-WRBTR.
+        WQSSHB = X_WITH_ITEM-WT_QSSHH * -1.
+        WQBSHB = X_WITH_ITEM-WT_QBSHH * -1.
+      ELSE.
+        WDMBTR = H_DMBTR * -1.
+        WWRBTR = BSIK-WRBTR * -1.
+        WQSSHB = X_WITH_ITEM-WT_QSSHH * -1.
+        WQBSHB = X_WITH_ITEM-WT_QBSHH * -1.
+      ENDIF.
+
+      WQSFBT = WDMBTR - WQSSHB.
+      NETTO  = WDMBTR - WQBSHB.
+
+      P_PROCESSING_FLAG = 'X'.
+
+ENDFORM.                        " Of 'prep_data_extract_ext_wt_ctrgr_1'
+
+*----------------------------------------------------------------------*
+*                   Form 'prep_data_extract_ext_wt_ctrgr_2'            *
+*                   Performs several selection checks and fills        *
+*                   the fields of the data extract.                    *
+*                   The selection checks are specific for the          *
+*                   country group (ctrgr).                             *
+*                   Country group 2 is currently used for:             *
+*                   FR                                                 *
+*----------------------------------------------------------------------*
+FORM PREP_DATA_EXTR_EXT_WT_CTRGR_2 CHANGING P_PROCESSING_FLAG.
+
+      CLEAR P_PROCESSING_FLAG.
+
+*      if p_varia eq 'BE'.
+*        check bsik-umsks ne 'A'.
+*      endif.
+      CASE BSIK-UMSKS.
+        WHEN ' '.
+*          if p_varia ne 'BE'.
+            CHECK AUGDAT.
+*          else.
+*            check buchdt.
+*          endif.
+          CHECK BSIK-XZAHL NE 'X'.
+          CHECK BSIK-BSCHL IN BUSCHL.
+          CHECK BELNUM.
+          IF UNAUSGEG NE 'X'.
+            CHECK: BSIK-AUGBL NE SPACE,
+                   BSIK-AUGDT NE '00000000'.
+          ENDIF.
+        WHEN 'A'.
+          CHECK BELNUM.
+          IF BSIK-AUGBL EQ SPACE.
+            CHECK BUCHDT.
+         ELSE.
+            CHECK AUGDAT.
+            CHECK BSIK-BUDAT LT AUGDAT-LOW.
+          ENDIF.
+        WHEN OTHERS.
+          REJECT.
+      ENDCASE.
+
+      IF BSIK-SHKZG EQ 'H'
+        OR  BSIK-UMSKS EQ 'A' AND BSIK-AUGBL EQ SPACE.
+        WDMBTR = H_DMBTR.
+        WWRBTR = BSIK-WRBTR.
+        IF BSIK-SHKZG = 'H'.
+          WQSSHB = X_WITH_ITEM-WT_QSSHH * -1.
+          WQBSHB = X_WITH_ITEM-WT_QBSHH * -1.
+        ELSE.
+          WQSSHB = X_WITH_ITEM-WT_QSSHH.
+          WQBSHB = X_WITH_ITEM-WT_QBSHH.
+        ENDIF.
+      ELSE.
+        WDMBTR = H_DMBTR * -1.
+        WWRBTR = BSIK-WRBTR * -1.
+        WQSSHB = X_WITH_ITEM-WT_QSSHH * -1.
+        WQBSHB = X_WITH_ITEM-WT_QBSHH * -1.
+     ENDIF.
+
+     WQSFBT = WDMBTR - WQSSHB.
+     NETTO  = WDMBTR - WQBSHB.
+
+     P_PROCESSING_FLAG = 'X'.
+
+ENDFORM.                           " Of 'prep_data_extr_ext_wt_ctrgr_2'
+
+*----------------------------------------------------------------------*
+*                   Form 'prep_data_extract_ext_wt_ctrgr_3'            *
+*                   Performs several selection checks and fills        *
+*                   the fields of the data extract.                    *
+*                   The selection checks are specific for the          *
+*                   country group (ctrgr).                             *
+*                   Country group 3 is currently used for:             *
+*                   BE                                                 *
+*----------------------------------------------------------------------*
+FORM PREP_DATA_EXTR_EXT_WT_CTRGR_3 CHANGING P_PROCESSING_FLAG.
+
+      CLEAR P_PROCESSING_FLAG.
+
+*      if p_varia eq 'BE'.
+        CHECK BSIK-UMSKS NE 'A'.
+*      endif.
+      CASE BSIK-UMSKS.
+        WHEN ' '.
+*          if p_varia ne 'BE'.
+*            check augdat.
+*          else.
+            CHECK BUCHDT.
+*          endif.
+          CHECK BSIK-XZAHL NE 'X'.
+          CHECK BSIK-BSCHL IN BUSCHL.
+          CHECK BELNUM.
+          IF UNAUSGEG NE 'X'.
+            CHECK: BSIK-AUGBL NE SPACE,
+                   BSIK-AUGDT NE '00000000'.
+          ENDIF.
+        WHEN 'A'.
+          CHECK BELNUM.
+          IF BSIK-AUGBL EQ SPACE.
+            CHECK BUCHDT.
+         ELSE.
+            CHECK AUGDAT.
+            CHECK BSIK-BUDAT LT AUGDAT-LOW.
+          ENDIF.
+        WHEN OTHERS.
+          REJECT.
+      ENDCASE.
+
+      IF BSIK-SHKZG EQ 'H'
+        OR  BSIK-UMSKS EQ 'A' AND BSIK-AUGBL EQ SPACE.
+        WDMBTR = H_DMBTR.
+        WWRBTR = BSIK-WRBTR.
+        IF BSIK-SHKZG = 'H'.
+          WQSSHB = X_WITH_ITEM-WT_QSSHH * -1.
+          WQBSHB = X_WITH_ITEM-WT_QBSHH * -1.
+        ELSE.
+          WQSSHB = X_WITH_ITEM-WT_QSSHH.
+          WQBSHB = X_WITH_ITEM-WT_QBSHH.
+        ENDIF.
+      ELSE.
+        WDMBTR = H_DMBTR * -1.
+        WWRBTR = BSIK-WRBTR * -1.
+        WQSSHB = X_WITH_ITEM-WT_QSSHH * -1.
+        WQBSHB = X_WITH_ITEM-WT_QBSHH * -1.
+     ENDIF.
+
+     WQSFBT = WDMBTR - WQSSHB.
+     NETTO  = WDMBTR - WQBSHB.
+
+     P_PROCESSING_FLAG = 'X'.
+
+ENDFORM.                           " Of 'prep_data_extr_ext_wt_ctrgr_3'
+
+*----------------------------------------------------------------------*
+*    Include für Meldung Italien                                       *
+*----------------------------------------------------------------------*
+INCLUDE KQST2001 .
+*----------------------------------------------------------------------*
+*    Include für Quellensteuerreport  Italien und Spanien              *
+*----------------------------------------------------------------------*
+INCLUDE KQST1001 .
+*----------------------------------------------------------------------*
+*    Include für Meldung Frankreich und Belgien                        *
+*----------------------------------------------------------------------*
+INCLUDE KQST2002.
+*----------------------------------------------------------------------*
+*    Include für Meldung Kolumbien                                     *
+*----------------------------------------------------------------------*
+INCLUDE KQST2003.
+*----------------------------------------------------------------------*
+*    Include für Quellensteuerreport Frankreich und Belgien            *
+*----------------------------------------------------------------------*
+INCLUDE KQST1003 .
+*----------------------------------------------------------------------*
+*    Include for extended functionality                                *
+*----------------------------------------------------------------------*
+INCLUDE FIWT0010 .
+*----------------------------------------------------------------------*
+*    Include for help routines withholding tax reports                 *
+*----------------------------------------------------------------------*
+INCLUDE FIWT0020.
+
+*&---------------------------------------------------------------------*
+*&      Form  CONVERT_INTO_ALT_LOC_CURR (EURO)
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*  -->  p1        text
+*  <--  p2        text
+*----------------------------------------------------------------------*
+FORM CONVERT_INTO_ALT_LOC_CURR.
+
+        IF WDMBTR <> 0.
+          H_WDMBTR = WDMBTR.
+          CALL FUNCTION 'CONVERT_TO_FOREIGN_CURRENCY'
+               EXPORTING DATE             = CONVDAT
+                         FOREIGN_CURRENCY = ALTCURR
+                         LOCAL_AMOUNT     = WDMBTR
+                         LOCAL_CURRENCY   = T001-WAERS
+*                         rate             = ???
+                         TYPE_OF_RATE     = 'M'
+               IMPORTING FOREIGN_AMOUNT   = WDMBTR.
+          ALT_RATE = WDMBTR / H_WDMBTR.
+          WQSSHB = ALT_RATE * WQSSHB.
+          WQBSHB = ALT_RATE * WQBSHB.
+          WQSFBT = ALT_RATE * WQSFBT.
+          NETTO  = ALT_RATE * NETTO.
+        ENDIF.
+
+ENDFORM.                    " CONVERT_INTO_ALT_LOC_CURR
+
+*&---------------------------------------------------------------------*
+*&      Form  CONVERT_INTO_LOC_CURR_OLD_WT
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*  -->  p1        text
+*  <--  p2        text
+*----------------------------------------------------------------------*
+FORM CONVERT_INTO_LOC_CURR_OLD_WT.
+
+*---------------- Conversion at invoice time ---------------------------
+    IF UMRECHN = 'X'.
+
+*     Converts WT base of old WT
+
+*     Invoice currency -> local currency at clearing date
+      WQSSHB = BSIK-QSSHB.  " Intermediate value: WT base in inv. curr.
+      IF CURR_INV NE T001-WAERS.
+        CALL FUNCTION 'CONVERT_TO_LOCAL_CURRENCY'
+             EXPORTING DATE             = INV_DATE " Insert OSS 306375
+                       FOREIGN_CURRENCY = CURR_INV
+                       LOCAL_CURRENCY   = T001-WAERS
+                       FOREIGN_AMOUNT   = BSIK-QSSHB
+*                      rate from tcurr
+                       RATE             = RATE_INV  " Insert OSS 306375
+                       TYPE_OF_RATE     = 'M'
+             IMPORTING LOCAL_AMOUNT     = BSIK-QSSHB.
+      ENDIF.
+
+*     WT amount and base from clr. curr. -> local curr. at inv. date
+      IF CURR_PAY NE T001-WAERS.
+
+        IF CURR_PAY = CURR_INV.
+          CALL FUNCTION 'CONVERT_TO_LOCAL_CURRENCY'
+               EXPORTING DATE             = INV_DATE
+                         FOREIGN_AMOUNT   = BSIK-QBSHB
+                         FOREIGN_CURRENCY = CURR_PAY
+                         LOCAL_CURRENCY   = T001-WAERS
+                         RATE             = RATE_INV
+                         TYPE_OF_RATE     = 'M'
+               IMPORTING LOCAL_AMOUNT     = BSIK-QBSHB.
+        ELSE.
+
+        CALL FUNCTION 'CONVERT_TO_LOCAL_CURRENCY'
+             EXPORTING DATE             = INV_DATE
+                       FOREIGN_AMOUNT   = BSIK-QBSHB
+                       FOREIGN_CURRENCY = CURR_PAY
+                       LOCAL_CURRENCY   = T001-WAERS
+*                      rate from tcurr
+                       TYPE_OF_RATE     = 'M'
+             IMPORTING LOCAL_AMOUNT     = BSIK-QBSHB.
+         ENDIF.                " Insertion OSS 306375
+      ENDIF.
+
+*     Converts invoice amount into local currency
+      IF WQSSHB NE 0.
+         RATE = BSIK-QSSHB / WQSSHB.
+         BSIK-DMBTR = BSIK-WRBTR * RATE.
+         CLEAR: WQSSHB,
+                RATE.
+      ENDIF.
+
+*---------------- Conversion at payment time ---------------------------
+    ELSE.
+
+*     Converts WT base of old WT
+      IF CURR_INV NE T001-WAERS.
+        WQSSHB = BSIK-QSSHB.
+
+        IF CURR_INV = CURR_PAY.
+        CALL FUNCTION 'CONVERT_TO_LOCAL_CURRENCY'
+             EXPORTING DATE             = PAY_DATE
+                       FOREIGN_CURRENCY = CURR_INV
+                       LOCAL_CURRENCY   = T001-WAERS
+                       FOREIGN_AMOUNT   = BSIK-QSSHB
+                       RATE             = RATE_PAY
+                       TYPE_OF_RATE     = 'M'
+             IMPORTING LOCAL_AMOUNT     = BSIK-QSSHB.
+        ELSE.
+
+        CALL FUNCTION 'CONVERT_TO_LOCAL_CURRENCY'
+             EXPORTING DATE             = PAY_DATE
+                       FOREIGN_CURRENCY = CURR_INV
+                       LOCAL_CURRENCY   = T001-WAERS
+                       FOREIGN_AMOUNT   = BSIK-QSSHB
+*                      rate from tcurr
+                       TYPE_OF_RATE     = 'M'
+             IMPORTING LOCAL_AMOUNT     = BSIK-QSSHB.
+        ENDIF.
+
+*       Converts invoice amount
+        IF WQSSHB NE 0.
+          RATE = BSIK-QSSHB / WQSSHB.
+          BSIK-DMBTR = BSIK-WRBTR * RATE.
+          CLEAR: WQSSHB,
+                 RATE.
+        ENDIF.
+      ENDIF.
+
+*     Converts WT amount of old WT
+      IF CURR_PAY NE T001-WAERS.
+        CALL FUNCTION 'CONVERT_TO_LOCAL_CURRENCY'
+             EXPORTING DATE             = PAY_DATE
+                       FOREIGN_CURRENCY = CURR_PAY
+                       LOCAL_CURRENCY   = T001-WAERS
+                       FOREIGN_AMOUNT   = BSIK-QBSHB
+                       RATE             = RATE_PAY
+                       TYPE_OF_RATE     = 'M'
+             IMPORTING LOCAL_AMOUNT     = BSIK-QBSHB.
+      ENDIF.
+
+    ENDIF.                                          " End of conversion
+
+ENDFORM.                    " CONVERT_INTO_LOC_CURR_OLD_WT
+
+*&---------------------------------------------------------------------*
+*&      Form  PREP_DATA_EXTR_OLD_WT_CTRGR_1
+*&---------------------------------------------------------------------*
+*                   Form 'prep_data_extract_old_wt_ctrgr_1'            *
+*                   Performs several selection checks and fills        *
+*                   the fields of the data extract.                    *
+*                   The selection checks are specific for the          *
+*                   country group (ctrgr).                             *
+*                   Country group 1 is currently used for:             *
+*                   IT, ES, CZ                                         *
+*----------------------------------------------------------------------*
+*  -->  p1        text
+*  <--  p2        text
+*----------------------------------------------------------------------*
+FORM PREP_DATA_EXTR_OLD_WT_CTRGR_1 CHANGING P_PROCESSING_FLAG.
+
+      CLEAR P_PROCESSING_FLAG.
+
+      CHECK BELNUM.
+      CASE BSIK-UMSKS.
+        WHEN ' '.
+          CHECK BSIK-AUGBL NE SPACE.
+          CHECK AUGDAT.
+          CHECK BSIK-BSCHL IN BUSCHL.
+        WHEN 'A'.
+          CHECK BUCHDT.
+          IF BSIK-SHKZG EQ 'S'.
+            MOVE  'H' TO BSIK-SHKZG.
+          ELSE.
+            MOVE  'S' TO BSIK-SHKZG.
+          ENDIF.
+        WHEN OTHERS.
+          REJECT.
+      ENDCASE.
+
+      IF BSIK-SHKZG EQ 'H'.
+        WDMBTR = BSIK-DMBTR.
+        WWRBTR = BSIK-WRBTR.
+        WQSSHB = BSIK-QSSHB.
+        WQBSHB = BSIK-QBSHB.
+        WQSFBT = WDMBTR - WQSSHB.
+        NETTO  = WDMBTR - WQBSHB.
+      ELSE.
+
+        WDMBTR = BSIK-DMBTR * -1.
+        WWRBTR = BSIK-WRBTR * -1.
+        WQSSHB = BSIK-QSSHB * -1.
+        WQBSHB = BSIK-QBSHB * -1.
+        WQSFBT = WDMBTR - WQSSHB.
+        NETTO  = WDMBTR - WQBSHB.
+      ENDIF.
+
+      P_PROCESSING_FLAG = 'X'.
+
+ENDFORM.                    " PREP_DATA_EXTR_OLD_WT_CTRGR_1
+
+*&---------------------------------------------------------------------*
+*&      Form  PREP_DATA_EXTR_OLD_WT_CTRGR_2
+*&---------------------------------------------------------------------*
+*                   Performs several selection checks and fills        *
+*                   the fields of the data extract.                    *
+*                   The selection checks are specific for the          *
+*                   country group (ctrgr).                             *
+*                   Country group 2 is currently used for:             *
+*                   FR                                                 *
+*----------------------------------------------------------------------*
+*  -->  p1        text
+*  <--  p2        text
+*----------------------------------------------------------------------*
+FORM PREP_DATA_EXTR_OLD_WT_CTRGR_2 CHANGING P_PROCESSING_FLAG.
+
+      CLEAR P_PROCESSING_FLAG.
+
+*      if p_varia eq 'BE'.
+*        check bsik-umsks ne 'A'.
+*      endif.
+      CASE BSIK-UMSKS.
+        WHEN ' '.
+*          if p_varia ne 'BE'.
+*           check augdat.
+*          else.
+*            check buchdt.
+*          endif.
+          CHECK BSIK-XZAHL NE 'X'.
+          CHECK BSIK-BSCHL IN BUSCHL.
+          CHECK BELNUM.
+          IF UNAUSGEG NE 'X'.
+            CHECK: BSIK-AUGBL NE SPACE,
+                   BSIK-AUGDT NE '00000000'.
+            CHECK AUGDAT.
+          ELSE.
+            CHECK BUCHDT.
+          ENDIF.
+        WHEN 'A'.
+          CHECK BELNUM.
+          IF BSIK-AUGBL EQ SPACE.
+            CHECK BUCHDT.
+          ELSE.
+            CHECK AUGDAT.
+            CHECK BSIK-BUDAT LT AUGDAT-LOW.
+          ENDIF.
+        WHEN OTHERS.
+          REJECT.
+      ENDCASE.
+
+      IF BSIK-SHKZG EQ 'H'
+        OR  BSIK-UMSKS EQ 'A' AND BSIK-AUGBL EQ SPACE.
+        WDMBTR = BSIK-DMBTR.
+        WWRBTR = BSIK-WRBTR.
+        WQSSHB = BSIK-QSSHB.
+        WQBSHB = BSIK-QBSHB.
+        WQSFBT = WDMBTR - WQSSHB.
+        NETTO  = WDMBTR - WQBSHB.
+      ELSE.
+        WDMBTR = BSIK-DMBTR * -1.
+        WWRBTR = BSIK-WRBTR * -1.
+        WQSSHB = BSIK-QSSHB * -1.
+        WQBSHB = BSIK-QBSHB * -1.
+        WQSFBT = WDMBTR - WQSSHB.
+        NETTO  = WDMBTR - WQBSHB.
+      ENDIF.
+
+      P_PROCESSING_FLAG = 'X'.
+
+ENDFORM.                    " PREP_DATA_EXTR_OLD_WT_CTRGR_2
+
+*&---------------------------------------------------------------------*
+*&      Form  PREP_DATA_EXTR_OLD_WT_CTRGR_3
+*&---------------------------------------------------------------------*
+*                   Form 'prep_data_extract_old_wt_ctrgr_3'            *
+*                   Performs several selection checks and fills        *
+*                   the fields of the data extract.                    *
+*                   The selection checks are specific for the          *
+*                   country group (ctrgr).                             *
+*                   Country group 3 is currently used for:             *
+*                   BE                                                 *
+*----------------------------------------------------------------------*
+*  -->  p1        text
+*  <--  p2        text
+*----------------------------------------------------------------------*
+FORM PREP_DATA_EXTR_OLD_WT_CTRGR_3 CHANGING P_PROCESSING_FLAG.
+
+      CLEAR P_PROCESSING_FLAG.
+
+*      if p_varia eq 'BE'.
+        CHECK BSIK-UMSKS NE 'A'.
+*      endif.
+      CASE BSIK-UMSKS.
+        WHEN ' '.
+*          if p_varia ne 'BE'.
+*            check augdat.
+*          else.
+            CHECK BUCHDT.
+*          endif.
+          CHECK BSIK-XZAHL NE 'X'.
+          CHECK BSIK-BSCHL IN BUSCHL.
+          CHECK BELNUM.
+          IF UNAUSGEG NE 'X'.
+            CHECK: BSIK-AUGBL NE SPACE,
+                   BSIK-AUGDT NE '00000000'.
+          ENDIF.
+        WHEN 'A'.
+          CHECK BELNUM.
+          IF BSIK-AUGBL EQ SPACE.
+            CHECK BUCHDT.
+          ELSE.
+            CHECK AUGDAT.
+            CHECK BSIK-BUDAT LT AUGDAT-LOW.
+          ENDIF.
+        WHEN OTHERS.
+          REJECT.
+      ENDCASE.
+
+      IF BSIK-SHKZG EQ 'H'
+        OR  BSIK-UMSKS EQ 'A' AND BSIK-AUGBL EQ SPACE.
+        WDMBTR = BSIK-DMBTR.
+        WWRBTR = BSIK-WRBTR.
+        WQSSHB = BSIK-QSSHB.
+        WQBSHB = BSIK-QBSHB.
+        WQSFBT = WDMBTR - WQSSHB.
+        NETTO  = WDMBTR - WQBSHB.
+      ELSE.
+        WDMBTR = BSIK-DMBTR * -1.
+        WWRBTR = BSIK-WRBTR * -1.
+        WQSSHB = BSIK-QSSHB * -1.
+        WQBSHB = BSIK-QBSHB * -1.
+        WQSFBT = WDMBTR - WQSSHB.
+        NETTO  = WDMBTR - WQBSHB.
+      ENDIF.
+
+      P_PROCESSING_FLAG = 'X'.
+
+ENDFORM.                    " PREP_DATA_EXTR_OLD_WT_CTRGR_3
+
+*&---------------------------------------------------------------------*
+*&      Form  PREP_DATA_EXTR_EXT_WT_CTRGR_4
+*&---------------------------------------------------------------------*
+*                   Form 'prep_data_extract_ext_wt_ctrgr_4'            *
+*                   Performs several selection checks and fills        *
+*                   the fields of the data extract.                    *
+*                   The selection checks are specific for the          *
+*                   country group (ctrgr).                             *
+*                   Country group 1 is currently used for:             *
+*                   CO, MX                                             *
+*----------------------------------------------------------------------*
+*  -->  p1        text
+*  <--  p2        text
+*----------------------------------------------------------------------*
+FORM PREP_DATA_EXTR_EXT_WT_CTRGR_4 CHANGING P_PROCESSING_FLAG.
+
+      CLEAR P_PROCESSING_FLAG.
+
+      CHECK BELNUM.
+      CHECK BUCHDT.
+      CASE BSIK-UMSKS.
+        WHEN ' '.
+*          check bsik-augbl ne space.
+*          check augdat.
+          CHECK BSIK-BSCHL IN BUSCHL.
+        WHEN 'A'.
+*          check buchdt.
+          IF BSIK-SHKZG EQ 'S'.
+            MOVE  'H' TO BSIK-SHKZG.
+          ELSE.
+            MOVE  'S' TO BSIK-SHKZG.
+          ENDIF.
+
+*         ------------------- Switch sign of WT in case of down payment
+          X_WITH_ITEM-WT_QSSHH = X_WITH_ITEM-WT_QSSHH * -1.
+          X_WITH_ITEM-WT_QBSHH = X_WITH_ITEM-WT_QBSHH * -1.
+        WHEN OTHERS.
+          REJECT.
+      ENDCASE.
+
+      IF BSIK-SHKZG EQ 'H'.
+        WDMBTR = H_DMBTR.
+        WWRBTR = BSIK-WRBTR.
+        WQSSHB = X_WITH_ITEM-WT_QSSHH * -1.
+        WQBSHB = X_WITH_ITEM-WT_QBSHH * -1.
+      ELSE.
+        WDMBTR = H_DMBTR * -1.
+        WWRBTR = BSIK-WRBTR * -1.
+        WQSSHB = X_WITH_ITEM-WT_QSSHH * -1.
+        WQBSHB = X_WITH_ITEM-WT_QBSHH * -1.
+      ENDIF.
+
+*     Net amount with respect to WT base
+      WQSFBT = WDMBTR - WQSSHB.
+
+*     Net amount with respect to VAT tax
+*     netto  = wdmbtr - wqbshb.
+      PERFORM GET_TAX_AMOUNT TABLES X_WT_AT_INVOICE
+                              USING 'X'                        " New WT
+                                    BSIK
+                                    VDMBTR.
+      NETTO  = WDMBTR - VDMBTR.
+
+      P_PROCESSING_FLAG = 'X'.
+
+ENDFORM.                    " PREP_DATA_EXTR_EXT_WT_CTRGR_4
+
+*&---------------------------------------------------------------------*
+*&      Form  PREP_DATA_EXTR_OLD_WT_CTRGR_4
+*&---------------------------------------------------------------------*
+*                   Form 'prep_data_extract_old_wt_ctrgr_4'            *
+*                   Performs several selection checks and fills        *
+*                   the fields of the data extract.                    *
+*                   The selection checks are specific for the          *
+*                   country group (ctrgr).                             *
+*                   Country group 1 is currently used for:             *
+*                   CO, MX                                             *
+*----------------------------------------------------------------------*
+*  -->  p1        text
+*  <--  p2        text
+*----------------------------------------------------------------------*
+FORM PREP_DATA_EXTR_OLD_WT_CTRGR_4 CHANGING P_PROCESSING_FLAG.
+
+      CLEAR P_PROCESSING_FLAG.
+
+      CHECK BELNUM.
+      CHECK BUCHDT.                    " insert for colombia and mexico
+      CASE BSIK-UMSKS.
+        WHEN ' '.
+*          check bsik-augbl ne space.
+*         check augdat.
+          CHECK BSIK-BSCHL IN BUSCHL.
+        WHEN 'A'.
+*          check buchdt.
+          IF BSIK-SHKZG EQ 'S'.
+            MOVE  'H' TO BSIK-SHKZG.
+          ELSE.
+            MOVE  'S' TO BSIK-SHKZG.
+          ENDIF.
+        WHEN OTHERS.
+          REJECT.
+      ENDCASE.
+
+      IF BSIK-SHKZG EQ 'H'.
+        WDMBTR = BSIK-DMBTR.
+        WWRBTR = BSIK-WRBTR.
+        WQSSHB = BSIK-QSSHB.
+        WQBSHB = BSIK-QBSHB.
+      ELSE.
+        WDMBTR = BSIK-DMBTR * -1.
+        WWRBTR = BSIK-WRBTR * -1.
+        WQSSHB = BSIK-QSSHB * -1.
+        WQBSHB = BSIK-QBSHB * -1.
+      ENDIF.
+
+*     Net amount with respect to WT base
+      WQSFBT = WDMBTR - WQSSHB.
+
+*     Net amount with respect to VAT tax
+*     netto  = wdmbtr - wqbshb.
+      PERFORM GET_TAX_AMOUNT TABLES X_WT_AT_INVOICE
+                              USING ' '                        " Old WT
+                                    BSIK
+                                    VDMBTR.
+      NETTO  = WDMBTR - VDMBTR.
+
+      P_PROCESSING_FLAG = 'X'.
+
+ENDFORM.                    " PREP_DATA_EXTR_OLD_WT_CTRGR_4
+
+*&---------------------------------------------------------------------*
+*&      Form  GET_REPYEAR
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*      -->P_H_REPYEAR  text
+*----------------------------------------------------------------------*
+FORM GET_REPYEAR TABLES I_REPYEAR LIKE T_REPYEAR[].
+
+DATA: CURRENT_INDEX TYPE I,
+      LOWER_BUDAT LIKE BSIK-BUDAT.
+
+  CLEAR   I_REPYEAR.
+  REFRESH I_REPYEAR.
+
+  LOOP.
+
+    AT NEW BSIK-BUKRS.
+      I_REPYEAR-BUKRS   = BSIK-BUKRS.
+      I_REPYEAR-REPYEAR = BSIK-GJAHR.
+      APPEND I_REPYEAR.
+      CURRENT_INDEX = SY-TABIX.
+      LOWER_BUDAT = BSIK-BUDAT.
+    ENDAT.
+
+    IF BSIK-BUDAT <  LOWER_BUDAT AND
+       BSIK-GJAHR <> I_REPYEAR-REPYEAR.
+      I_REPYEAR-REPYEAR = BSIK-GJAHR.
+      MODIFY I_REPYEAR INDEX CURRENT_INDEX.
+    ENDIF.
+
+  ENDLOOP.
+
+ENDFORM.                    " GET_REPYEAR
+
+*&---------------------------------------------------------------------*
+*&      Form  GET_TAX_AMOUNT
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*      -->P_WDMBTR  text
+*      -->P_VDMBTR  text
+*----------------------------------------------------------------------*
+FORM GET_TAX_AMOUNT TABLES P_X_WT_AT_INVOICE LIKE X_WT_AT_INVOICE[]
+                     USING VALUE(P_EXT_WT)
+                           VALUE(P_BSIK)  LIKE BSIK
+                                 P_VDMBTR LIKE BSET-HWSTE.
+
+DATA: I_BSEG LIKE BSEG OCCURS 10 WITH HEADER LINE.
+DATA: I_BSET LIKE BSET OCCURS 10 WITH HEADER LINE.
+DATA: SUM_DMBTR LIKE BSIK-DMBTR,
+      H_DMBTR   LIKE BSIK-DMBTR,
+      SUM_HWSTE LIKE BSET-HWSTE,
+      P_RATE TYPE F.
+
+  CLEAR P_VDMBTR.
+
+* Get complete document
+  SELECT * FROM BSEG INTO TABLE I_BSEG WHERE BUKRS = P_BSIK-BUKRS
+                                         AND BELNR = P_BSIK-BELNR
+                                         AND GJAHR = P_BSIK-GJAHR.
+
+* Add WT at invoice amounts
+  IF P_EXT_WT = 'X'.
+    LOOP AT I_BSEG WHERE KOART = 'K'.
+*     Read total WT at invoice
+      READ TABLE P_X_WT_AT_INVOICE WITH KEY BUKRS = I_BSEG-BUKRS
+                                            BELNR = I_BSEG-BELNR
+                                            GJAHR = I_BSEG-GJAHR
+                                            BUZEI = I_BSEG-BUZEI.
+      IF P_X_WT_AT_INVOICE-WT_QBSHH < 0.
+        P_X_WT_AT_INVOICE-WT_QBSHH = P_X_WT_AT_INVOICE-WT_QBSHH * -1.
+      ENDIF.
+      I_BSEG-DMBTR = I_BSEG-DMBTR + P_X_WT_AT_INVOICE-WT_QBSHH.
+      MODIFY I_BSEG.
+    ENDLOOP.
+  ENDIF.
+
+* Get tax information
+  SELECT * FROM BSET INTO TABLE I_BSET WHERE BUKRS = P_BSIK-BUKRS
+                                         AND BELNR = P_BSIK-BELNR
+                                         AND GJAHR = P_BSIK-GJAHR.
+
+* Determine relative contribution of current vendor line
+  CLEAR SUM_DMBTR.
+  LOOP AT I_BSEG WHERE KOART = 'K'.
+
+    IF I_BSEG-SHKZG = 'H'.
+      I_BSEG-DMBTR = I_BSEG-DMBTR * -1.
+    ENDIF.
+
+    SUM_DMBTR = SUM_DMBTR + I_BSEG-DMBTR.
+    IF I_BSEG-BUZEI = P_BSIK-BUZEI.
+      H_DMBTR = I_BSEG-DMBTR.
+    ENDIF.
+
+  ENDLOOP.
+
+  IF SUM_DMBTR <> 0.
+    P_RATE = H_DMBTR / SUM_DMBTR.
+  ELSE.
+    P_RATE = 0.
+  ENDIF.
+
+* Determine tax amount
+  CLEAR SUM_HWSTE.
+  LOOP AT I_BSET.
+    IF I_BSET-SHKZG = 'H'.
+      I_BSET-HWSTE = I_BSET-HWSTE * -1.
+    ENDIF.
+    SUM_HWSTE = SUM_HWSTE + I_BSET-HWSTE.
+  ENDLOOP.
+
+  P_VDMBTR = P_RATE * SUM_HWSTE.
+
+ENDFORM.                    " GET_TAX_AMOUNT
+
+*&---------------------------------------------------------------------*
+*&      Form  GET_TOTAL_WT_AT_INVOICE
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*      -->P_X_WITH_ITEM  text
+*      -->P_X_T059P  text
+*      -->P_X_WT_AT_INVOICE  text
+*----------------------------------------------------------------------*
+FORM GET_TOTAL_WT_AT_INVOICE
+                  TABLES P_X_WITH_ITEM STRUCTURE WITH_ITEM
+                         P_X_T059P STRUCTURE T059P
+                         P_X_WT_AT_INVOICE LIKE X_WT_AT_INVOICE[]
+                   USING VALUE(P_LAND1) LIKE T001-LAND1.
+
+    CLEAR   P_X_WT_AT_INVOICE.        " Set accumulation values to zero
+    REFRESH P_X_WT_AT_INVOICE.
+
+    LOOP AT P_X_WITH_ITEM.                         " Loop over WT types
+
+*     WT type with posting at invoice or at payment?
+      PERFORM READ_T059P TABLES P_X_T059P
+                          USING P_LAND1
+                                P_X_WITH_ITEM-WITHT.
+
+*     If Withholding tax at invoice, accumulate the WT amounts.
+      IF P_X_T059P-WT_POSTM = '1'.
+        P_X_WT_AT_INVOICE-BUKRS    = P_X_WITH_ITEM-BUKRS.
+        P_X_WT_AT_INVOICE-BELNR    = P_X_WITH_ITEM-BELNR.
+        P_X_WT_AT_INVOICE-GJAHR    = P_X_WITH_ITEM-GJAHR.
+        P_X_WT_AT_INVOICE-BUZEI    = P_X_WITH_ITEM-BUZEI.
+        P_X_WT_AT_INVOICE-WT_QBSHH = P_X_WITH_ITEM-WT_QBSHH.
+        P_X_WT_AT_INVOICE-WT_QBSHB = P_X_WITH_ITEM-WT_QBSHB.
+        COLLECT P_X_WT_AT_INVOICE.
+      ENDIF.
+
+    ENDLOOP.                                         " at p_x_with_item
+
+ENDFORM.                    " GET_TOTAL_WT_AT_INVOICE
