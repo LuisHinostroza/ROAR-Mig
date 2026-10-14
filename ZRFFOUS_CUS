@@ -27601,3 +27601,62 @@ abap
 ENHANCEMENT 7 ZEI_F110_US_R3_RI99.
   PERFORM zr3_logo_fin IN PROGRAM (sy-repid) IF FOUND.
 ENDENHANCEMENT.
+
+
+*************************************************************************************************************
+*----------------------------------------------------------------------*
+* AT NEW reguh-vblnr (fin de ZAHLUNGS_DATEN_LESEN): datos del form
+*----------------------------------------------------------------------*
+  FORM zr3_llenar_datos.
+    DATA: lt_items TYPE STANDARD TABLE OF ty_zr3_item,
+          ls_item  TYPE ty_zr3_item,
+          lv_num   TYPE n LENGTH 2,          " 01, 02 ... 22
+          lv_name  TYPE c LENGTH 10.
+    FIELD-SYMBOLS <ls_dest> TYPE ty_zr3_item.
+
+    CLEAR: _01, _02, _03, _04, _05, _06, _07, _08, _09, _10, _11,
+           _12, _13, _14, _15, _16, _17, _18, _19, _20, _21, _22,
+           lfb1, lv_bankl.
+
+    CHECK gv_zr3_activo = abap_true.
+
+    lv_bankl = reguh-ubnky.
+
+    SELECT SINGLE altkn FROM lfb1
+      WHERE bukrs = @reguh-zbukr AND lifnr = @reguh-lifnr
+      INTO @lfb1-altkn.
+
+    SELECT p~bldat, p~xblnr, k~bktxt, p~dmbtr
+      FROM regup AS p
+      LEFT OUTER JOIN bkpf AS k
+        ON  k~bukrs = p~bukrs
+        AND k~belnr = p~belnr
+        AND k~gjahr = p~gjahr
+      WHERE p~laufd = @reguh-laufd
+        AND p~laufi = @reguh-laufi
+        AND p~xvorl = @reguh-xvorl
+        AND p~zbukr = @reguh-zbukr
+        AND p~vblnr = @reguh-vblnr
+      INTO TABLE @DATA(lt_raw).
+
+    LOOP AT lt_raw INTO DATA(ls_raw).
+      CLEAR ls_item.
+      ls_item-bldat = ls_raw-bldat.
+      ls_item-xblnr = ls_raw-xblnr.
+      ls_item-bktxt = ls_raw-bktxt.
+      ls_item-dmbtr = ls_raw-dmbtr.
+      COLLECT ls_item INTO lt_items.
+    ENDLOOP.
+
+    LOOP AT lt_items INTO ls_item.
+      IF sy-tabix > 22.
+        EXIT.
+      ENDIF.
+      lv_num = sy-tabix.
+      CONCATENATE '_' lv_num INTO lv_name.   " _01 ... _22
+      ASSIGN (lv_name) TO <ls_dest>.
+      IF sy-subrc = 0.
+        <ls_dest> = ls_item.
+      ENDIF.
+    ENDLOOP.
+  ENDFORM.
