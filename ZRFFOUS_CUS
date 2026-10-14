@@ -27368,3 +27368,236 @@ FORM scheckdruck_mail.
   COMMIT WORK.
 
 ENDFORM.                               "Scheckdruck Mail
+
+
+******************************************************************************************************
+******************************************************************************************************
+******************************************************************************************************
+******************************************************************************************************
+ENHANCEMENT 1 ZEI_F110_US_R3_MAIN.
+*----------------------------------------------------------------------*
+* Lógica de cheques R/3 (ex ZRFFOUS_CUS / ZRFFORI01US)
+* Se activa solo cuando T042E-ZFORN = form de R/3.
+* Cualquier otro form -> estándar puro.
+*----------------------------------------------------------------------*
+  CONSTANTS gc_zr3_form TYPE t042e-zforn VALUE 'ZF110_CENT_CHECK'.
+
+  TYPES: BEGIN OF ty_zr3_item,
+           bldat TYPE regup-bldat,
+           xblnr TYPE regup-xblnr,
+           bktxt TYPE bkpf-bktxt,
+           dmbtr TYPE regup-dmbtr,
+         END OF ty_zr3_item.
+
+  " Mismos nombres que usa el SAPscript de R/3
+  DATA: _01 TYPE ty_zr3_item, _02 TYPE ty_zr3_item, _03 TYPE ty_zr3_item,
+        _04 TYPE ty_zr3_item, _05 TYPE ty_zr3_item, _06 TYPE ty_zr3_item,
+        _07 TYPE ty_zr3_item, _08 TYPE ty_zr3_item, _09 TYPE ty_zr3_item,
+        _10 TYPE ty_zr3_item, _11 TYPE ty_zr3_item, _12 TYPE ty_zr3_item,
+        _13 TYPE ty_zr3_item, _14 TYPE ty_zr3_item, _15 TYPE ty_zr3_item,
+        _16 TYPE ty_zr3_item, _17 TYPE ty_zr3_item, _18 TYPE ty_zr3_item,
+        _19 TYPE ty_zr3_item, _20 TYPE ty_zr3_item, _21 TYPE ty_zr3_item,
+        _22 TYPE ty_zr3_item,
+        lfb1     TYPE lfb1,
+        lv_bankl TYPE bnka-bankl.
+
+  " Control
+  DATA: gv_zr3_en_scheck  TYPE abap_bool,   " dentro de FORM SCHECK
+        gv_zr3_activo     TYPE abap_bool,   " form actual = form R/3
+        gv_zr3_logo_pend  TYPE abap_bool,   " cheque real abierto, falta firma
+        gv_zr3_flg_orig   LIKE flg_schecknum.
+
+*----------------------------------------------------------------------*
+* Inicio / fin de FORM SCHECK
+*----------------------------------------------------------------------*
+  FORM zr3_scheck_inicio.
+    gv_zr3_en_scheck = abap_true.
+    gv_zr3_flg_orig  = flg_schecknum.      " 1, o 2 si PAR_NOVO
+    CLEAR: gv_zr3_activo, gv_zr3_logo_pend.
+  ENDFORM.
+
+  FORM zr3_scheck_fin.
+    flg_schecknum = gv_zr3_flg_orig.
+    CLEAR: gv_zr3_en_scheck, gv_zr3_activo, gv_zr3_logo_pend.
+  ENDFORM.
+
+*----------------------------------------------------------------------*
+* AT NEW reguh-rzawe (fin de ZAHLWEG_DATEN_LESEN): ¿form de R/3?
+*----------------------------------------------------------------------*
+  FORM zr3_zahlweg.
+    CHECK gv_zr3_en_scheck = abap_true.
+
+    gv_zr3_activo = xsdbool( t042e-zforn = gc_zr3_form ).
+
+    CHECK flg_schecknum <> 0.
+    IF gv_zr3_activo = abap_true.
+      flg_schecknum = 2.                   " = PAR_NOVO: un número por cheque
+    ELSE.
+      flg_schecknum = gv_zr3_flg_orig.     " comportamiento estándar
+    ENDIF.
+  ENDFORM.
+
+*----------------------------------------------------------------------*
+* AT NEW reguh-vblnr (fin de ZAHLUNGS_DATEN_LESEN): datos del form
+*----------------------------------------------------------------------*
+  FORM zr3_llenar_datos.
+    DATA: lt_items TYPE STANDARD TABLE OF ty_zr3_item,
+          lv_name  TYPE string.
+    FIELD-SYMBOLS <ls_dest> TYPE ty_zr3_item.
+
+    DO 22 TIMES.
+      lv_name = |_{ sy-index WIDTH = 2 ALIGN = RIGHT PAD = '0' }|.
+      ASSIGN (lv_name) TO <ls_dest>.
+      IF sy-subrc = 0. CLEAR <ls_dest>. ENDIF.
+    ENDDO.
+    CLEAR: lfb1, lv_bankl.
+
+    CHECK gv_zr3_activo = abap_true.
+
+    lv_bankl = reguh-ubnky.
+
+    SELECT SINGLE altkn FROM lfb1
+      WHERE bukrs = @reguh-zbukr AND lifnr = @reguh-lifnr
+      INTO @lfb1-altkn.
+
+    SELECT p~bldat, p~xblnr, k~bktxt, p~dmbtr
+      FROM regup AS p
+      LEFT OUTER JOIN bkpf AS k
+        ON  k~bukrs = p~bukrs
+        AND k~belnr = p~belnr
+        AND k~gjahr = p~gjahr
+      WHERE p~laufd = @reguh-laufd
+        AND p~laufi = @reguh-laufi
+        AND p~xvorl = @reguh-xvorl
+        AND p~zbukr = @reguh-zbukr
+        AND p~vblnr = @reguh-vblnr
+      INTO TABLE @DATA(lt_raw).
+
+    LOOP AT lt_raw INTO DATA(ls_raw).
+      COLLECT CORRESPONDING ty_zr3_item( ls_raw ) INTO lt_items.
+    ENDLOOP.
+
+    LOOP AT lt_items INTO DATA(ls_item) TO 22.
+      lv_name = |_{ sy-tabix WIDTH = 2 ALIGN = RIGHT PAD = '0' }|.
+      ASSIGN (lv_name) TO <ls_dest>.
+      IF sy-subrc = 0. <ls_dest> = ls_item. ENDIF.
+    ENDLOOP.
+  ENDFORM.
+
+*----------------------------------------------------------------------*
+* Después de START_FORM del cheque real (fin de SCHECKNUMMER_ERMITTELN
+* con TYP = 2): NCHECK + borrar default de LOGO2/CHECK2
+*----------------------------------------------------------------------*
+  FORM zr3_logo_inicio USING iv_typ TYPE any.
+    CLEAR gv_zr3_logo_pend.
+    CHECK iv_typ = 2
+      AND gv_zr3_activo = abap_true.
+
+    IF t042z-xeinz IS INITIAL.
+      CALL FUNCTION 'WRITE_FORM'
+        EXPORTING
+          window = 'NCHECK'
+        EXCEPTIONS
+          window  = 1
+          element = 2
+          OTHERS  = 3.
+    ENDIF.
+
+    CALL FUNCTION 'WRITE_FORM'
+      EXPORTING
+        window   = 'LOGO2'
+        function = 'DELETE'
+      EXCEPTIONS
+        window   = 1
+        element  = 2
+        OTHERS   = 3.
+
+    CALL FUNCTION 'WRITE_FORM'
+      EXPORTING
+        window   = 'CHECK2'
+        function = 'DELETE'
+      EXCEPTIONS
+        window   = 1
+        element  = 2
+        OTHERS   = 3.
+
+    gv_zr3_logo_pend = abap_true.
+  ENDFORM.
+
+*----------------------------------------------------------------------*
+* AT END OF reguh-vblnr (fin de ZIFFERN_IN_WORTEN, 1a llamada tras
+* START_FORM): CHECK2 555 + firma LOGO2, solo pagos con importe
+*----------------------------------------------------------------------*
+  FORM zr3_logo_fin.
+    CHECK gv_zr3_logo_pend = abap_true.
+    CLEAR gv_zr3_logo_pend.                " una sola vez por cheque
+
+    CHECK reguh-rwbtr <> 0
+      AND t042z-xeinz IS INITIAL.
+
+    CALL FUNCTION 'WRITE_FORM'
+      EXPORTING
+        window  = 'CHECK2'
+        element = '555'
+      EXCEPTIONS
+        window  = 1
+        element = 2
+        OTHERS  = 3.
+
+    CALL FUNCTION 'WRITE_FORM'
+      EXPORTING
+        window = 'LOGO2'
+      EXCEPTIONS
+        window  = 1
+        element = 2
+        OTHERS  = 3.
+  ENDFORM.
+ENDENHANCEMENT.
+*******************************************************************************************
+Elementos 2, 3 y 4: include RFFORI01 (ZEI_F110_US_R3_RI01)
+
+Inicio de FORM scheck:
+
+abap
+ENHANCEMENT 2 ZEI_F110_US_R3_RI01.
+  PERFORM zr3_scheck_inicio IN PROGRAM (sy-repid) IF FOUND.
+ENDENHANCEMENT.
+
+Final de FORM scheck:
+
+abap
+ENHANCEMENT 3 ZEI_F110_US_R3_RI01.
+  PERFORM zr3_scheck_fin IN PROGRAM (sy-repid) IF FOUND.
+ENDENHANCEMENT.
+
+Final de FORM schecknummer_ermitteln:
+
+abap
+ENHANCEMENT 4 ZEI_F110_US_R3_RI01.
+  PERFORM zr3_logo_inicio IN PROGRAM (sy-repid) USING typ IF FOUND.
+ENDENHANCEMENT.
+
+Verifica que el parámetro del FORM en tu sistema se llame typ (FORM schecknummer_ermitteln USING typ.).
+
+Elementos 5, 6 y 7: include RFFORI99 (ZEI_F110_US_R3_RI99)
+
+Final de FORM zahlweg_daten_lesen:
+
+abap
+ENHANCEMENT 5 ZEI_F110_US_R3_RI99.
+  PERFORM zr3_zahlweg IN PROGRAM (sy-repid) IF FOUND.
+ENDENHANCEMENT.
+
+Final de FORM zahlungs_daten_lesen:
+
+abap
+ENHANCEMENT 6 ZEI_F110_US_R3_RI99.
+  PERFORM zr3_llenar_datos IN PROGRAM (sy-repid) IF FOUND.
+ENDENHANCEMENT.
+
+Final de FORM ziffern_in_worten:
+
+abap
+ENHANCEMENT 7 ZEI_F110_US_R3_RI99.
+  PERFORM zr3_logo_fin IN PROGRAM (sy-repid) IF FOUND.
+ENDENHANCEMENT.
