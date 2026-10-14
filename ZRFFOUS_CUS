@@ -27665,3 +27665,59 @@ Programa RFFOUS_C
 This ABAP SQL statement uses additions that can only be used when the
 fixed point arithmetic flag is activated (such as CASE expressions or
 host variables in expressions).
+
+*********************************************************************************************************************
+*----------------------------------------------------------------------*
+* AT NEW reguh-vblnr (fin de ZAHLUNGS_DATEN_LESEN): datos del form
+* Sintaxis SQL clásica: RFFOUS_C no tiene aritmética de punto fijo
+*----------------------------------------------------------------------*
+  FORM zr3_llenar_datos.
+    DATA: lt_raw   TYPE STANDARD TABLE OF ty_zr3_item,
+          lt_items TYPE STANDARD TABLE OF ty_zr3_item,
+          ls_item  TYPE ty_zr3_item,
+          lv_num   TYPE n LENGTH 2,          " 01, 02 ... 22
+          lv_name  TYPE c LENGTH 10.
+    FIELD-SYMBOLS <ls_dest> TYPE ty_zr3_item.
+
+    CLEAR: _01, _02, _03, _04, _05, _06, _07, _08, _09, _10, _11,
+           _12, _13, _14, _15, _16, _17, _18, _19, _20, _21, _22,
+           lfb1, lv_bankl.
+
+    CHECK gv_zr3_activo = abap_true.
+
+    lv_bankl = reguh-ubnky.
+
+    SELECT SINGLE altkn FROM lfb1
+      INTO lfb1-altkn
+      WHERE bukrs = reguh-zbukr
+        AND lifnr = reguh-lifnr.
+
+    SELECT p~bldat p~xblnr k~bktxt p~dmbtr
+      INTO TABLE lt_raw
+      FROM regup AS p
+      LEFT OUTER JOIN bkpf AS k
+        ON  k~bukrs = p~bukrs
+        AND k~belnr = p~belnr
+        AND k~gjahr = p~gjahr
+      WHERE p~laufd = reguh-laufd
+        AND p~laufi = reguh-laufi
+        AND p~xvorl = reguh-xvorl
+        AND p~zbukr = reguh-zbukr
+        AND p~vblnr = reguh-vblnr.
+
+    LOOP AT lt_raw INTO ls_item.
+      COLLECT ls_item INTO lt_items.        " suma DMBTR por fecha/ref/texto
+    ENDLOOP.
+
+    LOOP AT lt_items INTO ls_item.
+      IF sy-tabix > 22.
+        EXIT.
+      ENDIF.
+      lv_num = sy-tabix.
+      CONCATENATE '_' lv_num INTO lv_name.   " _01 ... _22
+      ASSIGN (lv_name) TO <ls_dest>.
+      IF sy-subrc = 0.
+        <ls_dest> = ls_item.
+      ENDIF.
+    ENDLOOP.
+  ENDFORM.
