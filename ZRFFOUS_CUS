@@ -27660,3 +27660,8 @@ ENDENHANCEMENT.
       ENDIF.
     ENDLOOP.
   ENDFORM.
+
+Programa RFFOUS_C
+This ABAP SQL statement uses additions that can only be used when the
+fixed point arithmetic flag is activated (such as CASE expressions or
+host variables in expressions).
