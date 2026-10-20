@@ -1,0 +1,2044 @@
+report AQCSTR==========ZTR_0001======
+   line-size 183 no standard page heading line-count 000(001).
+
+include <symbol>.
+include <icon>.
+data: %RTMODE type aqlimode,
+      %IQID   type aqliqid,
+      %gcprog type PROGRAMM.
+
+selection-screen: begin of block prog
+                           with frame title text-f58.
+
+tables REGUP.
+data %count-REGUP(4) type x.
+data %linr-REGUP(2).
+tables REGUH.
+data %count-REGUH(4) type x.
+data %linr-REGUH(2).
+
+tables aqldb.
+
+include rsaqexcd.
+
+data: begin of %st_liste occurs 100,
+          head(1),
+          tab(3),
+          line(6) type n,
+          cont(1) type n,
+          fint(1),
+          finv(1),
+          fcol(1) type n,
+          text(0183),
+      end of %st_liste.
+
+data %data_selected(1).
+data %glframe(1)  value 'X' .
+data %uflag(1).
+data %ustflag(1).
+data %grst_text(255).
+data %glline type i.
+data %tabix like sy-tabix.
+data %prflag(1) type x value '02'.
+
+
+data: %textpool_read(1),
+      %textpool_langu type textpool occurs 0,
+      %textpool_langu_line type textpool.
+data: %txt1        type textpool-entry,
+       %txt2        type textpool-entry,
+       %txt3        type textpool-entry,
+       %txtkey      type textpool-key,
+       %txt_unknown type textpool-entry value 'UNKNOWN TEXT'.
+
+
+data EGRESO like BKPF-XBLNR.
+data TEXT_REGUH_ABSBU like T001-BUTXT.
+data TEXT_REGUH_ABWAE like TCURT-LTEXT.
+data TEXT_REGUH_AVISG like DD07D-DDTEXT.
+data TEXT_REGUH_BNKS1 like T005T-LANDX50.
+data TEXT_REGUH_BTYP1 like DD07D-DDTEXT.
+data TEXT_REGUH_BUSAB like T001S-SNAME.
+data TEXT_REGUH_DTAMS like DD07D-DDTEXT.
+data TEXT_REGUH_EDIAV like DD07D-DDTEXT.
+data TEXT_REGUH_EDIBN like DD07D-DDTEXT.
+data TEXT_REGUH_HBKID like T012T-TEXT1.
+data TEXT_REGUH_HBKIW like T012T-TEXT1.
+data TEXT_REGUH_HKTID like T012T-TEXT1.
+data TEXT_REGUH_HKTIW like T012T-TEXT1.
+data TEXT_REGUH_KUNNR like KNA1-NAME1.
+data TEXT_REGUH_LAND1 like T005T-LANDX50.
+data TEXT_REGUH_LIFNR like LFA1-NAME1.
+data TEXT_REGUH_REGIO like T005U-BEZEI.
+data TEXT_REGUH_RZAWE like T042Z-TEXT1.
+data TEXT_REGUH_SRTGB like TGSBT-GTEXT.
+data TEXT_REGUH_UBNKS like T005T-LANDX50.
+data TEXT_REGUH_UZAWE like T042H-TXT30.
+data TEXT_REGUH_WAERS like TCURT-LTEXT.
+data TEXT_REGUH_WEVWV like DD07D-DDTEXT.
+data TEXT_REGUH_XAEND like DD07D-DDTEXT.
+data TEXT_REGUH_XEZER like DD07D-DDTEXT.
+data TEXT_REGUH_XINVE like DD07D-DDTEXT.
+data TEXT_REGUH_XSIWE like DD07D-DDTEXT.
+data TEXT_REGUH_XVORL like DD07D-DDTEXT.
+data TEXT_REGUH_ZBNKS like T005T-LANDX50.
+data TEXT_REGUH_ZBUKR like T001-BUTXT.
+data TEXT_REGUH_ZLAND like T005T-LANDX50.
+data TEXT_REGUH_ZLSPR like T008T-TEXTL.
+data TEXT_REGUH_ZREGI like T005U-BEZEI.
+data TEXT_REGUH_ZSPRA like T002T-SPTXT.
+data TEXT_REGUP_BLART like T003T-LTEXT.
+data TEXT_REGUP_BSCHL like TBSLT-LTEXT.
+data TEXT_REGUP_BUKRS like T001-BUTXT.
+data TEXT_REGUP_GSBER like TGSBT-GTEXT.
+data TEXT_REGUP_HBKID like T012T-TEXT1.
+data TEXT_REGUP_KOART like DD07D-DDTEXT.
+data TEXT_REGUP_KUNNR like KNA1-NAME1.
+data TEXT_REGUP_LIFNR like LFA1-NAME1.
+data TEXT_REGUP_SHKZG like DD07D-DDTEXT.
+data TEXT_REGUP_UMSKZ like T074T-LTEXT.
+data TEXT_REGUP_WAERS like TCURT-LTEXT.
+data TEXT_REGUP_XVORL like DD07D-DDTEXT.
+data TEXT_REGUP_ZBUKR like T001-BUTXT.
+data TEXT_REGUP_ZLSCH like T042Z-TEXT1.
+data TEXT_REGUP_ZUMSK like T074T-LTEXT.
+data %perc(4) type p decimals 3.
+data %p100(4) type p decimals 3 value '100.000'.
+data %rangct type i.
+data %rangcc(8).
+data %subrc like sy-subrc.
+
+data: begin of %wa020 occurs 10,
+            REGUP-WRBTR(16) type p decimals 02,
+            begin of REGUP,
+                  REGUH-WAERS like REGUH-WAERS,
+            end of REGUP,
+      end of %wa020.
+
+data: begin of %w0100 occurs 20,
+            REGUH-WAERS like REGUH-WAERS,
+            REGUP-WRBTR(16) type p decimals 02,
+      end of %w0100.
+select-options SP$00006 for REGUP-BELNR memory id BLN.
+select-options SP$00004 for REGUP-LAUFD.
+select-options SP$00005 for REGUP-VBLNR.
+select-options SP$00003 for REGUP-ZBUKR.
+select-options SP$00007 for REGUP-ZLSCH.
+selection-screen skip 1.
+selection-screen: begin of block direct
+                  with frame title text-f59.
+selection-screen: begin of line.
+*selection-screen: comment 1(12) text-f57.
+selection-screen: pushbutton 75(18) pb%exco user-command expcol
+                                   modif id new.
+selection-screen: end of line.
+selection-screen: begin of line.
+parameters:       %alv radiobutton group func user-command outbut
+                                modif id new  default 'X' .
+selection-screen: comment 4(26) text-f72 for field %alv
+                                modif id new.
+parameters:       %alvl type slis_vari modif id new.
+selection-screen: end of line.
+selection-screen: begin of line.
+parameters:       %nofunc radiobutton group func modif id old.
+selection-screen: comment 4(26) text-f66 for field %nofunc
+                                         modif id old.
+parameters:       %tview radiobutton group func modif id old.
+selection-screen: comment 34(26) text-f68 for field %tview
+                                          modif id old,
+                  end of line.
+selection-screen: begin of line.
+parameters:       %graph radiobutton group func modif id old.
+selection-screen: comment 4(26) text-f61 for field %graph
+                                         modif id old.
+parameters:       %text radiobutton group func modif id old.
+selection-screen: comment 34(26) text-f69 for field %text
+                                          modif id old,
+                  end of line.
+selection-screen: begin of line.
+parameters:       %abc radiobutton group func modif id old.
+selection-screen: comment 4(26) text-f70 for field %abc
+                                         modif id old.
+parameters:       %excel radiobutton group func modif id old.
+selection-screen: comment 34(26) text-f60 for field %excel
+                                         modif id old,
+                  end of line.
+selection-screen: begin of line.
+parameters:       %eis radiobutton group func modif id old.
+selection-screen: comment 4(26) text-f63 for field %eis
+                                         modif id old.
+parameters:       %priv radiobutton group func modif id old.
+selection-screen: comment 34(26) text-f65 for field %priv
+                                             modif id old.
+selection-screen: end of line.
+selection-screen: begin of line.
+parameters:       %xint radiobutton group func modif id xin.
+selection-screen: comment 4(26) text-f73 for field %xint
+                                         modif id xin.
+parameters:       %xintk like AQXINT-XIKEY lower case modif id xin.
+selection-screen: end of line.
+selection-screen: begin of line.
+parameters:       %down radiobutton group func modif id old.
+selection-screen: comment 4(26) text-f64 for field %down
+                                         modif id old.
+parameters:       %path type AQ_FILENAME lower case modif id old.
+selection-screen: end of line.
+selection-screen: begin of line.
+parameters:       %save radiobutton group func modif id lis.
+selection-screen: comment 4(26) text-f62 for field %save
+                                         modif id lis.
+parameters:       %listid like AQCAQL-TEXT visible length 40
+                  lower case modif id lis.
+selection-screen: end of line.
+selection-screen: end of block direct.
+selection-screen: end of block prog.
+
+data: begin of %g00 occurs 100,
+            REGUP-ZBUKR like REGUP-ZBUKR,
+            REGUP-VBLNR like REGUP-VBLNR,
+            REGUP-BELNR like REGUP-BELNR,
+            REGUP-LIFNR like REGUP-LIFNR,
+            EGRESO like EGRESO,
+            REGUH-NAME1 like REGUH-NAME1,
+            REGUH-STRAS like REGUH-STRAS,
+            REGUH-STCD1 like REGUH-STCD1,
+            REGUH-ZNME1 like REGUH-ZNME1,
+            REGUP-ZLSCH like REGUP-ZLSCH,
+            REGUP-WRBTR like REGUP-WRBTR,
+            REGUH-WAERS-0201 like REGUH-WAERS,
+            REGUP-SGTXT like REGUP-SGTXT,
+            REGUP-ZUONR like REGUP-ZUONR,
+            REGUP-BUDAT like REGUP-BUDAT,
+            REGUP-XBLNR like REGUP-XBLNR,
+            REGUH-ORT01 like REGUH-ORT01,
+            REGUH-BNKL1 like REGUH-BNKL1,
+            REGUP-BLDAT like REGUP-BLDAT,
+            REGUP-SHKZG like REGUP-SHKZG,
+            REGUH-KOINH like REGUH-KOINH,
+            REGUH-BNKN1 like REGUH-BNKN1,
+            REGUH-REGIO like REGUH-REGIO,
+            %alvcount type i,
+      end of %g00.
+data: begin of %%g00,
+            REGUP-ZBUKR(004),
+            REGUP-VBLNR(010),
+            REGUP-BELNR(010),
+            REGUP-LIFNR(010),
+            EGRESO(016),
+            REGUH-NAME1(035),
+            REGUH-STRAS(035),
+            REGUH-STCD1(016),
+            REGUH-ZNME1(035),
+            REGUP-ZLSCH(001),
+            REGUP-WRBTR(016),
+            REGUH-WAERS-0201 like REGUH-WAERS,
+            REGUP-SGTXT(050),
+            REGUP-ZUONR(018),
+            REGUP-BUDAT(010),
+            REGUP-XBLNR(016),
+            REGUH-ORT01(035),
+            REGUH-BNKL1(015),
+            REGUP-BLDAT(010),
+            REGUP-SHKZG(001),
+            REGUH-KOINH(060),
+            REGUH-BNKN1(018),
+            REGUH-REGIO(003),
+      end of %%g00.
+data %znr type i.
+data %lznr type i value 99999.
+field-groups header.
+field-groups %fg01.
+data %any-01.
+field-groups %fg02.
+data %any-02.
+data %ext-REGUP02.
+field-groups %fg03.
+data %any-03.
+field-groups %fgwrREGUP02.
+
+controls tview100 type tableview using screen 100.
+
+AT SELECTION-SCREEN.
+perform alvl_check(rsaqexce) using %alvl 'G00'.
+perform testmode(rsaqexce).
+perform check_expcol(rsaqexce) using %alv.
+
+
+AT SELECTION-SCREEN ON VALUE-REQUEST FOR %ALVL.
+perform alvl_value_request(rsaqexce) using %alvl 'G00'.
+
+AT SELECTION-SCREEN ON VALUE-REQUEST FOR %XINTK.
+perform xint_value_request(rsaqexce).
+
+AT SELECTION-SCREEN OUTPUT.
+
+perform save_initial_sscr(rsaqexce).
+perform rinit(rsaqbrst).
+perform set_expcol(rsaqexce) using %alv pb%exco.
+perform alvl_set_invisible(rsaqexce).
+perform set_xint_params(rsaqexce).
+
+INITIALIZATION.
+perform init_xint(rsaqexce).
+%gcprog = sy-cprog.
+if %gcprog(1) = '!' or
+   %gcprog(1) = 'Y' or
+   %gcprog(1) = 'Z'.
+  %gcprog(1) = 'A'.
+endif.
+call function  'RSAQ_DECODE_REPORT_NAME'
+     exporting reportname = %gcprog
+     importing WORKSPACE  = %IQID-workspace
+               USERGROUP  = %IQID-USERGROUP
+               QUERY      = %IQID-QUERY.
+call function  'RSAQRT_SET_IDENTIFICATION'
+     exporting iqid        = %IQID
+               sscr_report = %gcprog
+     changing  rtmode      = %RTMODE.
+perform set_www_flags(rsaqexce).
+perform init_print_params(rsaqexce).
+
+if %textpool_read is initial.
+  read textpool sy-repid into %textpool_langu language sy-langu.
+  %textpool_read = 'X'.
+endif.
+
+START-OF-SELECTION.
+insert REGUH-WAERS into %fgwrREGUP02.
+insert REGUP-WRBTR into %fgwrREGUP02.
+insert %count-REGUH into header.
+insert %linr-REGUH into header.
+insert %count-REGUP into header.
+insert %linr-REGUP into header.
+insert REGUP-ZBUKR into %fg01.
+insert REGUP-VBLNR into %fg01.
+insert REGUP-BELNR into %fg01.
+insert REGUP-LIFNR into %fg01.
+insert EGRESO into %fg01.
+insert REGUH-NAME1 into %fg01.
+insert REGUH-STRAS into %fg01.
+insert REGUH-STCD1 into %fg01.
+insert REGUH-ZNME1 into %fg01.
+insert REGUP-ZLSCH into %fg01.
+insert REGUP-WRBTR into %fg02.
+insert REGUH-WAERS into %fg02.
+insert REGUP-SGTXT into %fg02.
+insert REGUP-ZUONR into %fg02.
+insert REGUP-BUDAT into %fg02.
+insert REGUP-XBLNR into %fg02.
+insert REGUH-ORT01 into %fg02.
+insert REGUH-BNKL1 into %fg03.
+insert REGUP-BLDAT into %fg03.
+insert REGUP-SHKZG into %fg03.
+insert REGUH-KOINH into %fg03.
+insert REGUH-BNKN1 into %fg03.
+insert REGUH-REGIO into %fg03.
+perform init_texthandling(rsaqexce) using 'CL_TEXT_IDENTIFIER' ' ' 'ZTR0001'.
+"webgui
+data: %ret type i.
+  if sy-batch is initial and %excel is not initial.
+    perform check_wingui(rsaqsyst) using %ret.
+    if %ret <> 0.
+      message e842(aq).
+    endif.
+  endif.
+"webgui
+perform %comp_ldesc.
+if %RTMODE is initial.
+  %gcprog = sy-cprog.
+  if %gcprog(1) = '!' or
+     %gcprog(1) = 'Y' or
+     %gcprog(1) = 'Z'.
+    %gcprog(1) = 'A'.
+  endif.
+  call function  'RSAQ_DECODE_REPORT_NAME'
+       exporting reportname = %gcprog
+       importing WORKSPACE  = %IQID-workspace
+                 USERGROUP  = %IQID-USERGROUP
+                 QUERY      = %IQID-QUERY.
+  call function  'RSAQRT_SET_IDENTIFICATION'
+       exporting iqid        = %IQID
+                 sscr_report = %gcprog
+       changing  rtmode      = %RTMODE.
+endif.
+
+GET REGUH .
+  %dbacc = %dbacc - 1.
+  if %dbacc = 0.
+    stop.
+  endif.
+*tables: *BKPF.
+  select single xblnr into egreso from BKPF
+                     where BELNR eq REGUh-VBLNR.
+  add 1 to %count-REGUH.
+  %linr-REGUH = '99'.
+
+GET REGUP .
+  %dbacc = %dbacc - 1.
+  if %dbacc = 0.
+    perform %_get_REGUH_late in program (sy-cprog) if found
+            using %selected REGUH.
+    stop.
+  endif.
+  check SP$00006.
+  check SP$00004.
+  check SP$00005.
+  check SP$00003.
+  check SP$00007.
+  add 1 to %count-REGUP.
+  %linr-REGUP = '01'.
+  extract %fg01.
+  %linr-REGUP = '02'.
+  extract %fg02.
+  %ext-REGUP02 = 'X'.
+  %linr-REGUP = '03'.
+  extract %fg03.
+  %linr-REGUP = '99'.
+
+GET REGUP LATE.
+  if %ext-REGUP02 <> space.
+    %linr-REGUP = '02'.
+    extract %fgwrREGUP02.
+    %linr-REGUP = '99'.
+    clear %ext-REGUP02.
+  endif.
+
+END-OF-SELECTION.
+sort as text.
+%diact = space.
+%printon = space.
+%batch = sy-batch.
+if %batch <> space.
+  if %eis <> space.
+    %diact = 'E'.
+    %printon = 'X'.
+    if %eisprotocol = space.
+      new-page print on destination 'NULL' no dialog
+               line-size 0183 line-count 0065.
+    else.
+      new-page print on no dialog
+               parameters %init_pri_params.
+    endif.
+  endif.
+  if %priv <> space.
+    %diact = 'P'.
+    %printon = 'X'.
+    new-page print on destination 'NULL' no dialog
+             line-size 0183 line-count 0065.
+  endif.
+  if %alv <> space.
+    %diact = 'V'.
+    %printon = 'X'.
+    %alv_layout = %alvl.
+    new-page print on destination 'NULL' no dialog
+             line-size 0183 line-count 0065.
+  endif.
+  if %save <> space.
+    %diact = 'S'.
+    %printon = 'X'.
+    new-page print on destination 'NULL' no dialog
+             line-size 0183 line-count 0065.
+  endif.
+elseif %called_by_www <> space.
+  %diact = space.
+elseif %called_by_www_alv <> space.
+  %diact = 'V'.
+else.
+  perform init_print_params(rsaqexce).
+  if %save  <> space. %diact = 'S'. endif.
+  if %priv  <> space. %diact = 'P'. endif.
+  if %xint  <> space. %diact = 'I'. endif.
+  if %tview <> space. %diact = 'T'. endif.
+  if %alv   <> space. %diact = 'V'. endif.
+  if %down  <> space. %diact = 'D'. endif.
+  if %eis   <> space. %diact = 'E'. endif.
+  if %graph <> space. %diact = 'G'. endif.
+  if %excel <> space. %diact = 'X'. endif.
+  if %text  <> space. %diact = 'W'. endif.
+  if %abc   <> space. %diact = 'A'. endif.
+  if %diact <> space and %diact <> 'S' and %diact <> 'W'.
+    %printon = 'X'.
+    new-page print on destination 'NULL' no dialog
+             line-size 0183 line-count 0065.
+  endif.
+  %pathname = %path.
+  if %diact = 'I'.
+    %functionkey = %xintk.
+  endif.
+  if %diact = 'V'.
+    %alv_layout = %alvl.
+  endif.
+endif.
+free memory id 'AQLISTDATA'.
+if %memmode <> space.
+  if %batch <> space and %printon = space.
+    %printon = 'X'.
+    new-page print on destination 'NULL' no dialog
+             line-size 0183 line-count 0065.
+  endif.
+  %diact = '1'.
+endif.
+%titel = ' '.
+if sy-subty o %prflag and %titel = space.
+  new-page with-title.
+endif.
+%tvsize = 0200.
+%pline = 1.
+%pzgr  = 1.
+%first = 'X'.
+perform %output.
+%first = space.
+if %diact <> space and %diact <> 'S'.
+  if %batch = space.
+    new-page print off.
+    if not ( %diact = 'V' and %ucomm = 'PRIN' ).
+      new-page no-heading no-title.
+      write space.
+    endif.
+  endif.
+else.
+  perform pf-status(rsaqexce) using 'XXX X '.
+endif.
+clear: %tab, %line, %cont.
+if %data_selected = space.
+  if %diact = '1'.
+    export empty from %empty to memory id 'AQLISTDATA'.
+    leave.
+  else.
+    if %batch = space and
+       %called_by_www = space and
+       %called_by_www_alv = space.
+      message s260(aq).
+      leave list-processing.
+    else.
+      if %called_by_www_alv = space.
+        %diact = space.
+      endif.
+    endif.
+  endif.
+endif.
+if %diact = 'S'.
+  perform %save_list.
+  leave list-processing.
+endif.
+if %diact = 'V' and %batch <> space.
+  new-page print off.
+  perform set_print_params(rsaqexce).
+  perform %download using 'ALV'.
+  leave.
+endif.
+if %diact = 'V' and %called_by_www_alv <> space.
+  perform %download using 'ALV'.
+  leave.
+endif.
+*if %diact = 'V' and ( %ucomm = 'PRIN' or sy-subty = '07' ).
+data %is_submit_to_spool type c.
+if %diact = 'V'.
+  CALL FUNCTION 'IS_SUBMIT_TO_SPOOL'
+    IMPORTING FLAG = %is_submit_to_spool.
+  if ( %ucomm = 'PRIN' or %is_submit_to_spool = 'X' ).
+    perform set_print_params(rsaqexce).
+    perform %download using 'ALV'.
+    set parameter id 'SPI' field sy-spono.
+    leave list-processing.
+  endif.
+endif.
+if %diact = 'P' and %batch <> space.
+  perform %download using '+DAT'.
+  leave list-processing.
+endif.
+if %diact = 'E' and %batch <> space.
+  perform %download using 'EIS'.
+  leave list-processing.
+endif.
+if %diact = '1'.
+  perform %download using '+MEM'.
+  leave.
+endif.
+if %diact = 'X'.
+  set user-command 'XXL'.
+elseif %diact = 'W'.
+  set user-command 'TEXT'.
+elseif %diact = 'V'.
+  set user-command 'ALV'.
+elseif %diact = 'T'.
+  set user-command 'VIEW'.
+elseif %diact = 'G'.
+  set user-command 'GRAF'.
+elseif %diact = 'A'.
+  set user-command 'ABCA'.
+elseif %diact = 'E'.
+  set user-command 'EIS'.
+elseif %diact = 'D'.
+  set user-command 'DOWN'.
+elseif %diact = 'I'.
+  set user-command 'XINT'.
+elseif %diact = 'P'.
+  set user-command '+DAT'.
+endif.
+
+TOP-OF-PAGE.
+perform %top-of-page.
+
+END-OF-PAGE.
+perform page_foot(rsaqexce).
+perform %save_page.
+
+TOP-OF-PAGE DURING LINE-SELECTION.
+perform %top-of-page.
+
+AT USER-COMMAND.
+case sy-ucomm.
+when 'EXIT'.
+  leave program.
+when 'RETN'.
+  perform return(rsaqexce).
+when 'CANC'.
+  perform return(rsaqexce).
+when 'WEIT'.
+  perform return(rsaqexce).
+when 'INHA'.
+  perform catalogue(rsaqexce).
+when 'AUSL'.
+  perform pickup(rsaqexce).
+when 'AUSW'.
+  perform pickup(rsaqexce).
+when 'RCAA'.
+  perform rchain(rsaqbrst).
+when 'RCAL'.
+  perform rcall(rsaqbrst).
+when 'VGLI'.
+  perform change(rsaqexce).
+when 'VGLE'.
+  perform change(rsaqexce).
+when 'TOTO'.
+  perform change(rsaqexce).
+when 'VSTA'.
+  perform change(rsaqexce).
+when 'VSTE'.
+  perform return(rsaqexce).
+when 'SAVL'.
+  perform %save_list.
+when 'ODRU'.
+  perform print_list(rsaqexce).
+when 'COPA'.
+  perform print_cover_page(rsaqexce).
+when 'TEXT'.
+  perform %download using 'TEXT'.
+when 'ALV'.
+  perform %download using 'ALV'.
+when 'VIEW'.
+  perform %view.
+when 'XXL'.
+  perform %download using 'XXL'.
+when 'GRAF'.
+  perform %download using 'GRAF'.
+when 'ABCA'.
+  perform %download using 'ABCA'.
+when 'EIS'.
+  perform %download using 'EIS'.
+when 'DOWN'.
+  perform %download using 'DOWN'.
+when 'XINT'.
+  perform %download using 'XINT'.
+when '+DAT'.
+  perform %download using '+DAT'.
+endcase.
+clear: %cline, %zgr.
+clear: %tab, %line, %cont.
+if %diact <> space.
+  leave list-processing.
+endif.
+
+
+form %comp_ldesc.
+
+*... textpool required (API calls %comp_ldesc directly)
+  if %textpool_read is initial.
+    read textpool sy-repid into %textpool_langu language sy-langu.
+    %textpool_read = 'X'.
+  endif.
+
+  refresh %ldesc.
+  refresh %gdesc.
+  read table %textpool_langu into %textpool_langu_line
+                             with key ID = 'I' key = 'A00'.
+  if sy-subrc is initial. %txt1 = %textpool_langu_line-entry.
+  else. %txt1 = %txt_unknown.
+  endif.
+  read table %textpool_langu into %textpool_langu_line
+                             with key key = 'B00'.
+  if sy-subrc is initial. %txt2 = %textpool_langu_line-entry.
+  else. %txt2 = %txt_unknown.
+  endif.
+  read table %textpool_langu into %textpool_langu_line
+                             with key key = 'H01'.
+  if sy-subrc is initial. %txt3 = %textpool_langu_line-entry.
+  else. %txt3 = %txt_unknown.
+  endif.
+  perform ldesc(rsaqexce) using 'G00010000X004       00  02'
+    %txt1 %txt2 %txt3 'REGUP-ZBUKR' REGUP-ZBUKR 'REGUP-ZBUKR'.
+  read table %textpool_langu into %textpool_langu_line
+                             with key ID = 'I' key = 'A01'.
+  if sy-subrc is initial. %txt1 = %textpool_langu_line-entry.
+  else. %txt1 = %txt_unknown.
+  endif.
+  read table %textpool_langu into %textpool_langu_line
+                             with key key = 'B01'.
+  if sy-subrc is initial. %txt2 = %textpool_langu_line-entry.
+  else. %txt2 = %txt_unknown.
+  endif.
+  read table %textpool_langu into %textpool_langu_line
+                             with key key = 'H01'.
+  if sy-subrc is initial. %txt3 = %textpool_langu_line-entry.
+  else. %txt3 = %txt_unknown.
+  endif.
+  perform ldesc(rsaqexce) using 'G00020000X010       00  02'
+    %txt1 %txt2 %txt3 'REGUP-VBLNR' REGUP-VBLNR 'REGUP-VBLNR'.
+  read table %textpool_langu into %textpool_langu_line
+                             with key ID = 'I' key = 'A02'.
+  if sy-subrc is initial. %txt1 = %textpool_langu_line-entry.
+  else. %txt1 = %txt_unknown.
+  endif.
+  read table %textpool_langu into %textpool_langu_line
+                             with key key = 'B02'.
+  if sy-subrc is initial. %txt2 = %textpool_langu_line-entry.
+  else. %txt2 = %txt_unknown.
+  endif.
+  read table %textpool_langu into %textpool_langu_line
+                             with key key = 'H01'.
+  if sy-subrc is initial. %txt3 = %textpool_langu_line-entry.
+  else. %txt3 = %txt_unknown.
+  endif.
+  perform ldesc(rsaqexce) using 'G00030000X010       00  02'
+    %txt1 %txt2 %txt3 'REGUP-BELNR' REGUP-BELNR 'REGUP-BELNR'.
+  read table %textpool_langu into %textpool_langu_line
+                             with key ID = 'I' key = 'A03'.
+  if sy-subrc is initial. %txt1 = %textpool_langu_line-entry.
+  else. %txt1 = %txt_unknown.
+  endif.
+  read table %textpool_langu into %textpool_langu_line
+                             with key key = 'B03'.
+  if sy-subrc is initial. %txt2 = %textpool_langu_line-entry.
+  else. %txt2 = %txt_unknown.
+  endif.
+  read table %textpool_langu into %textpool_langu_line
+                             with key key = 'H01'.
+  if sy-subrc is initial. %txt3 = %textpool_langu_line-entry.
+  else. %txt3 = %txt_unknown.
+  endif.
+  perform ldesc(rsaqexce) using 'G00040000X010       00  02'
+    %txt1 %txt2 %txt3 'REGUP-LIFNR' REGUP-LIFNR 'REGUP-LIFNR'.
+  read table %textpool_langu into %textpool_langu_line
+                             with key ID = 'I' key = 'A04'.
+  if sy-subrc is initial. %txt1 = %textpool_langu_line-entry.
+  else. %txt1 = %txt_unknown.
+  endif.
+  read table %textpool_langu into %textpool_langu_line
+                             with key key = 'B04'.
+  if sy-subrc is initial. %txt2 = %textpool_langu_line-entry.
+  else. %txt2 = %txt_unknown.
+  endif.
+  read table %textpool_langu into %textpool_langu_line
+                             with key key = 'H00'.
+  if sy-subrc is initial. %txt3 = %textpool_langu_line-entry.
+  else. %txt3 = %txt_unknown.
+  endif.
+  perform ldesc(rsaqexce) using 'G00050000X016       00  01'
+    %txt1 %txt2 %txt3 'EGRESO' EGRESO 'EGRESO'.
+  read table %textpool_langu into %textpool_langu_line
+                             with key ID = 'I' key = 'A05'.
+  if sy-subrc is initial. %txt1 = %textpool_langu_line-entry.
+  else. %txt1 = %txt_unknown.
+  endif.
+  read table %textpool_langu into %textpool_langu_line
+                             with key key = 'B05'.
+  if sy-subrc is initial. %txt2 = %textpool_langu_line-entry.
+  else. %txt2 = %txt_unknown.
+  endif.
+  read table %textpool_langu into %textpool_langu_line
+                             with key key = 'H00'.
+  if sy-subrc is initial. %txt3 = %textpool_langu_line-entry.
+  else. %txt3 = %txt_unknown.
+  endif.
+  perform ldesc(rsaqexce) using 'G00060000X035       00  01'
+    %txt1 %txt2 %txt3 'REGUH-NAME1' REGUH-NAME1 'REGUH-NAME1'.
+  read table %textpool_langu into %textpool_langu_line
+                             with key ID = 'I' key = 'A06'.
+  if sy-subrc is initial. %txt1 = %textpool_langu_line-entry.
+  else. %txt1 = %txt_unknown.
+  endif.
+  read table %textpool_langu into %textpool_langu_line
+                             with key key = 'B06'.
+  if sy-subrc is initial. %txt2 = %textpool_langu_line-entry.
+  else. %txt2 = %txt_unknown.
+  endif.
+  read table %textpool_langu into %textpool_langu_line
+                             with key key = 'H00'.
+  if sy-subrc is initial. %txt3 = %textpool_langu_line-entry.
+  else. %txt3 = %txt_unknown.
+  endif.
+  perform ldesc(rsaqexce) using 'G00070000X035       00  01'
+    %txt1 %txt2 %txt3 'REGUH-STRAS' REGUH-STRAS 'REGUH-STRAS'.
+  read table %textpool_langu into %textpool_langu_line
+                             with key ID = 'I' key = 'A07'.
+  if sy-subrc is initial. %txt1 = %textpool_langu_line-entry.
+  else. %txt1 = %txt_unknown.
+  endif.
+  read table %textpool_langu into %textpool_langu_line
+                             with key key = 'B07'.
+  if sy-subrc is initial. %txt2 = %textpool_langu_line-entry.
+  else. %txt2 = %txt_unknown.
+  endif.
+  read table %textpool_langu into %textpool_langu_line
+                             with key key = 'H00'.
+  if sy-subrc is initial. %txt3 = %textpool_langu_line-entry.
+  else. %txt3 = %txt_unknown.
+  endif.
+  perform ldesc(rsaqexce) using 'G00080000X016       00  01'
+    %txt1 %txt2 %txt3 'REGUH-STCD1' REGUH-STCD1 'REGUH-STCD1'.
+  read table %textpool_langu into %textpool_langu_line
+                             with key ID = 'I' key = 'A08'.
+  if sy-subrc is initial. %txt1 = %textpool_langu_line-entry.
+  else. %txt1 = %txt_unknown.
+  endif.
+  read table %textpool_langu into %textpool_langu_line
+                             with key key = 'B08'.
+  if sy-subrc is initial. %txt2 = %textpool_langu_line-entry.
+  else. %txt2 = %txt_unknown.
+  endif.
+  read table %textpool_langu into %textpool_langu_line
+                             with key key = 'H00'.
+  if sy-subrc is initial. %txt3 = %textpool_langu_line-entry.
+  else. %txt3 = %txt_unknown.
+  endif.
+  perform ldesc(rsaqexce) using 'G00090000X035       00  01'
+    %txt1 %txt2 %txt3 'REGUH-ZNME1' REGUH-ZNME1 'REGUH-ZNME1'.
+  read table %textpool_langu into %textpool_langu_line
+                             with key ID = 'I' key = 'A09'.
+  if sy-subrc is initial. %txt1 = %textpool_langu_line-entry.
+  else. %txt1 = %txt_unknown.
+  endif.
+  read table %textpool_langu into %textpool_langu_line
+                             with key key = 'B09'.
+  if sy-subrc is initial. %txt2 = %textpool_langu_line-entry.
+  else. %txt2 = %txt_unknown.
+  endif.
+  read table %textpool_langu into %textpool_langu_line
+                             with key key = 'H01'.
+  if sy-subrc is initial. %txt3 = %textpool_langu_line-entry.
+  else. %txt3 = %txt_unknown.
+  endif.
+  perform ldesc(rsaqexce) using 'G00100000X001       00  02'
+    %txt1 %txt2 %txt3 'REGUP-ZLSCH' REGUP-ZLSCH 'REGUP-ZLSCH'.
+  read table %textpool_langu into %textpool_langu_line
+                             with key ID = 'I' key = 'A10'.
+  if sy-subrc is initial. %txt1 = %textpool_langu_line-entry.
+  else. %txt1 = %txt_unknown.
+  endif.
+  read table %textpool_langu into %textpool_langu_line
+                             with key key = 'B10'.
+  if sy-subrc is initial. %txt2 = %textpool_langu_line-entry.
+  else. %txt2 = %txt_unknown.
+  endif.
+  read table %textpool_langu into %textpool_langu_line
+                             with key key = 'H01'.
+  if sy-subrc is initial. %txt3 = %textpool_langu_line-entry.
+  else. %txt3 = %txt_unknown.
+  endif.
+  perform ldesc(rsaqexce) using 'G00111002 016F    X 00  02'
+    %txt1 %txt2 %txt3 'REGUP-WRBTR' REGUP-WRBTR 'REGUP-WRBTR'.
+  read table %textpool_langu into %textpool_langu_line
+                             with key ID = 'I' key = 'A11'.
+  if sy-subrc is initial. %txt1 = %textpool_langu_line-entry.
+  else. %txt1 = %txt_unknown.
+  endif.
+  read table %textpool_langu into %textpool_langu_line
+                             with key key = 'B11'.
+  if sy-subrc is initial. %txt2 = %textpool_langu_line-entry.
+  else. %txt2 = %txt_unknown.
+  endif.
+  read table %textpool_langu into %textpool_langu_line
+                             with key key = 'H01'.
+  if sy-subrc is initial. %txt3 = %textpool_langu_line-entry.
+  else. %txt3 = %txt_unknown.
+  endif.
+  perform ldesc(rsaqexce) using 'G00121000 005W      00  02'
+    %txt1 %txt2 %txt3 'REGUH-WAERS' REGUH-WAERS 'REGUH-WAERS-0201'.
+  read table %textpool_langu into %textpool_langu_line
+                             with key ID = 'I' key = 'A12'.
+  if sy-subrc is initial. %txt1 = %textpool_langu_line-entry.
+  else. %txt1 = %txt_unknown.
+  endif.
+  read table %textpool_langu into %textpool_langu_line
+                             with key key = 'B12'.
+  if sy-subrc is initial. %txt2 = %textpool_langu_line-entry.
+  else. %txt2 = %txt_unknown.
+  endif.
+  read table %textpool_langu into %textpool_langu_line
+                             with key key = 'H01'.
+  if sy-subrc is initial. %txt3 = %textpool_langu_line-entry.
+  else. %txt3 = %txt_unknown.
+  endif.
+  perform ldesc(rsaqexce) using 'G00131000X050       00  02'
+    %txt1 %txt2 %txt3 'REGUP-SGTXT' REGUP-SGTXT 'REGUP-SGTXT'.
+  read table %textpool_langu into %textpool_langu_line
+                             with key ID = 'I' key = 'A13'.
+  if sy-subrc is initial. %txt1 = %textpool_langu_line-entry.
+  else. %txt1 = %txt_unknown.
+  endif.
+  read table %textpool_langu into %textpool_langu_line
+                             with key key = 'B13'.
+  if sy-subrc is initial. %txt2 = %textpool_langu_line-entry.
+  else. %txt2 = %txt_unknown.
+  endif.
+  read table %textpool_langu into %textpool_langu_line
+                             with key key = 'H01'.
+  if sy-subrc is initial. %txt3 = %textpool_langu_line-entry.
+  else. %txt3 = %txt_unknown.
+  endif.
+  perform ldesc(rsaqexce) using 'G00141000X018       00  02'
+    %txt1 %txt2 %txt3 'REGUP-ZUONR' REGUP-ZUONR 'REGUP-ZUONR'.
+  read table %textpool_langu into %textpool_langu_line
+                             with key ID = 'I' key = 'A14'.
+  if sy-subrc is initial. %txt1 = %textpool_langu_line-entry.
+  else. %txt1 = %txt_unknown.
+  endif.
+  read table %textpool_langu into %textpool_langu_line
+                             with key key = 'B14'.
+  if sy-subrc is initial. %txt2 = %textpool_langu_line-entry.
+  else. %txt2 = %txt_unknown.
+  endif.
+  read table %textpool_langu into %textpool_langu_line
+                             with key key = 'H01'.
+  if sy-subrc is initial. %txt3 = %textpool_langu_line-entry.
+  else. %txt3 = %txt_unknown.
+  endif.
+  perform ldesc(rsaqexce) using 'G00151000X010       00  02'
+    %txt1 %txt2 %txt3 'REGUP-BUDAT' REGUP-BUDAT 'REGUP-BUDAT'.
+  read table %textpool_langu into %textpool_langu_line
+                             with key ID = 'I' key = 'A15'.
+  if sy-subrc is initial. %txt1 = %textpool_langu_line-entry.
+  else. %txt1 = %txt_unknown.
+  endif.
+  read table %textpool_langu into %textpool_langu_line
+                             with key key = 'B15'.
+  if sy-subrc is initial. %txt2 = %textpool_langu_line-entry.
+  else. %txt2 = %txt_unknown.
+  endif.
+  read table %textpool_langu into %textpool_langu_line
+                             with key key = 'H01'.
+  if sy-subrc is initial. %txt3 = %textpool_langu_line-entry.
+  else. %txt3 = %txt_unknown.
+  endif.
+  perform ldesc(rsaqexce) using 'G00161000X016       00  02'
+    %txt1 %txt2 %txt3 'REGUP-XBLNR' REGUP-XBLNR 'REGUP-XBLNR'.
+  read table %textpool_langu into %textpool_langu_line
+                             with key ID = 'I' key = 'A16'.
+  if sy-subrc is initial. %txt1 = %textpool_langu_line-entry.
+  else. %txt1 = %txt_unknown.
+  endif.
+  read table %textpool_langu into %textpool_langu_line
+                             with key key = 'B16'.
+  if sy-subrc is initial. %txt2 = %textpool_langu_line-entry.
+  else. %txt2 = %txt_unknown.
+  endif.
+  read table %textpool_langu into %textpool_langu_line
+                             with key key = 'H00'.
+  if sy-subrc is initial. %txt3 = %textpool_langu_line-entry.
+  else. %txt3 = %txt_unknown.
+  endif.
+  perform ldesc(rsaqexce) using 'G00171000X035       00  01'
+    %txt1 %txt2 %txt3 'REGUH-ORT01' REGUH-ORT01 'REGUH-ORT01'.
+  read table %textpool_langu into %textpool_langu_line
+                             with key ID = 'I' key = 'A17'.
+  if sy-subrc is initial. %txt1 = %textpool_langu_line-entry.
+  else. %txt1 = %txt_unknown.
+  endif.
+  read table %textpool_langu into %textpool_langu_line
+                             with key key = 'B17'.
+  if sy-subrc is initial. %txt2 = %textpool_langu_line-entry.
+  else. %txt2 = %txt_unknown.
+  endif.
+  read table %textpool_langu into %textpool_langu_line
+                             with key key = 'H00'.
+  if sy-subrc is initial. %txt3 = %textpool_langu_line-entry.
+  else. %txt3 = %txt_unknown.
+  endif.
+  perform ldesc(rsaqexce) using 'G00182000X015       00  01'
+    %txt1 %txt2 %txt3 'REGUH-BNKL1' REGUH-BNKL1 'REGUH-BNKL1'.
+  read table %textpool_langu into %textpool_langu_line
+                             with key ID = 'I' key = 'A18'.
+  if sy-subrc is initial. %txt1 = %textpool_langu_line-entry.
+  else. %txt1 = %txt_unknown.
+  endif.
+  read table %textpool_langu into %textpool_langu_line
+                             with key key = 'B18'.
+  if sy-subrc is initial. %txt2 = %textpool_langu_line-entry.
+  else. %txt2 = %txt_unknown.
+  endif.
+  read table %textpool_langu into %textpool_langu_line
+                             with key key = 'H01'.
+  if sy-subrc is initial. %txt3 = %textpool_langu_line-entry.
+  else. %txt3 = %txt_unknown.
+  endif.
+  perform ldesc(rsaqexce) using 'G00192000X010       00  02'
+    %txt1 %txt2 %txt3 'REGUP-BLDAT' REGUP-BLDAT 'REGUP-BLDAT'.
+  read table %textpool_langu into %textpool_langu_line
+                             with key ID = 'I' key = 'A19'.
+  if sy-subrc is initial. %txt1 = %textpool_langu_line-entry.
+  else. %txt1 = %txt_unknown.
+  endif.
+  read table %textpool_langu into %textpool_langu_line
+                             with key key = 'B19'.
+  if sy-subrc is initial. %txt2 = %textpool_langu_line-entry.
+  else. %txt2 = %txt_unknown.
+  endif.
+  read table %textpool_langu into %textpool_langu_line
+                             with key key = 'H01'.
+  if sy-subrc is initial. %txt3 = %textpool_langu_line-entry.
+  else. %txt3 = %txt_unknown.
+  endif.
+  perform ldesc(rsaqexce) using 'G00202000X001       00  02'
+    %txt1 %txt2 %txt3 'REGUP-SHKZG' REGUP-SHKZG 'REGUP-SHKZG'.
+  read table %textpool_langu into %textpool_langu_line
+                             with key ID = 'I' key = 'A20'.
+  if sy-subrc is initial. %txt1 = %textpool_langu_line-entry.
+  else. %txt1 = %txt_unknown.
+  endif.
+  read table %textpool_langu into %textpool_langu_line
+                             with key key = 'B20'.
+  if sy-subrc is initial. %txt2 = %textpool_langu_line-entry.
+  else. %txt2 = %txt_unknown.
+  endif.
+  read table %textpool_langu into %textpool_langu_line
+                             with key key = 'H00'.
+  if sy-subrc is initial. %txt3 = %textpool_langu_line-entry.
+  else. %txt3 = %txt_unknown.
+  endif.
+  perform ldesc(rsaqexce) using 'G00212000X060       00  01'
+    %txt1 %txt2 %txt3 'REGUH-KOINH' REGUH-KOINH 'REGUH-KOINH'.
+  read table %textpool_langu into %textpool_langu_line
+                             with key ID = 'I' key = 'A21'.
+  if sy-subrc is initial. %txt1 = %textpool_langu_line-entry.
+  else. %txt1 = %txt_unknown.
+  endif.
+  read table %textpool_langu into %textpool_langu_line
+                             with key key = 'B21'.
+  if sy-subrc is initial. %txt2 = %textpool_langu_line-entry.
+  else. %txt2 = %txt_unknown.
+  endif.
+  read table %textpool_langu into %textpool_langu_line
+                             with key key = 'H00'.
+  if sy-subrc is initial. %txt3 = %textpool_langu_line-entry.
+  else. %txt3 = %txt_unknown.
+  endif.
+  perform ldesc(rsaqexce) using 'G00222000X018       00  01'
+    %txt1 %txt2 %txt3 'REGUH-BNKN1' REGUH-BNKN1 'REGUH-BNKN1'.
+  read table %textpool_langu into %textpool_langu_line
+                             with key ID = 'I' key = 'A22'.
+  if sy-subrc is initial. %txt1 = %textpool_langu_line-entry.
+  else. %txt1 = %txt_unknown.
+  endif.
+  read table %textpool_langu into %textpool_langu_line
+                             with key key = 'B22'.
+  if sy-subrc is initial. %txt2 = %textpool_langu_line-entry.
+  else. %txt2 = %txt_unknown.
+  endif.
+  read table %textpool_langu into %textpool_langu_line
+                             with key key = 'H00'.
+  if sy-subrc is initial. %txt3 = %textpool_langu_line-entry.
+  else. %txt3 = %txt_unknown.
+  endif.
+  perform ldesc(rsaqexce) using 'G00232000X003       00  01'
+    %txt1 %txt2 %txt3 'REGUH-REGIO' REGUH-REGIO 'REGUH-REGIO'.
+  perform gdesc(rsaqexce) using 'G00' 1 20 ' ' ' ' 'X'.
+  perform complete_ldesc(rsaqexce) tables %ldesc.
+
+endform.
+
+form %read_ldesc using p_lid   type aql_lid
+                       p_ldesc type rsaqtldesc.
+
+  p_lid = 'G00'.
+  perform %comp_ldesc.
+  p_ldesc[] = %ldesc[].
+
+endform.
+
+
+form %output.
+
+describe table %prlist lines %max_prlist.
+%head = 'AAA'.
+%keyempty = space.
+new-page.
+perform %output_gl.
+perform complete_page(rsaqexce).
+%head = 'ZZZ'.
+perform last_ptab_entry(rsaqexce).
+new-page.
+if %keyempty <> space.
+  message s894(aq).
+endif.
+
+endform.
+
+
+form %top-of-page.
+
+if sy-ucomm = 'INHA'. exit. endif.
+if sy-ucomm = 'COPA'. exit. endif.
+if %head    = space.  exit. endif.
+if %head = 'DDD'.
+  perform tviewpage(rsaqexce).
+  exit.
+endif.
+if %head = 'GGG'.
+  perform page(rsaqexce) using 'G00' text-grl 183 %glframe 001.
+  set left scroll-boundary column 002.
+  perform set_scroll_boundary(rsaqexce) using 002.
+  if %toto <> space. exit. endif.
+else.
+  case %head.
+  when others.
+  endcase.
+endif.
+
+endform.
+
+
+form %newline.
+
+data: %llen type i.
+  %llen = 183.
+  %uflag = space.
+  new-line.
+  write: '|', 183 '|'.
+  position 2.
+
+endform.
+
+form %skip using count.
+
+  if sy-linno > 1.
+    %uflag = space.
+    do count times.
+      new-line.
+      format reset.
+      write: '|', 183 '|'.
+    enddo.
+  endif.
+
+endform.
+
+form %uline.
+
+  if %uflag = space.
+    if sy-linno > 1.
+      uline /1(183).
+    endif.
+    %uflag = 'X'.
+  endif.
+
+endform.
+
+form %hide.
+
+  if %batch <> space and %diact = 'S'.
+    perform hide(rsaqexce).
+  else.
+    hide: %tab, %line, %cont.
+  endif.
+
+endform.
+
+form %hide_color.
+
+  if %batch <> space and %diact = 'S'.
+    perform hide_color(rsaqexce).
+  else.
+    hide: %fint, %fcol.
+  endif.
+
+endform.
+
+form %rcall using name value.
+
+field-symbols <field>.
+
+  assign (name) to <field>.
+  if sy-subrc <> 0.
+    value = space.
+    exit.
+  endif.
+  read current line field value <field> into value.
+  if value = space and %tab = 'G00' and %ldesc-fcur na 'FM'.
+    read table %g00 index %line.
+    if sy-subrc = 0.
+      assign component %ldesc-fnameint of structure %g00
+                                       to <field>.
+      if sy-subrc = 0.
+        write <field> to value(%ldesc-folen).
+      endif.
+    endif.
+  endif.
+
+endform.
+
+form %save_page.
+
+  if %batch <> space and %diact = 'S'.
+    perform save_page(rsaqexce) tables %st_liste.
+  endif.
+
+endform.
+
+form %replace_var using text.
+
+field-symbols <var>.
+
+  assign text+1(*) to <var>.
+
+endform.
+
+form %save_list.
+
+data: %sflag,
+      qreport like sy-repid.
+
+  if %diact = 'S'. %sflag = 'X'. endif.
+  qreport = sy-repid.
+  perform save_list(rsaqexce) tables %st_liste
+                              using qreport %sflag %listid.
+  if %ql_id <> space.
+    %dlflag = 'X'.
+    %listsize = 0183.
+    perform comp_selection_screen(rsaqexce).
+    export %st_liste %ptab %ldesc %gdesc %dlflag %listsize
+           %selections
+           %g00
+           to database aqldb(aq) id %ql_id.
+  endif.
+
+endform.
+
+form %refresh.
+
+  case %tab.
+  when 'G00'.
+    import %g00 from database aqldb(aq) id %ql_id.
+  endcase.
+
+endform.
+
+form %download using code.
+
+data: qreport like sy-repid.
+
+  perform init_download(rsaqexce).
+  qreport = sy-repid.
+  case %tab.
+  when 'G00'.
+    perform download(rsaqexce)
+            tables %g00 using code qreport text-grl.
+  when others.
+    message s860(aq).
+  endcase.
+
+endform.
+
+form %set_data changing l_lines type i.
+
+  import ldata to %g00 from memory id 'AQLISTDATA'.
+  describe table %g00 lines l_lines.
+  free memory id 'AQLISTDATA'.
+
+endform.
+
+form %get_data tables datatab structure %g00
+               using  first type i
+                      last  type i.
+
+  append lines of %g00 from first to last to datatab.
+
+endform.
+
+form %get_ref_to_table using lid         like rsaqldesc-lid
+                             ref_to_itab type ref to data
+                             subrc       like sy-subrc.
+
+  subrc = 0.
+  case lid.
+  when 'G00'.
+    create data ref_to_itab like %g00[].
+  when others.
+    subrc = 4.
+    message s860(aq).
+  endcase.
+
+endform.
+
+form %view.
+
+data: ret type i.
+
+  perform check_wingui(rsaqsyst) using ret.
+  if ret <> 0.
+    message s841(aq).
+    perform %download using 'ALV'.
+    exit.
+  endif.
+
+data: anz type i,
+      prog like sy-repid.
+
+  prog = sy-repid.
+  perform init_download(rsaqexce).
+  case %tab.
+  when 'G00'.
+    perform generate_view_dynpro(rsaqexce)
+            using prog text-grl.
+    describe table %g00 lines anz.
+    tview100-lines = anz.
+    perform init_view(rsaqexce) tables %g00 using tview100.
+    call screen 100.
+    perform reset_view_dynpro(rsaqexce).
+  when others.
+    message s860(aq).
+  endcase.
+
+endform.
+
+form %colhead_print changing lines like sy-linno
+                             hflag type c.
+data: l_text(255),
+      l_size type i.
+  if %textpool_read is initial.
+    read textpool sy-cprog into %textpool_langu language sy-langu.
+    %textpool_read = 'X'.
+  endif.
+  lines = lines +  3.
+  if  3 = 0. clear hflag. else. hflag = 'X'. endif.
+  write at (1) '|' no-gap.
+  read table %textpool_langu into %textpool_langu_line
+                             with key ID = 'I' key = 'B001'.
+  if sy-subrc is initial.
+    l_text = %textpool_langu_line-entry.
+  else.
+    clear l_text.
+  endif.
+  perform replace_vars(rsaqexce) using l_text 'X'.
+  call method cl_abap_list_utilities=>memory_offset
+    exporting
+      field          = l_text
+      display_offset = 004
+    importing
+      memory_offset  = l_size.
+  if l_size = 0.
+    l_size = 004.
+  endif.
+  write at 002(004) l_text(l_size)  no-gap.
+  write at (1) ' ' no-gap.
+  read table %textpool_langu into %textpool_langu_line
+                             with key ID = 'I' key = 'B011'.
+  if sy-subrc is initial.
+    l_text = %textpool_langu_line-entry.
+  else.
+    clear l_text.
+  endif.
+  perform replace_vars(rsaqexce) using l_text 'X'.
+  call method cl_abap_list_utilities=>memory_offset
+    exporting
+      field          = l_text
+      display_offset = 010
+    importing
+      memory_offset  = l_size.
+  if l_size = 0.
+    l_size = 010.
+  endif.
+  write at 007(010) l_text(l_size)  no-gap.
+  write at (1) ' ' no-gap.
+  read table %textpool_langu into %textpool_langu_line
+                             with key ID = 'I' key = 'B021'.
+  if sy-subrc is initial.
+    l_text = %textpool_langu_line-entry.
+  else.
+    clear l_text.
+  endif.
+  perform replace_vars(rsaqexce) using l_text 'X'.
+  call method cl_abap_list_utilities=>memory_offset
+    exporting
+      field          = l_text
+      display_offset = 010
+    importing
+      memory_offset  = l_size.
+  if l_size = 0.
+    l_size = 010.
+  endif.
+  write at 018(010) l_text(l_size)  no-gap.
+  write at (1) ' ' no-gap.
+  read table %textpool_langu into %textpool_langu_line
+                             with key ID = 'I' key = 'B031'.
+  if sy-subrc is initial.
+    l_text = %textpool_langu_line-entry.
+  else.
+    clear l_text.
+  endif.
+  perform replace_vars(rsaqexce) using l_text 'X'.
+  call method cl_abap_list_utilities=>memory_offset
+    exporting
+      field          = l_text
+      display_offset = 010
+    importing
+      memory_offset  = l_size.
+  if l_size = 0.
+    l_size = 010.
+  endif.
+  write at 029(010) l_text(l_size)  no-gap.
+  write at (1) ' ' no-gap.
+  read table %textpool_langu into %textpool_langu_line
+                             with key ID = 'I' key = 'B041'.
+  if sy-subrc is initial.
+    l_text = %textpool_langu_line-entry.
+  else.
+    clear l_text.
+  endif.
+  perform replace_vars(rsaqexce) using l_text 'X'.
+  call method cl_abap_list_utilities=>memory_offset
+    exporting
+      field          = l_text
+      display_offset = 016
+    importing
+      memory_offset  = l_size.
+  if l_size = 0.
+    l_size = 016.
+  endif.
+  write at 040(016) l_text(l_size)  no-gap.
+  write at (1) ' ' no-gap.
+  read table %textpool_langu into %textpool_langu_line
+                             with key ID = 'I' key = 'B051'.
+  if sy-subrc is initial.
+    l_text = %textpool_langu_line-entry.
+  else.
+    clear l_text.
+  endif.
+  perform replace_vars(rsaqexce) using l_text 'X'.
+  call method cl_abap_list_utilities=>memory_offset
+    exporting
+      field          = l_text
+      display_offset = 035
+    importing
+      memory_offset  = l_size.
+  if l_size = 0.
+    l_size = 035.
+  endif.
+  write at 057(035) l_text(l_size)  no-gap.
+  write at (1) ' ' no-gap.
+  read table %textpool_langu into %textpool_langu_line
+                             with key ID = 'I' key = 'B061'.
+  if sy-subrc is initial.
+    l_text = %textpool_langu_line-entry.
+  else.
+    clear l_text.
+  endif.
+  perform replace_vars(rsaqexce) using l_text 'X'.
+  call method cl_abap_list_utilities=>memory_offset
+    exporting
+      field          = l_text
+      display_offset = 035
+    importing
+      memory_offset  = l_size.
+  if l_size = 0.
+    l_size = 035.
+  endif.
+  write at 093(035) l_text(l_size)  no-gap.
+  write at (1) ' ' no-gap.
+  read table %textpool_langu into %textpool_langu_line
+                             with key ID = 'I' key = 'B071'.
+  if sy-subrc is initial.
+    l_text = %textpool_langu_line-entry.
+  else.
+    clear l_text.
+  endif.
+  perform replace_vars(rsaqexce) using l_text 'X'.
+  call method cl_abap_list_utilities=>memory_offset
+    exporting
+      field          = l_text
+      display_offset = 016
+    importing
+      memory_offset  = l_size.
+  if l_size = 0.
+    l_size = 016.
+  endif.
+  write at 129(016) l_text(l_size)  no-gap.
+  write at (1) ' ' no-gap.
+  read table %textpool_langu into %textpool_langu_line
+                             with key ID = 'I' key = 'B081'.
+  if sy-subrc is initial.
+    l_text = %textpool_langu_line-entry.
+  else.
+    clear l_text.
+  endif.
+  perform replace_vars(rsaqexce) using l_text 'X'.
+  call method cl_abap_list_utilities=>memory_offset
+    exporting
+      field          = l_text
+      display_offset = 035
+    importing
+      memory_offset  = l_size.
+  if l_size = 0.
+    l_size = 035.
+  endif.
+  write at 146(035) l_text(l_size)  no-gap.
+  write at (1) ' ' no-gap.
+  read table %textpool_langu into %textpool_langu_line
+                             with key ID = 'I' key = 'B091'.
+  if sy-subrc is initial.
+    l_text = %textpool_langu_line-entry.
+  else.
+    clear l_text.
+  endif.
+  perform replace_vars(rsaqexce) using l_text 'X'.
+  call method cl_abap_list_utilities=>memory_offset
+    exporting
+      field          = l_text
+      display_offset = 001
+    importing
+      memory_offset  = l_size.
+  if l_size = 0.
+    l_size = 001.
+  endif.
+  write at 182(001) l_text(l_size)  no-gap.
+  write at (1) ' ' no-gap.
+  write at 183(1) '|' no-gap.
+  new-line.
+  write at (1) '|' no-gap.
+  read table %textpool_langu into %textpool_langu_line
+                             with key ID = 'I' key = 'B101'.
+  if sy-subrc is initial.
+    l_text = %textpool_langu_line-entry.
+  else.
+    clear l_text.
+  endif.
+  perform replace_vars(rsaqexce) using l_text 'X'.
+  call method cl_abap_list_utilities=>memory_offset
+    exporting
+      field          = l_text
+      display_offset = 016
+    importing
+      memory_offset  = l_size.
+  if l_size = 0.
+    l_size = 016.
+  endif.
+  write at 002(016) l_text(l_size)  right-justified  no-gap.
+  write at (1) ' ' no-gap.
+  write at 019(005) ' ' no-gap.
+  write at (1) ' ' no-gap.
+  read table %textpool_langu into %textpool_langu_line
+                             with key ID = 'I' key = 'B121'.
+  if sy-subrc is initial.
+    l_text = %textpool_langu_line-entry.
+  else.
+    clear l_text.
+  endif.
+  perform replace_vars(rsaqexce) using l_text 'X'.
+  call method cl_abap_list_utilities=>memory_offset
+    exporting
+      field          = l_text
+      display_offset = 050
+    importing
+      memory_offset  = l_size.
+  if l_size = 0.
+    l_size = 050.
+  endif.
+  write at 025(050) l_text(l_size)  no-gap.
+  write at (1) ' ' no-gap.
+  read table %textpool_langu into %textpool_langu_line
+                             with key ID = 'I' key = 'B131'.
+  if sy-subrc is initial.
+    l_text = %textpool_langu_line-entry.
+  else.
+    clear l_text.
+  endif.
+  perform replace_vars(rsaqexce) using l_text 'X'.
+  call method cl_abap_list_utilities=>memory_offset
+    exporting
+      field          = l_text
+      display_offset = 018
+    importing
+      memory_offset  = l_size.
+  if l_size = 0.
+    l_size = 018.
+  endif.
+  write at 076(018) l_text(l_size)  no-gap.
+  write at (1) ' ' no-gap.
+  read table %textpool_langu into %textpool_langu_line
+                             with key ID = 'I' key = 'B141'.
+  if sy-subrc is initial.
+    l_text = %textpool_langu_line-entry.
+  else.
+    clear l_text.
+  endif.
+  perform replace_vars(rsaqexce) using l_text 'X'.
+  call method cl_abap_list_utilities=>memory_offset
+    exporting
+      field          = l_text
+      display_offset = 010
+    importing
+      memory_offset  = l_size.
+  if l_size = 0.
+    l_size = 010.
+  endif.
+  write at 095(010) l_text(l_size)  no-gap.
+  write at (1) ' ' no-gap.
+  read table %textpool_langu into %textpool_langu_line
+                             with key ID = 'I' key = 'B151'.
+  if sy-subrc is initial.
+    l_text = %textpool_langu_line-entry.
+  else.
+    clear l_text.
+  endif.
+  perform replace_vars(rsaqexce) using l_text 'X'.
+  call method cl_abap_list_utilities=>memory_offset
+    exporting
+      field          = l_text
+      display_offset = 016
+    importing
+      memory_offset  = l_size.
+  if l_size = 0.
+    l_size = 016.
+  endif.
+  write at 106(016) l_text(l_size)  no-gap.
+  write at (1) ' ' no-gap.
+  read table %textpool_langu into %textpool_langu_line
+                             with key ID = 'I' key = 'B161'.
+  if sy-subrc is initial.
+    l_text = %textpool_langu_line-entry.
+  else.
+    clear l_text.
+  endif.
+  perform replace_vars(rsaqexce) using l_text 'X'.
+  call method cl_abap_list_utilities=>memory_offset
+    exporting
+      field          = l_text
+      display_offset = 035
+    importing
+      memory_offset  = l_size.
+  if l_size = 0.
+    l_size = 035.
+  endif.
+  write at 123(035) l_text(l_size)  no-gap.
+  write at (1) ' ' no-gap.
+  write at 183(1) '|' no-gap.
+  new-line.
+  write at (1) '|' no-gap.
+  read table %textpool_langu into %textpool_langu_line
+                             with key ID = 'I' key = 'B171'.
+  if sy-subrc is initial.
+    l_text = %textpool_langu_line-entry.
+  else.
+    clear l_text.
+  endif.
+  perform replace_vars(rsaqexce) using l_text 'X'.
+  call method cl_abap_list_utilities=>memory_offset
+    exporting
+      field          = l_text
+      display_offset = 015
+    importing
+      memory_offset  = l_size.
+  if l_size = 0.
+    l_size = 015.
+  endif.
+  write at 002(015) l_text(l_size)  no-gap.
+  write at (1) ' ' no-gap.
+  read table %textpool_langu into %textpool_langu_line
+                             with key ID = 'I' key = 'B181'.
+  if sy-subrc is initial.
+    l_text = %textpool_langu_line-entry.
+  else.
+    clear l_text.
+  endif.
+  perform replace_vars(rsaqexce) using l_text 'X'.
+  call method cl_abap_list_utilities=>memory_offset
+    exporting
+      field          = l_text
+      display_offset = 010
+    importing
+      memory_offset  = l_size.
+  if l_size = 0.
+    l_size = 010.
+  endif.
+  write at 018(010) l_text(l_size)  no-gap.
+  write at (1) ' ' no-gap.
+  read table %textpool_langu into %textpool_langu_line
+                             with key ID = 'I' key = 'B191'.
+  if sy-subrc is initial.
+    l_text = %textpool_langu_line-entry.
+  else.
+    clear l_text.
+  endif.
+  perform replace_vars(rsaqexce) using l_text 'X'.
+  call method cl_abap_list_utilities=>memory_offset
+    exporting
+      field          = l_text
+      display_offset = 001
+    importing
+      memory_offset  = l_size.
+  if l_size = 0.
+    l_size = 001.
+  endif.
+  write at 029(001) l_text(l_size)  no-gap.
+  write at (1) ' ' no-gap.
+  read table %textpool_langu into %textpool_langu_line
+                             with key ID = 'I' key = 'B201'.
+  if sy-subrc is initial.
+    l_text = %textpool_langu_line-entry.
+  else.
+    clear l_text.
+  endif.
+  perform replace_vars(rsaqexce) using l_text 'X'.
+  call method cl_abap_list_utilities=>memory_offset
+    exporting
+      field          = l_text
+      display_offset = 060
+    importing
+      memory_offset  = l_size.
+  if l_size = 0.
+    l_size = 060.
+  endif.
+  write at 031(060) l_text(l_size)  no-gap.
+  write at (1) ' ' no-gap.
+  read table %textpool_langu into %textpool_langu_line
+                             with key ID = 'I' key = 'B211'.
+  if sy-subrc is initial.
+    l_text = %textpool_langu_line-entry.
+  else.
+    clear l_text.
+  endif.
+  perform replace_vars(rsaqexce) using l_text 'X'.
+  call method cl_abap_list_utilities=>memory_offset
+    exporting
+      field          = l_text
+      display_offset = 018
+    importing
+      memory_offset  = l_size.
+  if l_size = 0.
+    l_size = 018.
+  endif.
+  write at 092(018) l_text(l_size)  no-gap.
+  write at (1) ' ' no-gap.
+  read table %textpool_langu into %textpool_langu_line
+                             with key ID = 'I' key = 'B221'.
+  if sy-subrc is initial.
+    l_text = %textpool_langu_line-entry.
+  else.
+    clear l_text.
+  endif.
+  perform replace_vars(rsaqexce) using l_text 'X'.
+  call method cl_abap_list_utilities=>memory_offset
+    exporting
+      field          = l_text
+      display_offset = 003
+    importing
+      memory_offset  = l_size.
+  if l_size = 0.
+    l_size = 003.
+  endif.
+  write at 111(003) l_text(l_size)  no-gap.
+  write at (1) ' ' no-gap.
+  write at 183(1) '|' no-gap.
+  new-line.
+endform.
+
+
+form %clear02.
+
+  clear %g00-REGUP-WRBTR.
+  clear %g00-REGUH-WAERS-0201.
+  clear %g00-REGUP-SGTXT.
+  clear %g00-REGUP-ZUONR.
+  clear %g00-REGUP-BUDAT.
+  clear %g00-REGUP-XBLNR.
+  clear %g00-REGUH-ORT01.
+  perform %clear03.
+
+endform.
+
+
+form %clear03.
+
+  clear %g00-REGUH-BNKL1.
+  clear %g00-REGUP-BLDAT.
+  clear %g00-REGUP-SHKZG.
+  clear %g00-REGUH-KOINH.
+  clear %g00-REGUH-BNKN1.
+  clear %g00-REGUH-REGIO.
+
+endform.
+
+
+form %output_gl.
+
+if %max_prlist <> 0.
+  read table %prlist with key tab = 'GGG'.
+  if sy-subrc <> 0.
+    exit.
+  endif.
+endif.
+set margin 00.
+perform complete_page(rsaqexce).
+%nochange = space.
+new-page.
+refresh %wa020.
+refresh %w0100.
+%glline   = 0.
+%tab      = 'G00'.
+%line     = 0.
+%cont     = '0'.
+%fint     = space.
+%fcol     = '0'.
+%head     = 'GGG'.
+%cline    = 0.
+%outflag  = space.
+%outcomp  = space.
+%outtotal = space.
+%rflag    = 'AA'.
+if %diact <> space and %diact na 'SWE'. write space. endif.
+format reset.
+loop.
+  %data_selected = 'X'.
+  at %fg01.
+    %znr = '01'.
+    %zgr = '01'.
+    %cline = %cline + 1.
+    perform %clear02.
+    %g00-REGUP-ZBUKR = REGUP-ZBUKR.
+    %g00-REGUP-VBLNR = REGUP-VBLNR.
+    %g00-REGUP-BELNR = REGUP-BELNR.
+    %g00-REGUP-LIFNR = REGUP-LIFNR.
+    %g00-EGRESO = EGRESO.
+    %g00-REGUH-NAME1 = REGUH-NAME1.
+    %g00-REGUH-STRAS = REGUH-STRAS.
+    %g00-REGUH-STCD1 = REGUH-STCD1.
+    %g00-REGUH-ZNME1 = REGUH-ZNME1.
+    %g00-REGUP-ZLSCH = REGUP-ZLSCH.
+    if %first <> space. append %g00. endif.
+    %glline = %glline + 1.
+    %lznr = %znr.
+    if %diact <> space and %diact na 'SWE'. continue. endif.
+    perform check(rsaqexce) using ' '.
+    if %rflag = 'E'. exit. endif.
+    if %rflag = 'AA'.
+      perform reserve(rsaqexce) using 003.
+    endif.
+    if %rflag(1) = 'A'.
+    format reset.
+    %fint = 'F'. %fcol = '0'.
+    format color 2. %fcol = '2'.
+    perform %newline.
+    write 002(004) REGUP-ZBUKR.
+    %line = %glline.
+    perform %hide.
+    %line = 0.
+    if %rflag = 'AA'. hide %cline. endif. hide %zgr.
+    perform %hide_color.
+    write 007(010) REGUP-VBLNR.
+    write 018(010) REGUP-BELNR.
+    write 029(010) REGUP-LIFNR.
+    write 040(016) EGRESO.
+    write 057(035) REGUH-NAME1.
+    write 093(035) REGUH-STRAS.
+    write 129(016) REGUH-STCD1.
+    write 146(035) REGUH-ZNME1.
+    write 182(001) REGUP-ZLSCH.
+    endif.
+  endat.
+  at %fg02.
+    %znr = '02'.
+    %zgr = '01'.
+    if %znr > %lznr.
+      read table %g00 index %glline.
+    endif.
+    perform %clear03.
+    %g00-REGUP-WRBTR = REGUP-WRBTR.
+    %g00-REGUH-WAERS-0201 = REGUH-WAERS.
+    %g00-REGUP-SGTXT = REGUP-SGTXT.
+    %g00-REGUP-ZUONR = REGUP-ZUONR.
+    %g00-REGUP-BUDAT = REGUP-BUDAT.
+    %g00-REGUP-XBLNR = REGUP-XBLNR.
+    %g00-REGUH-ORT01 = REGUH-ORT01.
+    if %znr > %lznr.
+      if %first <> space. modify %g00 index %glline. endif.
+    else.
+      if %first <> space. append %g00. endif.
+      %glline = %glline + 1.
+    endif.
+    %lznr = %znr.
+    if %diact <> space and %diact na 'SWE'. continue. endif.
+    perform check(rsaqexce) using ' '.
+    if %rflag = 'E'. exit. endif.
+    if %rflag(1) = 'A'.
+    format reset.
+    %fint = 'F'. %fcol = '0'.
+    format color 2. %fcol = '2'.
+    perform %newline.
+    write 002(016) REGUP-WRBTR
+      currency REGUH-WAERS.
+    %line = %glline.  %cont = '1'.
+    perform %hide.
+    %line = 0.  %cont = '0'.
+    if %rflag = 'AA'. hide %cline. endif. hide %zgr.
+    perform %hide_color.
+    write 019(005) REGUH-WAERS.
+    write 025(050) REGUP-SGTXT.
+    write 076(018) REGUP-ZUONR.
+    write 095(010) REGUP-BUDAT.
+    write 106(016) REGUP-XBLNR.
+    write 123(035) REGUH-ORT01.
+    endif.
+  endat.
+  at %fg03.
+    %znr = '03'.
+    %zgr = '01'.
+    if %znr > %lznr.
+      read table %g00 index %glline.
+    endif.
+    %g00-REGUH-BNKL1 = REGUH-BNKL1.
+    %g00-REGUP-BLDAT = REGUP-BLDAT.
+    %g00-REGUP-SHKZG = REGUP-SHKZG.
+    %g00-REGUH-KOINH = REGUH-KOINH.
+    %g00-REGUH-BNKN1 = REGUH-BNKN1.
+    %g00-REGUH-REGIO = REGUH-REGIO.
+    if %znr > %lznr.
+      if %first <> space. modify %g00 index %glline. endif.
+    else.
+      if %first <> space. append %g00. endif.
+      %glline = %glline + 1.
+    endif.
+    %lznr = %znr.
+    if %diact <> space and %diact na 'SWE'. continue. endif.
+    perform check(rsaqexce) using ' '.
+    if %rflag = 'E'. exit. endif.
+    if %rflag(1) = 'A'.
+    format reset.
+    %fint = 'F'. %fcol = '0'.
+    format color 2. %fcol = '2'.
+    perform %newline.
+    write 002(015) REGUH-BNKL1.
+    %line = %glline.  %cont = '2'.
+    perform %hide.
+    %line = 0.  %cont = '0'.
+    if %rflag = 'AA'. hide %cline. endif. hide %zgr.
+    perform %hide_color.
+    write 018(010) REGUP-BLDAT.
+    write 029(001) REGUP-SHKZG.
+    write 031(060) REGUH-KOINH.
+    write 092(018) REGUH-BNKN1.
+    write 111(003) REGUH-REGIO.
+    endif.
+  endat.
+  at %fgwrREGUP02.
+    clear %w0100.
+    %w0100-REGUH-WAERS = REGUH-WAERS.
+    %w0100-REGUP-WRBTR = REGUP-WRBTR.
+    collect %w0100.
+  endat.
+  at last.
+    %znr = 0.
+    %rflag = 'AA'.
+    %outtotal = 'X'.
+    perform reserve(rsaqexce) using 2.
+    perform %uline.
+    format reset.
+    format intensified on color 3.
+    %fint = 'N'. %fcol = '3'.
+    %nochange = 'X'.
+    perform %newline.
+    %nochange = space.
+    write (12) text-f02.
+    perform %hide.
+    perform %hide_color.
+    sort %w0100 by REGUH-WAERS.
+      perform %newline.
+      write 025 '*'.
+      refresh %wa020.
+      do.
+        %subrc = 4.
+        clear %wa020.
+        read table %w0100 index sy-index.
+        if sy-subrc = 0.
+          %subrc = 0.
+          %wa020-REGUP-REGUH-WAERS = %w0100-REGUH-WAERS.
+          %wa020-REGUP-WRBTR = %w0100-REGUP-WRBTR.
+        endif.
+        if %subrc = 4.
+          exit.
+        endif.
+        append %wa020.
+      enddo.
+      loop at %wa020.
+        if sy-tabix <> 1.
+          perform %newline.
+        endif.
+        if %wa020-REGUP-REGUH-WAERS = space.
+          write 002(016) %wa020-REGUP-WRBTR
+                currency %wa020-REGUP-REGUH-WAERS no-zero.
+          if not %wa020-REGUP-WRBTR is initial.
+            %keyempty = 'X'.
+          endif.
+        else.
+          write 002(016) %wa020-REGUP-WRBTR
+                currency %wa020-REGUP-REGUH-WAERS.
+        endif.
+        write 019(005) %wa020-REGUP-REGUH-WAERS.
+        perform %hide.
+        perform %hide_color.
+      endloop.
+  endat.
+endloop.
+%rflag = 'AA'.
+perform %uline.
+clear: %cline, %zgr.
+
+endform.
+
+
+
+module %init_view output.
+
+  case %tab.
+  when 'G00'.
+    perform init_pbo(rsaqexce) tables %g00 using tview100 'X'.
+  when others.
+    message s860(aq).
+  endcase.
+
+endmodule.
+
+module %pbo_view output.
+
+  case %tab.
+  when 'G00'.
+    perform loop_pbo(rsaqexce) tables %g00 using %%g00 tview100.
+  endcase.
+
+endmodule.
+
+module %pai_view input.
+
+  case %tab.
+  when 'G00'.
+    perform loop_pai(rsaqexce) tables %g00 using %%g00 tview100.
+  endcase.
+
+endmodule.
+
+module %okcode_view input.
+
+  case %tab.
+  when 'G00'.
+    perform okcode(rsaqexce) tables %g00 using tview100.
+  endcase.
+
+endmodule. 
