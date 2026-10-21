@@ -1,3 +1,144 @@
+Simbolos de texto
+%Z0	Rango
+%Z1	Total
+%Z2	Ctd.
+%Z3	Cuota
+%Z4	en %
+%Z5	Prom.
+%Z6	Valor
+A00	Sociedad pagadora
+A01	Número del documento de pago
+A02	Número de un documento contable
+A03	Número de cuenta del proveedor o acreedor
+A04	egreso
+A05	Nombre 1
+A06	Calle y nº
+A07	Número de identificación fiscal 1
+A08	Nombre del receptor del pago
+A09	Vía de pago
+A10	Importe en la moneda del documento
+A11	Clave de moneda
+A12	Texto posición
+A13	Número de asignación
+A14	Fecha de contabilización en el documento
+A15	Número de documento de referencia
+A16	Población
+A17	Clave de banco
+A18	Fecha de documento en documento
+A19	Indicador debe/haber
+A20	Titular de la cuenta
+A21	Nº cuenta bancaria
+A22	Región (Estado federal, "land", provincia, condado)
+B00	Soc.pag.
+B00	Soc.pag.
+B01	Pago
+B01	Pago
+B02	Nº doc.
+B02	Nº doc.
+B03	Acreedor
+B03	Acreedor
+B04	Comprobante de egreso
+B04	Comprobante de egreso
+B05	Nombre 1
+B05	Nombre 1
+B06	Calle
+B06	Calle
+B07	Nº ident.fis.1
+B07	Nº ident.fis.1
+B08	Nombre del receptor del pago
+B08	Nombre del receptor del pago
+B09	VP
+B09	VP
+B10	Importe
+B10	Importe
+B11	Mon.
+B11	Mon.
+B12	Texto
+B12	Texto
+B13	Asignación
+B13	Asignación
+B14	Fe.contab.
+B14	Fe.contab.
+B15	Referencia
+B15	Referencia
+B16	Población
+B16	Población
+B17	Clave banco
+B17	Clave banco
+B18	Fecha doc.
+B18	Fecha doc.
+B19	D/H
+B19	D/H
+B20	Titular de la cuenta
+B20	Titular de la cuenta
+B21	Cuenta bancaria
+B21	Cuenta bancaria
+B22	Rg
+B22	Rg
+F01	Total
+F02	Total general
+F03	Cantidad
+F04	Cantidad total
+F05	Fichero
+F13	(Continuación)
+F15	Ctd.total
+F16	Porcentaje
+F17	Promedio
+F18	Rango
+F40	Fecha conversión moneda
+F41	Tp.cotiz.
+F42	Moneda referencia (opcional)
+F43	Ctd.posiciones lista ranking
+F57	Opciones
+F58	Delimit.programa
+F59	Formato de salida
+F60	Hoja de cálculo
+F61	Función gráfica
+F62	Grabar con identificación
+F63	Info.dirección - Sistema EIS
+F64	Archivo fichero
+F65	Archivo personal
+F66	Lista ABAP
+F67	Ident.
+F68	Visualizar como tabla
+F69	Tratamiento de textos
+F70	Análisis ABC
+F71	Fichero
+F72	List Viewer ABAP
+F73	Archivo ampliado
+F74	Función
+F75	Variante de layout
+GH0	|Soc. Pago       Nº doc.    Acreedor   Comprobante de e Nombre 1                            Calle                               Nº i
+GH0	|        Importe        Texto                                              Asignación         Fe.contab. Referencia       Población
+GH0	|Clave banco     Fecha doc. D Titular de la cuenta                                         Cuenta bancaria    Rg
+GRL	LIstado de pagos
+H00	Datos de pago del programa de pagos
+H01	Posiciones tratadas del programa de pagos
+
+Tesxtos de selección
+%ABC	Análisis ABC
+%ALV	List Viewer ABAP
+%ALVL	Variante de layout
+%DOWN	Archivo fichero
+%EIS	Info.dirección - Sistema EIS
+%EXCEL	Hoja de cálculo
+%GRAPH	Función gráfica
+%LISTID	Ident.
+%NOFUNC	Lista ABAP
+%PATH	Fichero
+%PRIV	Archivo personal
+%SAVE	Grabar con identificación
+%TEXT	Tratamiento de textos
+%TVIEW	Visualizar como tabla
+%XINT	Archivo ampliado
+%XINTK	Función
+SP$00003	Sociedad pagadora
+SP$00004	Fecha en la que debe ejecutars
+SP$00005	Número del documento de pago
+SP$00006	Número de un documento contabl
+SP$00007	Vía de pago
+
+
 report AQCSTR==========ZTR_0001======
    line-size 183 no standard page heading line-count 000(001).
 
