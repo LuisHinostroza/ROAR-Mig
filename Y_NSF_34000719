@@ -1,3 +1,429 @@
+Paso 1. Basic de cabecera: ZI_LP_PagoCab
+
+En ADT: botón derecho en tu paquete → New → Other ABAP Repository Object → Core Data Services → Data Definition. Nombre ZI_LP_PAGOCAB, plantilla Define View Entity.
+
+abap
+@AccessControl.authorizationCheck: #NOT_REQUIRED
+@EndUserText.label: 'Listado de pagos - Datos de pago (REGUH)'
+@ObjectModel.usageType: {
+  serviceQuality: #C,
+  sizeCategory:   #XL,
+  dataClass:      #TRANSACTIONAL
+}
+/*
+  Cabecera del pago (REGUH) + Comprobante de egreso (BKPF-XBLNR del doc. de pago).
+  El original hacía SELECT SINGLE xblnr FROM bkpf WHERE belnr = reguh-vblnr
+  (sin BUKRS ni GJAHR -> no determinista). Aquí se une por sociedad pagadora,
+  número de documento de pago y fecha de contabilización (ZALDT = BUDAT del pago).
+*/
+define view entity ZI_LP_PagoCab
+  as select from    reguh
+    left outer join bkpf on  bkpf.bukrs = reguh.zbukr
+                         and bkpf.belnr = reguh.vblnr
+                         and bkpf.budat = reguh.zaldt
+{
+  key reguh.laufd as PaymentRunDate,
+  key reguh.laufi as PaymentRunId,
+  key reguh.xvorl as IsProposalRun,
+  key reguh.zbukr as PayingCompanyCode,
+  key reguh.lifnr as Supplier,
+  key reguh.kunnr as Customer,
+  key reguh.empfg as PayeeCode,
+  key reguh.vblnr as PaymentDocument,
+      reguh.zaldt as PaymentPostingDate,
+      reguh.waers as PaymentCurrency,
+      reguh.name1 as Name1,
+      reguh.stras as Street,
+      reguh.ort01 as City,
+      reguh.regio as Region,
+      reguh.stcd1 as TaxNumber1,
+      reguh.znme1 as PayeeName,
+      reguh.bnkl1 as BankKey,
+      reguh.bnkn1 as BankAccount,
+      reguh.koinh as AccountHolder,
+      bkpf.xblnr  as PaymentReference
+}
+
+Activa con Ctrl+F3.
+
+Paso 2. Basic de posiciones: ZI_LP_PagoPos
+abap
+@AccessControl.authorizationCheck: #NOT_REQUIRED
+@EndUserText.label: 'Listado de pagos - Posiciones pagadas (REGUP)'
+@ObjectModel.usageType: {
+  serviceQuality: #C,
+  sizeCategory:   #XL,
+  dataClass:      #TRANSACTIONAL
+}
+define view entity ZI_LP_PagoPos
+  as select from regup
+{
+  key laufd as PaymentRunDate,
+  key laufi as PaymentRunId,
+  key xvorl as IsProposalRun,
+  key zbukr as PayingCompanyCode,
+  key lifnr as Supplier,
+  key kunnr as Customer,
+  key empfg as PayeeCode,
+  key vblnr as PaymentDocument,
+  key bukrs as CompanyCode,
+  key belnr as AccountingDocument,
+  key gjahr as FiscalYear,
+  key buzei as AccountingDocumentItem,
+      zlsch as PaymentMethod,
+      @Semantics.amount.currencyCode: 'DocumentCurrency'
+      wrbtr as AmountInDocCurrency,
+      waers as DocumentCurrency,
+      sgtxt as ItemText,
+      zuonr as AssignmentReference,
+      budat as PostingDate,
+      bldat as DocumentDate,
+      xblnr as DocumentReference,
+      shkzg as DebitCreditCode
+}
+Paso 3. Composite: ZI_LP_ListadoPagos
+abap
+@AccessControl.authorizationCheck: #NOT_REQUIRED
+@EndUserText.label: 'Listado de pagos - Composite'
+@ObjectModel.usageType: {
+  serviceQuality: #C,
+  sizeCategory:   #XL,
+  dataClass:      #TRANSACTIONAL
+}
+define view entity ZI_LP_ListadoPagos
+  as select from ZI_LP_PagoPos as Pos
+    inner join   ZI_LP_PagoCab as Cab on  Cab.PaymentRunDate    = Pos.PaymentRunDate
+                                      and Cab.PaymentRunId      = Pos.PaymentRunId
+                                      and Cab.IsProposalRun     = Pos.IsProposalRun
+                                      and Cab.PayingCompanyCode = Pos.PayingCompanyCode
+                                      and Cab.Supplier          = Pos.Supplier
+                                      and Cab.Customer          = Pos.Customer
+                                      and Cab.PayeeCode         = Pos.PayeeCode
+                                      and Cab.PaymentDocument   = Pos.PaymentDocument
+{
+  key Pos.PaymentRunDate,
+  key Pos.PaymentRunId,
+  key Pos.IsProposalRun,
+  key Pos.PayingCompanyCode,
+  key Pos.Supplier,
+  key Pos.Customer,
+  key Pos.PayeeCode,
+  key Pos.PaymentDocument,
+  key Pos.CompanyCode,
+  key Pos.AccountingDocument,
+  key Pos.FiscalYear,
+  key Pos.AccountingDocumentItem,
+
+      // Datos de pago (REGUH)
+      Cab.PaymentReference,
+      Cab.Name1,
+      Cab.Street,
+      Cab.TaxNumber1,
+      Cab.PayeeName,
+      Cab.City,
+      Cab.BankKey,
+      Cab.AccountHolder,
+      Cab.BankAccount,
+      Cab.Region,
+      Cab.PaymentCurrency,
+
+      // Posiciones tratadas (REGUP)
+      Pos.PaymentMethod,
+      @Semantics.amount.currencyCode: 'DocumentCurrency'
+      Pos.AmountInDocCurrency,
+      Pos.DocumentCurrency,
+      Pos.ItemText,
+      Pos.AssignmentReference,
+      Pos.PostingDate,
+      Pos.DocumentReference,
+      Pos.DocumentDate,
+      Pos.DebitCreditCode
+}
+// Solo ejecuciones productivas: equivale a "Sólo ejecución de propuesta" desmarcado
+where Pos.IsProposalRun = ''
+Paso 4. Consumption: ZC_LP_ListadoPagos (modificada)
+
+Cambios respecto a la versión anterior:
+
+Solo la fecha de ejecución es obligatoria.
+Sociedad pagadora deja de ser obligatoria.
+Se agregan ayudas de búsqueda en Sociedad emisora.
+abap
+@AccessControl.authorizationCheck: #CHECK
+@EndUserText.label: 'Listado de pagos'
+@Metadata.allowExtensions: true
+@ObjectModel.usageType: {
+  serviceQuality: #C,
+  sizeCategory:   #XL,
+  dataClass:      #TRANSACTIONAL
+}
+define view entity ZC_LP_ListadoPagos
+  as select from ZI_LP_ListadoPagos
+{
+      // Fecha ejec. programa (LDB PYF) - única obligatoria
+      @Consumption.filter: { mandatory: true, selectionType: #INTERVAL, multipleSelections: false }
+  key PaymentRunDate,
+      // Característica identificación (LDB PYF)
+  key PaymentRunId,
+  key IsProposalRun,
+      // Sociedad pagadora - opcional, la corrida ya acota las sociedades
+      @Consumption.valueHelpDefinition: [{ entity: { name: 'I_CompanyCodeStdVH', element: 'CompanyCode' } }]
+  key PayingCompanyCode,
+      @Consumption.valueHelpDefinition: [{ entity: { name: 'I_Supplier_VH', element: 'Supplier' } }]
+  key Supplier,
+  key Customer,
+  key PayeeCode,
+  key PaymentDocument,
+      // Sociedad emisora (REGUP-BUKRS)
+      @Consumption.valueHelpDefinition: [{ entity: { name: 'I_CompanyCodeStdVH', element: 'CompanyCode' } }]
+  key CompanyCode,
+  key AccountingDocument,
+  key FiscalYear,
+  key AccountingDocumentItem,
+
+      PaymentReference,
+      Name1,
+      Street,
+      TaxNumber1,
+      PayeeName,
+      PaymentMethod,
+
+      @Semantics.amount.currencyCode: 'DocumentCurrency'
+      @Aggregation.default: #SUM
+      AmountInDocCurrency,
+      DocumentCurrency,
+      PaymentCurrency,
+
+      ItemText,
+      AssignmentReference,
+      PostingDate,
+      DocumentReference,
+      City,
+      BankKey,
+      DocumentDate,
+      DebitCreditCode,
+      AccountHolder,
+      BankAccount,
+      Region
+}
+Paso 5. Metadata Extension: ZC_LP_ListadoPagos (modificada)
+
+En ADT: New → Other → Core Data Services → Metadata Extension. Nombre ZC_LP_LISTADOPAGOS.
+
+Los filtros quedan en el mismo orden que la pantalla de R/3: Fecha, Identificación, Soc. pagadora, Soc. emisora, Nº doc., Pago y VP.
+
+abap
+@Metadata.layer: #CUSTOMER
+@UI.headerInfo: {
+  typeName:       'Pago',
+  typeNamePlural: 'Listado de pagos',
+  title:          { value: 'PaymentDocument' },
+  description:    { value: 'Name1' }
+}
+@UI.presentationVariant: [{
+  sortOrder: [ { by: 'PayingCompanyCode',  direction: #ASC },
+               { by: 'PaymentDocument',    direction: #ASC },
+               { by: 'AccountingDocument', direction: #ASC } ],
+  visualizations: [{ type: #AS_LINEITEM }]
+}]
+annotate entity ZC_LP_ListadoPagos with
+{
+  // ================= Filtros (orden de la pantalla R/3) =================
+
+  @EndUserText.label: 'Fecha ejec. programa'
+  @UI.selectionField: [{ position: 10 }]
+  PaymentRunDate;
+
+  @EndUserText.label: 'Identificación'
+  @UI.selectionField: [{ position: 20 }]
+  PaymentRunId;
+
+  @UI.hidden: true
+  IsProposalRun;
+
+  @EndUserText.label: 'Soc.pag.'
+  @UI.selectionField: [{ position: 30 }]
+  @UI.lineItem: [{ position: 10, importance: #HIGH }]
+  PayingCompanyCode;
+
+  @EndUserText.label: 'Sociedad emisora'
+  @UI.selectionField: [{ position: 40 }]
+  CompanyCode;
+
+  @EndUserText.label: 'Nº doc.'
+  @UI.selectionField: [{ position: 50 }]
+  @UI.lineItem: [{ position: 30, importance: #HIGH }]
+  AccountingDocument;
+
+  @EndUserText.label: 'Pago'
+  @UI.selectionField: [{ position: 60 }]
+  @UI.lineItem: [{ position: 20, importance: #HIGH }]
+  PaymentDocument;
+
+  @EndUserText.label: 'VP'
+  @UI.selectionField: [{ position: 70 }]
+  @UI.lineItem: [{ position: 100, importance: #MEDIUM }]
+  PaymentMethod;
+
+  // ================= Columnas (orden de la query original) =================
+
+  @EndUserText.label: 'Acreedor'
+  @UI.lineItem: [{ position: 40, importance: #HIGH }]
+  Supplier;
+
+  @EndUserText.label: 'Comprobante de egreso'
+  @UI.lineItem: [{ position: 50, importance: #HIGH }]
+  PaymentReference;
+
+  @EndUserText.label: 'Nombre 1'
+  @UI.lineItem: [{ position: 60, importance: #HIGH }]
+  Name1;
+
+  @EndUserText.label: 'Calle'
+  @UI.lineItem: [{ position: 70, importance: #LOW }]
+  Street;
+
+  @EndUserText.label: 'Nº ident.fis.1'
+  @UI.lineItem: [{ position: 80, importance: #MEDIUM }]
+  TaxNumber1;
+
+  @EndUserText.label: 'Nombre del receptor del pago'
+  @UI.lineItem: [{ position: 90, importance: #MEDIUM }]
+  PayeeName;
+
+  @EndUserText.label: 'Importe'
+  @UI.lineItem: [{ position: 110, importance: #HIGH }]
+  AmountInDocCurrency;
+
+  @EndUserText.label: 'Mon.'
+  DocumentCurrency;
+
+  @EndUserText.label: 'Moneda pago'
+  PaymentCurrency;
+
+  @EndUserText.label: 'Texto'
+  @UI.lineItem: [{ position: 130, importance: #MEDIUM }]
+  ItemText;
+
+  @EndUserText.label: 'Asignación'
+  @UI.lineItem: [{ position: 140, importance: #LOW }]
+  AssignmentReference;
+
+  @EndUserText.label: 'Fe.contab.'
+  @UI.lineItem: [{ position: 150, importance: #MEDIUM }]
+  PostingDate;
+
+  @EndUserText.label: 'Referencia'
+  @UI.lineItem: [{ position: 160, importance: #MEDIUM }]
+  DocumentReference;
+
+  @EndUserText.label: 'Población'
+  @UI.lineItem: [{ position: 170, importance: #LOW }]
+  City;
+
+  @EndUserText.label: 'Clave banco'
+  @UI.lineItem: [{ position: 180, importance: #LOW }]
+  BankKey;
+
+  @EndUserText.label: 'Fecha doc.'
+  @UI.lineItem: [{ position: 190, importance: #LOW }]
+  DocumentDate;
+
+  @EndUserText.label: 'D/H'
+  @UI.lineItem: [{ position: 200, importance: #LOW }]
+  DebitCreditCode;
+
+  @EndUserText.label: 'Titular de la cuenta'
+  @UI.lineItem: [{ position: 210, importance: #LOW }]
+  AccountHolder;
+
+  @EndUserText.label: 'Cuenta bancaria'
+  @UI.lineItem: [{ position: 220, importance: #LOW }]
+  BankAccount;
+
+  @EndUserText.label: 'Rg'
+  @UI.lineItem: [{ position: 230, importance: #LOW }]
+  Region;
+
+  // ====== Claves técnicas: disponibles en personalización, no visibles por defecto ======
+
+  @EndUserText.label: 'Deudor'
+  Customer;
+
+  @EndUserText.label: 'Receptor pago'
+  PayeeCode;
+
+  @EndUserText.label: 'Ejercicio'
+  FiscalYear;
+
+  @EndUserText.label: 'Posición'
+  AccountingDocumentItem;
+}
+Paso 6. DCL: ZRL_LP_LISTADOPAGOS
+
+En ADT: New → Other → Core Data Services → Access Control.
+
+abap
+@EndUserText.label: 'Autorización Listado de pagos'
+@MappingRole: true
+define role ZRL_LP_LISTADOPAGOS {
+  grant select on ZC_LP_ListadoPagos
+    where ( PayingCompanyCode ) = aspect pfcg_auth( F_BKPF_BUK, BUKRS, ACTVT = '03' );
+}
+Paso 7. Service Definition: ZSD_LP_LISTADOPAGOS
+
+En ADT: botón derecho sobre ZC_LP_ListadoPagos → New Service Definition.
+
+abap
+@EndUserText.label: 'Listado de pagos'
+define service ZSD_LP_LISTADOPAGOS {
+  expose ZC_LP_ListadoPagos as ListadoPagos;
+}
+Paso 8. Service Binding: ZSB_LP_LISTADOPAGOS
+Botón derecho sobre ZSD_LP_LISTADOPAGOS → New Service Binding.
+Nombre ZSB_LP_LISTADOPAGOS, Binding Type OData V4 - UI.
+Activa y pulsa Publish.
+Selecciona la entidad ListadoPagos → Preview. Prueba con la corrida de la captura (11.11.2009 / MX03T) y compara contra R/3.
+Paso 9. App en VS Code (Fiori tools)
+Ctrl+Shift+P → Fiori: Open Application Generator → List Report Page.
+Data Source: Connect to a System → tu sistema → servicio ZSB_LP_LISTADOPAGOS.
+Main Entity: ListadoPagos. Navigation entity: None.
+Datos del proyecto: module name (por ejemplo zlistadopagos), título "Listado de pagos" y el namespace del cliente.
+En webapp/manifest.json, busca el target ListadoPagosList y deja su bloque options así, para que salga el total por moneda:
+json
+"options": {
+  "settings": {
+    "contextPath": "/ListadoPagos",
+    "variantManagement": "Page",
+    "initialLoad": "Disabled",
+    "controlConfiguration": {
+      "@com.sap.vocabularies.UI.v1.LineItem": {
+        "tableSettings": {
+          "type": "AnalyticalTable",
+          "selectionMode": "None",
+          "enableExport": true
+        }
+      }
+    }
+  }
+}
+Prueba local con npm start.
+Paso 10. Despliegue
+
+Con conexión directa al sistema:
+
+npx fiori add deploy-config → ABAP, nombre de la BSP (por ejemplo ZLISTADOPAGOS), paquete y orden de transporte.
+npm run deploy.
+
+Sin conexión directa:
+
+npm run build, que genera la carpeta dist.
+En SE38, ejecuta /UI5/UI5_REPOSITORY_LOAD y sube el contenido de dist a la BSP.
+
+Al final falta el tile en el Launchpad (catálogo, target mapping y rol), como en Contrapartida.
+
+Si al publicar el binding o en el preview no aparecen los totales, quita @Aggregation.default: #SUM en el Paso 4 y cambia AnalyticalTable por ResponsiveTable en el manifest. Es la única pieza que depende del release.
+
 Simbolos de texto
 %Z0	Rango
 %Z1	Total
