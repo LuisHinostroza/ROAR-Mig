@@ -117,7 +117,7 @@
               "controlConfiguration": {
                 "@com.sap.vocabularies.UI.v1.LineItem": {
                   "tableSettings": {
-                    "type": "AnalyticalTable",
+                    "type": "GridTable",
                     "selectionMode": "None",
                     "enableExport": true
                   }
@@ -150,6 +150,7 @@
     }
   }
 }
+
 
 Paso 1. Basic de cabecera: ZI_LP_PagoCab
 
