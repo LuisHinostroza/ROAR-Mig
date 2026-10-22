@@ -1,36 +1,19 @@
 {
   "_version": "1.60.0",
   "sap.app": {
-    "id": "mapfre.fi.zmfilistadopagos",
+    "id": "mapfre.fi.contrapartida",
     "type": "application",
     "i18n": "i18n/i18n.properties",
     "applicationVersion": {
-      "version": "0.0.1"
+      "version": "1.1.0"
     },
-    "title": "{{appTitle}}",
-    "description": "{{appDescription}}",
-    "resources": "resources.json",
-    "sourceTemplate": {
-      "id": "@sap/generator-fiori:lrop",
-      "version": "1.33.0",
-      "toolsId": "fef01a0d-5006-4891-bc9d-c66cd46a5248"
-    },
+    "title": "Contrapartida",
+    "description": "Contrapartida",
     "dataSources": {
-      "annotation": {
-        "type": "ODataAnnotation",
-        "uri": "annotations/annotation.xml",
-        "settings": {
-          "localUri": "annotations/annotation.xml"
-        }
-      },
       "mainService": {
-        "uri": "/sap/opu/odata4/sap/zsb_lp_listadopagos/srvd/sap/zsd_lp_listadopagos/0001/",
+        "uri": "/sap/opu/odata4/sap/zsb_contrapartida/srvd/sap/zsd_contrapartida/0001/",
         "type": "OData",
         "settings": {
-          "annotations": [
-            "annotation"
-          ],
-          "localUri": "localService/mainService/metadata.xml",
           "odataVersion": "4.0"
         }
       }
@@ -70,7 +53,7 @@
       "i18n": {
         "type": "sap.ui.model.resource.ResourceModel",
         "settings": {
-          "bundleName": "mapfre.fi.zmfilistadopagos.i18n.i18n"
+          "bundleName": "mapfre.fi.contrapartida.i18n.i18n"
         }
       },
       "": {
@@ -81,10 +64,6 @@
           "autoExpandSelect": true,
           "earlyRequests": true
         }
-      },
-      "@i18n": {
-        "type": "sap.ui.model.resource.ResourceModel",
-        "uri": "i18n/i18n.properties"
       }
     },
     "resources": {
@@ -95,23 +74,18 @@
       "routes": [
         {
           "pattern": ":?query:",
-          "name": "ListadoPagosList",
-          "target": "ListadoPagosList"
-        },
-        {
-          "pattern": "ListadoPagos({key}):?query:",
-          "name": "ListadoPagosObjectPage",
-          "target": "ListadoPagosObjectPage"
+          "name": "ContrapartidaList",
+          "target": "ContrapartidaList"
         }
       ],
       "targets": {
-        "ListadoPagosList": {
+        "ContrapartidaList": {
           "type": "Component",
-          "id": "ListadoPagosList",
+          "id": "ContrapartidaList",
           "name": "sap.fe.templates.ListReport",
           "options": {
             "settings": {
-              "contextPath": "/ListadoPagos",
+              "contextPath": "/Contrapartida",
               "variantManagement": "Page",
               "initialLoad": "Disabled",
               "controlConfiguration": {
@@ -123,17 +97,6 @@
                   }
                 }
               }
-            }
-          }
-        },
-        "ListadoPagosObjectPage": {
-          "type": "Component",
-          "id": "ListadoPagosObjectPage",
-          "name": "sap.fe.templates.ObjectPage",
-          "options": {
-            "settings": {
-              "editableHeaderContent": false,
-              "contextPath": "/ListadoPagos"
             }
           }
         }
