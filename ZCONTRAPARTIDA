@@ -1,3 +1,6 @@
+https://<host>/sap/opu/odata4/sap/zsb_lp_listadopagos/srvd/sap/zsd_lp_listadopagos/0001/$metadata?sap-client=XXX
+https://<host>/sap/opu/odata4/sap/zsb_contrapartida/srvd/sap/zsd_contrapartida/0001/$metadata?sap-client=XXX
+
 {
   "_version": "1.60.0",
   "sap.app": {
