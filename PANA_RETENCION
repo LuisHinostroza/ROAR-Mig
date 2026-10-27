@@ -1,3 +1,82 @@
+@AccessControl.authorizationCheck: #NOT_REQUIRED
+@EndUserText.label: 'Retenciones Panamá - Vista básica'
+@Metadata.ignorePropagatedAnnotations: true
+define view entity ZMFI_I_PANA_RETENCION
+  as select from    with_item as wi
+    inner join      t001      as t1 on  t1.bukrs = wi.bukrs
+    left outer join bkpf      as bk on  bk.bukrs = wi.bukrs
+                                    and bk.belnr = wi.belnr
+                                    and bk.gjahr = wi.gjahr
+    left outer join bseg      as bs on  bs.bukrs = wi.bukrs
+                                    and bs.belnr = wi.belnr
+                                    and bs.gjahr = wi.gjahr
+                                    and bs.buzei = wi.buzei
+    left outer join bset      as bt on  bt.bukrs = wi.bukrs
+                                    and bt.belnr = wi.belnr
+                                    and bt.gjahr = wi.gjahr
+                                    and bt.buzei = wi.buzei   // replica el join original
+    left outer join lfa1      as lf on  lf.lifnr = wi.wt_acco
+{
+  key wi.bukrs     as CompanyCode,
+  key wi.belnr     as AccountingDocument,
+  key wi.gjahr     as FiscalYear,
+  key wi.buzei     as AccountingDocumentItem,
+  key wi.witht     as WithholdingTaxType,
+      wi.wt_withcd as WithholdingTaxCode,
+      wi.wt_acco   as Supplier,
+
+      // Cabecera documento
+      bk.xblnr     as DocumentReferenceID,
+      bk.monat     as FiscalPeriod,
+      bk.blart     as AccountingDocumentType,
+      bk.bldat     as DocumentDate,
+      bk.budat     as PostingDate,
+      bk.stblg     as ReverseDocument,
+      // Cast para quitar la conversion exit EXCRT (no soportada en OData V4)
+      cast( bk.kursf as abap.dec(9,5) ) as ExchangeRate,
+      bk.waers     as DocumentCurrency,
+      t1.waers     as CompanyCodeCurrency,
+
+      // Impuesto / posición
+      bt.mwskz     as TaxCode,
+      bs.sgtxt     as DocumentItemText,
+
+      // Tercero
+      lf.ktokk     as SupplierAccountGroup,
+      lf.name1     as SupplierName,
+      lf.land1     as Country,
+      lf.stcd1     as TaxNumber1,
+
+      // Importes moneda documento
+      @Semantics.amount.currencyCode: 'DocumentCurrency'
+      bs.wrbtr     as AmountInDocCurrency,
+
+      @Semantics.amount.currencyCode: 'DocumentCurrency'
+      wi.wt_qbshb  as WhldgTaxAmtInDocCrcy,
+
+      // Z_SUMA_MD = BSEG-WRBTR + ( WT_QBSHB * -1 )
+      @Semantics.amount.currencyCode: 'DocumentCurrency'
+      cast( coalesce( cast( bs.wrbtr as abap.dec(23,2) ), cast( 0 as abap.dec(23,2) ) )
+            - cast( wi.wt_qbshb as abap.dec(23,2) )
+            as abap.curr(23,2) ) as SumAmountInDocCurrency,
+
+      // Importes moneda local
+      @Semantics.amount.currencyCode: 'CompanyCodeCurrency'
+      bs.dmbtr     as AmountInCompanyCodeCurrency,
+
+      @Semantics.amount.currencyCode: 'CompanyCodeCurrency'
+      wi.wt_qsshh  as WhldgTaxBaseAmtInCCCrcy,
+
+      @Semantics.amount.currencyCode: 'CompanyCodeCurrency'
+      wi.wt_qbshh  as WhldgTaxAmtInCCCrcy,
+
+      // Z_SUMA_ML = BSEG-DMBTR + ( WT_QBSHH * -1 )
+      @Semantics.amount.currencyCode: 'CompanyCodeCurrency'
+      cast( coalesce( cast( bs.dmbtr as abap.dec(23,2) ), cast( 0 as abap.dec(23,2) ) )
+            - cast( wi.wt_qbshh as abap.dec(23,2) )
+            as abap.curr(23,2) ) as SumAmountInCCCrcy
+}
+
 Paso 1 – Vista básica ZMFI_I_PANA_RETENCION
 
 Esta vista replica el SELECT ... ENDSELECT:
