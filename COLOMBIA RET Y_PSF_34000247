@@ -1,3 +1,205 @@
+Paso 1 – CDS interface (base): ZMFI_I_RetAndi
+
+En ADT: New → Other ABAP Repository Object → Data Definition, con plantilla Define View Entity.
+
+Esta vista replica el SELECT de la query:
+
+WITH_ITEM es la tabla principal. Su clave completa (BUKRS, BELNR, GJAHR, BUZEI, WITHT) es la clave de la vista.
+BKPF va con left outer join, porque en la query, si no encuentra la cabecera, igual saca la línea.
+LFA1 va con left outer join por WT_ACCO, porque puede ser deudor y entonces no hay nombre, igual que en el original.
+T001 va con inner join para obtener la moneda local (es la corrección del punto 1).
+abap
+@AccessControl.authorizationCheck: #NOT_REQUIRED
+@EndUserText.label: 'Retenciones ANDI - Base'
+define view entity ZMFI_I_RetAndi
+  as select from    with_item as wi
+    inner join      t001      as cc on cc.bukrs = wi.bukrs
+    left outer join bkpf      as hd on  hd.bukrs = wi.bukrs
+                                    and hd.belnr = wi.belnr
+                                    and hd.gjahr = wi.gjahr
+    left outer join lfa1      as su on su.lifnr = wi.wt_acco
+{
+  key wi.bukrs     as CompanyCode,
+  key wi.belnr     as AccountingDocument,
+  key wi.gjahr     as FiscalYear,
+  key wi.buzei     as AccountingDocumentItem,
+  key wi.witht     as WithholdingTaxType,
+
+      wi.wt_withcd as WithholdingTaxCode,
+      wi.wt_acco   as Supplier,
+      su.name1     as SupplierName,
+      su.stcd1     as TaxNumber1,
+      hd.budat     as PostingDate,
+      wi.qsatz     as WithholdingTaxRate,
+
+      @Semantics.amount.currencyCode: 'DocumentCurrency'
+      wi.wt_qbshb  as WhldgTaxAmtInDocCrcy,
+      hd.waers     as DocumentCurrency,
+
+      @Semantics.amount.currencyCode: 'CompanyCodeCurrency'
+      wi.wt_qsshh  as WhldgTaxBaseAmtInCoCrcy,
+      cc.waers     as CompanyCodeCurrency,
+
+      wi.hkont     as GLAccount
+}
+
+Activa y prueba con F8 (Data Preview) contra una sociedad y ejercicio conocidos.
+
+Paso 2 – CDS consumption: ZMFI_C_RetAndi
+
+Esta vista es la que se expone. Aquí van:
+
+las etiquetas en español, tomadas de los textos A00–A12 del original;
+las ayudas de búsqueda estándar de sociedad y acreedor;
+el filtro de fecha de contabilización como intervalo (equivale a SP$00007);
+la búsqueda libre por nombre de acreedor.
+abap
+@AccessControl.authorizationCheck: #NOT_REQUIRED
+@EndUserText.label: 'Listado de Retenciones ANDI'
+@Metadata.allowExtensions: true
+@Search.searchable: true
+define view entity ZMFI_C_RetAndi
+  as select from ZMFI_I_RetAndi
+{
+      @EndUserText.label: 'Sociedad'
+      @Consumption.valueHelpDefinition: [{ entity: { name: 'I_CompanyCodeStdVH', element: 'CompanyCode' } }]
+  key CompanyCode,
+
+      @EndUserText.label: 'Nº documento'
+  key AccountingDocument,
+
+      @EndUserText.label: 'Ejercicio'
+  key FiscalYear,
+
+      @EndUserText.label: 'Posición'
+  key AccountingDocumentItem,
+
+      @EndUserText.label: 'Tipo de retenciones'
+  key WithholdingTaxType,
+
+      @EndUserText.label: 'Indicador de retención'
+      WithholdingTaxCode,
+
+      @EndUserText.label: 'Nº cuenta acreedor/deudor'
+      @Consumption.valueHelpDefinition: [{ entity: { name: 'I_Supplier_VH', element: 'Supplier' } }]
+      Supplier,
+
+      @EndUserText.label: 'Nombre 1'
+      @Search.defaultSearchElement: true
+      @Search.fuzzinessThreshold: 0.8
+      SupplierName,
+
+      @EndUserText.label: 'Nº id. fiscal 1'
+      @Search.defaultSearchElement: true
+      TaxNumber1,
+
+      @EndUserText.label: 'Fecha contabilización'
+      @Consumption.filter.selectionType: #INTERVAL
+      PostingDate,
+
+      @EndUserText.label: 'Tasa de retención (%)'
+      WithholdingTaxRate,
+
+      @EndUserText.label: 'Importe retención (mon. doc.)'
+      @Semantics.amount.currencyCode: 'DocumentCurrency'
+      WhldgTaxAmtInDocCrcy,
+
+      @EndUserText.label: 'Moneda documento'
+      DocumentCurrency,
+
+      @EndUserText.label: 'Base imponible ret. (mon. local)'
+      @Semantics.amount.currencyCode: 'CompanyCodeCurrency'
+      WhldgTaxBaseAmtInCoCrcy,
+
+      @EndUserText.label: 'Moneda local'
+      CompanyCodeCurrency,
+
+      @EndUserText.label: 'Cuenta de mayor'
+      GLAccount
+}
+Paso 3 – Metadata Extension: ZMFI_C_RetAndi
+
+En ADT: New → Metadata Extension, con el mismo nombre que la consumption.
+
+Los filtros van en el mismo orden que la pantalla de selección: sociedad, ejercicio, acreedor, documento, fecha, tipo e indicador.
+Las columnas van en el orden de la lista G00 original.
+La ordenación por defecto replica el SORT del original: acreedor, nombre y NIF.
+Las columnas de moneda no las pongo sueltas, porque Fiori ya muestra el importe con su moneda al lado.
+abap
+@Metadata.layer: #CUSTOMER
+@UI.headerInfo: { typeName: 'Retención', typeNamePlural: 'Listado de Retenciones' }
+@UI.presentationVariant: [{
+  sortOrder: [ { by: 'Supplier',     direction: #ASC },
+               { by: 'SupplierName', direction: #ASC },
+               { by: 'TaxNumber1',   direction: #ASC } ],
+  visualizations: [{ type: #AS_LINEITEM }]
+}]
+annotate entity ZMFI_C_RetAndi with
+{
+  @UI.selectionField: [{ position: 10 }]
+  @UI.lineItem:       [{ position: 140 }]
+  CompanyCode;
+
+  @UI.selectionField: [{ position: 40 }]
+  @UI.lineItem:       [{ position: 40 }]
+  AccountingDocument;
+
+  @UI.selectionField: [{ position: 20 }]
+  @UI.lineItem:       [{ position: 150 }]
+  FiscalYear;
+
+  @UI.hidden: true
+  AccountingDocumentItem;
+
+  @UI.selectionField: [{ position: 60 }]
+  @UI.lineItem:       [{ position: 70 }]
+  WithholdingTaxType;
+
+  @UI.selectionField: [{ position: 70 }]
+  @UI.lineItem:       [{ position: 60 }]
+  WithholdingTaxCode;
+
+  @UI.selectionField: [{ position: 30 }]
+  @UI.lineItem:       [{ position: 30 }]
+  Supplier;
+
+  @UI.lineItem:       [{ position: 10 }]
+  SupplierName;
+
+  @UI.lineItem:       [{ position: 20 }]
+  TaxNumber1;
+
+  @UI.selectionField: [{ position: 50 }]
+  @UI.lineItem:       [{ position: 50 }]
+  PostingDate;
+
+  @UI.lineItem:       [{ position: 80 }]
+  WithholdingTaxRate;
+
+  @UI.lineItem:       [{ position: 90 }]
+  WhldgTaxAmtInDocCrcy;
+
+  @UI.lineItem:       [{ position: 110 }]
+  WhldgTaxBaseAmtInCoCrcy;
+
+  @UI.lineItem:       [{ position: 130 }]
+  GLAccount;
+}
+Paso 4 – Service Definition: ZMFI_UI_RETANDI
+
+En ADT, clic derecho sobre ZMFI_C_RetAndi → New Service Definition. Como es solo lectura, no hace falta BDEF.
+
+abap
+@EndUserText.label: 'Listado de Retenciones ANDI'
+define service ZMFI_UI_RETANDI {
+  expose ZMFI_C_RetAndi as Retenciones;
+}
+Paso 5 – Service Binding: ZMFI_UI_RETANDI_O4
+Clic derecho sobre la service definition → New Service Binding.
+Binding type: OData V4 – UI.
+Activa y pulsa Publish.
+Haz Preview sobre la entidad Retenciones para validar filtros y columnas antes de pasar a VS Code.
+*********************************************************************************************************************
 Base de datos lógica __S                   Proceso sin base de datos
 *****************************textos seleccion
 %ABC	Análisis ABC
