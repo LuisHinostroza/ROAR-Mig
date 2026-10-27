@@ -1,3 +1,17 @@
+ZST_ITBMS_PROVEEDORES Estructura fichero ITBMS
+
+TIPO_PERS		CHAR	1	0	                                                            
+RUC		CHAR	20	0	                                                            
+DV		CHAR	2	0	                                                            
+NOMBRE		CHAR	100	0	                                                            
+DOCUMENTO		CHAR	22	0	                                                            
+MONTO_GRAVADO	HWBAS	CURR	13	2	Importe base del impuesto en moneda local
+ITBMS_CAUSADO	WRBTR	CURR	13	2	Importe en la moneda del documento
+OBJ_RETENCION	CHAR1	CHAR	1	0	Indicador de una posición
+ITBMS_RETENIDO	WRBTR	CURR	13	2	Importe en la moneda del documento
+BELNR	BELNR_D	CHAR	10	0	Número de un documento contable
+
+
 S_BELNR	Documento
 S_BLART	Clase de documento
 S_BUKRS	Sociedad
