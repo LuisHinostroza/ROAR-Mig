@@ -1,3 +1,262 @@
+1. ZI_ItbmsDocItem (líneas de las cuentas ITBMS con signo)
+abap
+@AccessControl.authorizationCheck: #NOT_REQUIRED
+@EndUserText.label: 'ITBMS Prov - Posiciones cuentas ITBMS'
+define view entity ZI_ItbmsDocItem
+  as select from bseg
+{
+  key bukrs as CompanyCode,
+  key belnr as AccountingDocument,
+  key gjahr as FiscalYear,
+  key buzei as AccountingDocumentItem,
+      hkont as GLAccount,
+      buzid as LineItemId,
+      augbl as ClearingDocument,
+      shkzg as DebitCreditCode,
+
+      case shkzg
+        when 'S' then cast( wrbtr as abap.dec( 23, 2 ) ) * -1
+        else          cast( wrbtr as abap.dec( 23, 2 ) )
+      end as AmountSigned,
+
+      case shkzg
+        when 'S' then cast( fwbas as abap.dec( 23, 2 ) ) * -1
+        else          cast( fwbas as abap.dec( 23, 2 ) )
+      end as TaxBaseSigned
+}
+where hkont = '0000204000'
+   or hkont = '0000204001'
+2. ZI_ItbmsDocAmount (importes por documento)
+abap
+@AccessControl.authorizationCheck: #NOT_REQUIRED
+@EndUserText.label: 'ITBMS Prov - Importes por documento'
+define view entity ZI_ItbmsDocAmount
+  as select from ZI_ItbmsDocItem
+{
+  key CompanyCode,
+  key AccountingDocument,
+  key FiscalYear,
+
+      sum( case when GLAccount = '0000204001'
+                then AmountSigned
+                else cast( 0 as abap.dec( 23, 2 ) ) end )  as ItbmsRetenido,
+
+      sum( case when GLAccount = '0000204000' and LineItemId = 'T'
+                then TaxBaseSigned
+                else cast( 0 as abap.dec( 23, 2 ) ) end )  as MontoGravado,
+
+      sum( case when GLAccount = '0000204000'
+                then AmountSigned
+                else cast( 0 as abap.dec( 23, 2 ) ) end )  as ItbmsCausado,
+
+      max( case when GLAccount = '0000204001' and ClearingDocument = ''
+                then 'X' else '' end )                      as HasOpenRetention
+}
+group by CompanyCode,
+         AccountingDocument,
+         FiscalYear
+3. ZI_ItbmsDocFirstSuppItem (primera línea con proveedor)
+
+Sustituye al LOOP ... EXIT del original y lo hace determinista.
+
+abap
+@AccessControl.authorizationCheck: #NOT_REQUIRED
+@EndUserText.label: 'ITBMS Prov - Primera posición proveedor'
+define view entity ZI_ItbmsDocFirstSuppItem
+  as select from bseg
+{
+  key bukrs        as CompanyCode,
+  key belnr        as AccountingDocument,
+  key gjahr        as FiscalYear,
+      min( buzei ) as FirstSupplierItem
+}
+where lifnr <> ''
+group by bukrs,
+         belnr,
+         gjahr
+4. ZI_ItbmsSupplier (proveedores R1/A1 y clasificación)
+abap
+@AccessControl.authorizationCheck: #NOT_REQUIRED
+@EndUserText.label: 'ITBMS Prov - Proveedores R1/A1'
+define view entity ZI_ItbmsSupplier
+  as select from lfbw
+    inner join   lfa1 on lfa1.lifnr = lfbw.lifnr
+{
+  key lfbw.bukrs as CompanyCode,
+  key lfbw.lifnr as Supplier,
+
+      cast( lfa1.stcd1 as abap.char( 20 ) )            as Ruc,
+      cast( left( lfa1.stcd2, 2 ) as abap.char( 2 ) )  as Dv,
+
+      cast( concat_with_space(
+              concat_with_space( lfa1.name1, lfa1.name2, 1 ),
+              lfa1.name3, 1 ) as abap.char( 100 ) )    as Nombre,
+
+      cast( case
+              when lfa1.land1 <> 'PA'                       then 'P'
+              when instr( upper( lfa1.stcd1 ), 'NT' ) > 0   then 'P'
+              when lfa1.stkzn = 'X'                         then 'N'
+              else                                               'J'
+            end as abap.char( 1 ) )                    as TipoPersona
+}
+where lfbw.witht     = 'R1'
+  and lfbw.wt_withcd = 'A1'
+5. ZC_ItbmsProveedor (composite)
+abap
+@AccessControl.authorizationCheck: #NOT_REQUIRED
+@EndUserText.label: 'ITBMS Prov - Composite'
+define view entity ZC_ItbmsProveedor
+  as select from bkpf                     as h
+    inner join   ZI_ItbmsDocAmount        as a on  a.CompanyCode        = h.bukrs
+                                               and a.AccountingDocument = h.belnr
+                                               and a.FiscalYear         = h.gjahr
+    inner join   ZI_ItbmsDocFirstSuppItem as f on  f.CompanyCode        = h.bukrs
+                                               and f.AccountingDocument = h.belnr
+                                               and f.FiscalYear         = h.gjahr
+    inner join   bseg                     as v on  v.bukrs = f.CompanyCode
+                                               and v.belnr = f.AccountingDocument
+                                               and v.gjahr = f.FiscalYear
+                                               and v.buzei = f.FirstSupplierItem
+    inner join   ZI_ItbmsSupplier         as s on  s.CompanyCode = v.bukrs
+                                               and s.Supplier    = v.lifnr
+{
+  key h.bukrs                                    as CompanyCode,
+  key h.belnr                                    as AccountingDocument,
+  key h.gjahr                                    as FiscalYear,
+      h.blart                                    as AccountingDocumentType,
+      h.monat                                    as FiscalPeriod,
+      h.waers                                    as TransactionCurrency,
+      v.lifnr                                    as Supplier,
+
+      s.TipoPersona,
+      s.Ruc,
+      s.Dv,
+      s.Nombre,
+      cast( h.xblnr as abap.char( 22 ) )         as Documento,
+
+      @Semantics.amount.currencyCode: 'TransactionCurrency'
+      cast( a.MontoGravado * -1 as abap.curr( 23, 2 ) )  as MontoGravado,
+
+      @Semantics.amount.currencyCode: 'TransactionCurrency'
+      cast( a.ItbmsCausado * -1 as abap.curr( 23, 2 ) )  as ItbmsCausado,
+
+      cast( '4' as abap.char( 1 ) )              as ObjRetencion,
+
+      @Semantics.amount.currencyCode: 'TransactionCurrency'
+      cast( a.ItbmsRetenido as abap.curr( 23, 2 ) )      as ItbmsRetenido
+}
+where h.stblg            = ''
+  and a.HasOpenRetention = 'X'
+6. ZCP_ItbmsProveedor (consumption/root)
+abap
+@AccessControl.authorizationCheck: #CHECK
+@EndUserText.label: 'ITBMS proveedores'
+@Metadata.allowExtensions: true
+define root view entity ZCP_ItbmsProveedor
+  as select from ZC_ItbmsProveedor
+{
+      @Consumption.filter.mandatory: true
+      @Consumption.valueHelpDefinition: [{ entity: { name: 'I_CompanyCodeStdVH', element: 'CompanyCode' } }]
+  key CompanyCode,
+  key AccountingDocument,
+  key FiscalYear,
+      AccountingDocumentType,
+      FiscalPeriod,
+      TransactionCurrency,
+      Supplier,
+      TipoPersona,
+      Ruc,
+      Dv,
+      Nombre,
+      Documento,
+      @Semantics.amount.currencyCode: 'TransactionCurrency'
+      MontoGravado,
+      @Semantics.amount.currencyCode: 'TransactionCurrency'
+      ItbmsCausado,
+      ObjRetencion,
+      @Semantics.amount.currencyCode: 'TransactionCurrency'
+      ItbmsRetenido
+}
+7. Metadata Extension ZCP_ItbmsProveedor
+
+El orden de columnas es el de la estructura, con las etiquetas del fieldcat original.
+
+abap
+@Metadata.layer: #CUSTOMER
+@UI.headerInfo: { typeName: 'Documento', typeNamePlural: 'Proveedores ITBMS' }
+annotate entity ZCP_ItbmsProveedor with
+{
+  @UI.selectionField: [{ position: 10 }]
+  @EndUserText.label: 'Sociedad'
+  CompanyCode;
+
+  @UI.selectionField: [{ position: 20 }]
+  @UI.lineItem: [{ position: 100, label: 'Nº DOCUMENTO' }]
+  @EndUserText.label: 'Documento'
+  AccountingDocument;
+
+  @UI.selectionField: [{ position: 30 }]
+  @EndUserText.label: 'Clase de documento'
+  AccountingDocumentType;
+
+  @UI.selectionField: [{ position: 40 }]
+  @EndUserText.label: 'Ejercicio'
+  FiscalYear;
+
+  @UI.selectionField: [{ position: 50 }]
+  @EndUserText.label: 'Periodo'
+  FiscalPeriod;
+
+  @UI.lineItem: [{ position: 10, label: 'TIPO_PERSONA' }]
+  TipoPersona;
+
+  @UI.lineItem: [{ position: 20, label: 'RUC' }]
+  Ruc;
+
+  @UI.lineItem: [{ position: 30, label: 'DV' }]
+  Dv;
+
+  @UI.lineItem: [{ position: 40, label: 'NOMBRE O RAZON SOCIAL' }]
+  Nombre;
+
+  @UI.lineItem: [{ position: 50, label: 'Nº FACTURA/DOCUMENTO' }]
+  Documento;
+
+  @UI.lineItem: [{ position: 60, label: 'MONTO GRAVADO ITBMS' }]
+  MontoGravado;
+
+  @UI.lineItem: [{ position: 70, label: 'ITBMS CAUSADO' }]
+  ItbmsCausado;
+
+  @UI.lineItem: [{ position: 80, label: 'OBJETO DE LA RETENCION' }]
+  ObjRetencion;
+
+  @UI.lineItem: [{ position: 90, label: 'ITBMS RETENIDO' }]
+  ItbmsRetenido;
+
+  @EndUserText.label: 'Proveedor'
+  Supplier;
+}
+8. DCL ZRL_ITBMS_PROV_AUTH
+abap
+@EndUserText.label: 'ITBMS proveedores - Autorización sociedad'
+@MappingRole: true
+define role ZRL_ITBMS_PROV_AUTH {
+  grant select on ZCP_ItbmsProveedor
+    where ( CompanyCode ) = aspect pfcg_auth( F_BKPF_BUK, BUKRS, ACTVT = '03' );
+}
+9. Service Definition ZSD_ITBMS_PROVEEDOR
+abap
+@EndUserText.label: 'ITBMS proveedores'
+define service ZSD_ITBMS_PROVEEDOR {
+  expose ZCP_ItbmsProveedor as ItbmsProveedor;
+}
+10. Service Binding ZSB_ITBMS_PROVEEDOR
+
+Créalo con tipo OData V4 - UI sobre ZSD_ITBMS_PROVEEDOR y publícalo. Antes de generar la app, valídalo con la preview del binding.
+
+
+
 ZST_ITBMS_PROVEEDORES Estructura fichero ITBMS
 
 TIPO_PERS		CHAR	1	0	                                                            
