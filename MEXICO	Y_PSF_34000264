@@ -34,6 +34,19 @@
           "odataVersion": "4.0"
         }
       }
+    },
+    "crossNavigation": {
+      "inbounds": {
+        "ZRetencionesMx-display": {
+          "semanticObject": "ZRetencionesMx",
+          "action": "display",
+          "title": "{{appTitle}}",
+          "signature": {
+            "parameters": {},
+            "additionalParameters": "allowed"
+          }
+        }
+      }
     }
   },
   "sap.ui": {
@@ -97,11 +110,6 @@
           "pattern": ":?query:",
           "name": "RetencionesList",
           "target": "RetencionesList"
-        },
-        {
-          "pattern": "Retenciones({key}):?query:",
-          "name": "RetencionesObjectPage",
-          "target": "RetencionesObjectPage"
         }
       ],
       "targets": {
@@ -113,31 +121,18 @@
             "settings": {
               "contextPath": "/Retenciones",
               "variantManagement": "Page",
-              "navigation": {
-                "Retenciones": {
-                  "detail": {
-                    "route": "RetencionesObjectPage"
-                  }
-                }
-              },
+              "initialLoad": "Disabled",
               "controlConfiguration": {
                 "@com.sap.vocabularies.UI.v1.LineItem": {
                   "tableSettings": {
-                    "type": "GridTable"
+                    "type": "GridTable",
+                    "selectionMode": "None",
+                    "enableExport": true,
+                    "enableFullScreen": true,
+                    "condensedTableLayout": true
                   }
                 }
               }
-            }
-          }
-        },
-        "RetencionesObjectPage": {
-          "type": "Component",
-          "id": "RetencionesObjectPage",
-          "name": "sap.fe.templates.ObjectPage",
-          "options": {
-            "settings": {
-              "editableHeaderContent": false,
-              "contextPath": "/Retenciones"
             }
           }
         }
