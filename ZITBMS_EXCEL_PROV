@@ -1,0 +1,554 @@
+S_BELNR	Documento
+S_BLART	Clase de documento
+S_BUKRS	Sociedad
+S_MONAT	Periodo
+S_YEAR	Ejercicio
+
+*&---------------------------------------------------------------------*
+*& Report  ZITBMS_EXCEL_PROV
+*&
+*&---------------------------------------------------------------------*
+*&
+*&
+*&---------------------------------------------------------------------*
+
+REPORT  ZITBMS_EXCEL_PROV.
+
+INCLUDE ZITBMS_EXCEL_PROV_TOP.
+INCLUDE ZITBMS_EXCEL_PROV_F01.
+INCLUDE ZITBMS_EXCEL_PROV_F02.
+
+INITIALIZATION.
+
+
+AT SELECTION-SCREEN.
+
+AT SELECTION-SCREEN OUTPUT.
+*Refresh Screen
+* lcl_main=>refresh_screen( ).
+
+*AT SELECTION-SCREEN ON VALUE-REQUEST FOR p_vari.
+**Search help with existing variants
+*  lcl_main=>read_variants( ).
+
+START-OF-SELECTION.
+*Create object
+  CREATE OBJECT go_main.
+  IF go_main IS BOUND.
+    IF go_main->mt_outtab IS INITIAL.
+      MESSAGE text-m01 TYPE 'S' DISPLAY LIKE 'E'.
+    ELSE.
+*Show
+      go_main->show( ).
+    ENDIF.
+  ENDIF.
+
+END-OF-SELECTION.
+
+*----------------------------------------------------------------------*
+*       CLASS lcl_handle_events DEFINITION
+*----------------------------------------------------------------------*
+*  Define a local class for handling events of cl_salv_table
+*----------------------------------------------------------------------*
+CLASS lcl_handle_events DEFINITION FINAL.
+  PUBLIC SECTION.
+    METHODS:
+      on_user_command FOR EVENT added_function OF cl_salv_events_table
+        IMPORTING e_salv_function.
+
+
+ENDCLASS.                    "lcl_handle_events DEFINITION
+
+*----------------------------------------------------------------------*
+*       CLASS lcl_main DEFINITION
+*----------------------------------------------------------------------*
+*
+*----------------------------------------------------------------------*
+CLASS lcl_main DEFINITION FINAL.
+  PUBLIC SECTION.
+*Globals data
+    DATA: mo_alv    TYPE REF TO cl_salv_table,
+          mo_events TYPE REF TO lcl_handle_events,
+          mt_outtab TYPE STANDARD TABLE OF ty_alv. "Alv output table
+
+*Instance methods
+    METHODS:
+      constructor,
+      do_fieldcat,
+      set_layout,
+      get_data,
+      show.
+
+
+  PRIVATE SECTION.
+ENDCLASS.                    "lcl_main DEFINITION
+*&---------------------------------------------------------------------*
+*&  Include           ZITBMS_EXCEL_PROV_F02
+*&---------------------------------------------------------------------*
+
+*----------------------------------------------------------------------*
+*       CLASS lcl_handle_events IMPLEMENTATION
+*----------------------------------------------------------------------*
+*
+*----------------------------------------------------------------------*
+CLASS lcl_handle_events IMPLEMENTATION.
+
+
+*Events when pressing pf-status buttons
+  METHOD on_user_command.
+    CASE sy-ucomm.
+      WHEN '&REFR'.
+        go_main->get_data( ).
+        go_main->mo_alv->refresh( ).
+        cl_gui_cfw=>flush( ).
+
+      WHEN 'BACK' OR '&F12' OR '&F15'.
+        LEAVE PROGRAM.
+
+      WHEN '&PAN'. "Create button in pf-status
+        DATA: lt_rows       TYPE salv_t_row,
+              ls_row        LIKE LINE OF lt_rows,
+              lt_select     TYPE STANDARD TABLE OF ty_alv, "Type equal to output table
+              lt_marc       TYPE STANDARD TABLE OF ty_alv, "Type equal to output table
+              lo_selections TYPE REF TO cl_salv_selections.
+
+*Local field-simbol
+        FIELD-SYMBOLS: <fsl_mark>   LIKE LINE OF go_main->mt_outtab,
+                       <fsl_select> LIKE LINE OF go_main->mt_outtab.
+
+*Get marked rows
+        lo_selections = go_main->mo_alv->get_selections( ).
+        lt_rows = lo_selections->get_selected_rows( ).
+
+*Fill table with marked rows
+        REFRESH lt_select.
+        LOOP AT lt_rows INTO ls_row.
+          READ TABLE go_main->mt_outtab ASSIGNING <fsl_select> INDEX ls_row. "Assign field-symbols
+          IF <fsl_select> IS ASSIGNED.
+            IF sy-subrc EQ 0.
+              APPEND <fsl_select> TO lt_select.
+            ENDIF.
+            UNASSIGN <fsl_select>.
+          ENDIF.
+        ENDLOOP.
+
+**Read only flag marked
+*        REFRESH lt_marc.
+*        LOOP AT go_main->mt_outtab ASSIGNING <fsl_mark>. "Assign field-symbol
+*          IF <fsl_mark> IS ASSIGNED.
+*            IF <fsl_mark>-check IS NOT INITIAL.
+*              APPEND <fsl_mark> TO lt_marc.
+*            ENDIF.
+*            UNASSIGN <fsl_mark>.
+*          ENDIF.
+*        ENDLOOP.
+
+      WHEN OTHERS.
+    ENDCASE.
+  ENDMETHOD.                    "on_user_command
+
+ENDCLASS.                    "lcl_handle_events IMPLEMENTATION
+
+*----------------------------------------------------------------------*
+*       CLASS lcl_main IMPLEMENTATION
+*----------------------------------------------------------------------*
+*
+*----------------------------------------------------------------------*
+CLASS lcl_main IMPLEMENTATION.
+
+  METHOD constructor.
+*Get data from tables
+    me->get_data( ).
+  ENDMETHOD.                    "constructor
+  METHOD get_data.
+
+*Locals data
+    DATA: lt_outtab TYPE STANDARD TABLE OF ty_alv,
+          ls_outtab LIKE LINE OF mt_outtab, "Wa output table type
+          lt_aux    TYPE STANDARD TABLE OF  bkpf, "Table BD
+          ls_aux    LIKE LINE OF lt_aux,
+          ls_color  TYPE lvc_s_scol.
+
+    DATA: it_bseg TYPE STANDARD TABLE OF bseg,
+*Inicio Modificacion 5000017229 06/02/2023 VGMEZVZ
+          it_bseg_aux TYPE STANDARD TABLE OF bseg,
+          it_lfbw TYPE STANDARD TABLE OF lfbw,
+*Fin Modificacion 5000017229 06/02/2023 VGMEZVZ
+    wa_bseg LIKE LINE OF it_bseg,
+
+    it_lfa1 TYPE STANDARD TABLE OF lfa1,
+    wa_lfa1 LIKE LINE OF it_lfa1.
+    DATA: lv_no_terc(1) TYPE c.
+*Field-symbols
+    FIELD-SYMBOLS: <fs_color> TYPE lvc_s_scol, "Local type color
+                   <fsl_aux>  TYPE ty_alv.     "Output table type
+
+    REFRESH: lt_aux, mt_outtab.
+    SELECT *
+      INTO TABLE lt_aux
+        FROM bkpf
+         WHERE bukrs IN s_bukrs AND belnr IN s_belnr AND gjahr IN s_year
+      AND blart IN s_blart
+      AND monat IN s_monat
+*Inicio Modificacion 5000017229 06/02/2023 VGMEZVZ
+      AND stblg = space.
+*Fin Modificacion 5000017229 06/02/2023 VGMEZVZ
+
+    IF lt_aux IS NOT INITIAL.
+*Inicio Modificacion 5000017229 06/02/2023 VGMEZVZ
+      SELECT * FROM bseg INTO TABLE it_bseg_aux
+         FOR ALL ENTRIES IN lt_aux
+         WHERE belnr = lt_aux-belnr AND bukrs = lt_aux-bukrs AND gjahr = lt_aux-gjahr
+         AND hkont = '0000204001'
+         AND augbl = space.
+      .
+      IF sy-subrc EQ 0.
+        SELECT * FROM bseg INTO TABLE it_bseg
+           FOR ALL ENTRIES IN it_bseg_aux
+           WHERE belnr = it_bseg_aux-belnr AND bukrs = it_bseg_aux-bukrs AND gjahr = it_bseg_aux-gjahr
+           .
+      ENDIF.
+*Fin Modificacion 5000017229 06/02/2023 VGMEZVZ
+      IF it_bseg IS NOT INITIAL.
+*Inicio Modificacion 5000017229 06/02/2023 VGMEZVZ
+        SELECT *
+          FROM lfbw
+            INTO TABLE it_lfbw
+            FOR ALL ENTRIES IN it_bseg
+              WHERE  bukrs = it_bseg-bukrs
+                 AND lifnr = it_bseg-lifnr
+                 AND witht = 'R1'
+                 AND wt_withcd = 'A1'.
+        IF sy-subrc EQ 0.
+          SELECT *
+            FROM lfa1
+              INTO TABLE it_lfa1
+                FOR ALL ENTRIES IN it_lfbw
+                  WHERE lifnr = it_lfbw-lifnr.
+        ENDIF.
+*Fin Modificacion 5000017229 06/02/2023 VGMEZVZ
+      ENDIF.
+    ENDIF.
+    IF sy-subrc EQ 0.
+
+      LOOP AT lt_aux INTO ls_aux.
+        CLEAR ls_outtab.
+        CLEAR:lv_no_terc.
+*        MOVE-CORRESPONDING ls_aux TO ls_outtab.
+*Inicio Modificacion 1000106861 22/02/2023 VGMEZVZ
+        ls_outtab-belnr = ls_aux-belnr.
+*Fin Modificacion 1000106861 22/02/2023 VGMEZVZ
+        ls_outtab-documento = ls_aux-xblnr.
+        ls_outtab-obj_retencion = '4'.
+*Inicio Modificacion 5000017229 09/02/2023 VGMEZVZ
+*        ls_outtab-dv = '99'.
+        CLEAR: ls_outtab-dv.
+*Fin Modificacion 5000017229 09/02/2023 VGMEZVZ
+
+        LOOP AT it_bseg INTO wa_bseg WHERE bukrs = ls_aux-bukrs AND
+                                                 belnr = ls_aux-belnr AND
+                                                 gjahr = ls_aux-gjahr AND
+                                                 lifnr NE ''.
+
+          READ TABLE it_lfa1 INTO wa_lfa1 WITH KEY lifnr = wa_bseg-lifnr.
+          IF sy-subrc = 0.
+            ls_outtab-ruc = wa_lfa1-stcd1.
+
+            CONCATENATE wa_lfa1-name1 wa_lfa1-name2 wa_lfa1-name3 INTO ls_outtab-nombre SEPARATED BY space.
+
+
+            IF wa_lfa1-land1 NE 'PA'.
+              ls_outtab-tipo_pers = 'P'.
+*Inicio Modificacion 5000017229 09/02/2023 VGMEZVZ
+*              ls_outtab-dv = '0'.
+              IF wa_lfa1-stcd2 IS NOT INITIAL.
+                ls_outtab-dv = wa_lfa1-stcd2(2).
+              ENDIF.
+*Fin Modificacion 5000017229 09/02/2023 VGMEZVZ
+            ELSE.
+*Inicio Modificacion 5000017229 09/02/2023 VGMEZVZ
+              IF wa_lfa1-stcd1 CS 'NT'.
+                ls_outtab-tipo_pers = 'P'.
+              ELSE.
+*Fin Modificacion 5000017229 09/02/2023 VGMEZVZ
+*              ls_outtab-dv = wa_lfa1-stcd2.
+                IF wa_lfa1-stkzn EQ 'X'.
+                  ls_outtab-tipo_pers = 'N'.
+                ELSE.
+                  ls_outtab-tipo_pers = 'J'.
+
+                ENDIF.
+*Inicio Modificacion 5000017229 09/02/2023 VGMEZVZ
+              ENDIF.
+*Fin Modificacion 5000017229 09/02/2023 VGMEZVZ
+*Inicio Modificacion 5000017229 09/02/2023 VGMEZVZ
+              IF wa_lfa1-stcd2 IS NOT INITIAL.
+                ls_outtab-dv = wa_lfa1-stcd2(2).
+              ENDIF.
+*Fin Modificacion 5000017229 09/02/2023 VGMEZVZ
+            ENDIF.
+          ELSE.
+            lv_no_terc = abap_true.
+          ENDIF.
+          EXIT.
+        ENDLOOP.
+
+
+        IF sy-subrc = 4.
+          CONTINUE.
+
+        ENDIF.
+
+        CLEAR wa_bseg.
+*Inicio Modificacion 5000017229 06/02/2023 VGMEZVZ
+        LOOP AT it_bseg INTO wa_bseg WHERE bukrs = ls_aux-bukrs
+                                               AND belnr = ls_aux-belnr
+                                               AND   gjahr = ls_aux-gjahr
+                                               AND   hkont = '0000204001'.
+
+          IF sy-subrc = 0.
+            IF wa_bseg-shkzg EQ 'S'.
+              ls_outtab-itbms_retenido = ls_outtab-itbms_retenido + ( wa_bseg-wrbtr * -1 ).
+            ELSE.
+              ls_outtab-itbms_retenido = ls_outtab-itbms_retenido + wa_bseg-wrbtr.
+            ENDIF.
+          ENDIF.
+        ENDLOOP.
+
+        CLEAR wa_bseg.
+        LOOP AT it_bseg INTO wa_bseg WHERE bukrs = ls_aux-bukrs
+                                       AND belnr = ls_aux-belnr
+                                       AND gjahr = ls_aux-gjahr
+                                       AND hkont = '0000204000'
+                                       AND buzid = 'T'.
+
+          IF sy-subrc = 0.
+            IF wa_bseg-shkzg EQ 'S'.
+              ls_outtab-monto_gravado = ls_outtab-monto_gravado +  ( wa_bseg-fwbas * -1 ).
+            ELSE.
+              ls_outtab-monto_gravado = ls_outtab-monto_gravado +  wa_bseg-fwbas.
+            ENDIF.
+
+          ENDIF.
+        ENDLOOP.
+
+*Fin Modificacion 5000017229 06/02/2023 VGMEZVZ
+
+        LOOP AT it_bseg INTO wa_bseg WHERE bukrs = ls_aux-bukrs AND
+                                                      belnr = ls_aux-belnr AND
+                                                      gjahr = ls_aux-gjahr AND
+                                                      hkont = '0000204000'.
+          " ( hkont = '0000204001' or hkont = '0000204000' ).
+          IF wa_bseg-shkzg EQ 'S'.
+            ls_outtab-itbms_causado = ls_outtab-itbms_causado + ( wa_bseg-wrbtr * -1 ).
+          ELSE.
+            ls_outtab-itbms_causado = ls_outtab-itbms_causado + wa_bseg-wrbtr.
+          ENDIF.
+        ENDLOOP.
+        IF lv_no_terc IS INITIAL.
+*Inicio Modificacion 5000017229 20/02/2023 VGMEZVZ
+          ls_outtab-monto_gravado = ls_outtab-monto_gravado * -1.
+          ls_outtab-itbms_causado = ls_outtab-itbms_causado * -1.
+*Fin Modificacion 5000017229 20/02/2023 VGMEZVZ
+          APPEND ls_outtab TO mt_outtab.
+        ENDIF.
+      ENDLOOP.
+    ENDIF.
+
+
+  ENDMETHOD.                    "get data
+
+  METHOD do_fieldcat.
+
+    DATA: lo_columns         TYPE REF TO cl_salv_columns_table,
+          lo_column          TYPE REF TO cl_salv_column,
+          lt_cols            TYPE salv_t_column_ref,
+          ls_cols            LIKE LINE OF lt_cols,
+          lv_msg             TYPE string,
+          lcx_salv_not_found TYPE REF TO cx_salv_not_found,
+          ls_color           TYPE lvc_s_colo,
+          lv_temp_s          TYPE scrtext_s,
+          lv_temp_m          TYPE scrtext_m,
+          lv_temp_l          TYPE scrtext_l.
+
+    lo_columns = mo_alv->get_columns( ).
+    lt_cols    = lo_columns->get( ).
+
+
+    lo_columns->set_optimize( abap_true ).
+
+    lo_column = lo_columns->get_column( 'TIPO_PERS' ).
+    lo_column->set_long_text( 'TIPO_PERSONA' ).
+    lo_column->set_medium_text( 'TIPO_PERSONA' ).
+    lo_column->set_short_text( 'TIPO_PERS' ).
+
+
+    lo_column = lo_columns->get_column( 'RUC' ).
+    lo_column->set_long_text( 'RUC' ).
+
+    lo_column = lo_columns->get_column( 'DV' ).
+    lo_column->set_long_text( 'DV' ).
+
+    lo_column = lo_columns->get_column( 'NOMBRE' ).
+    lo_column->set_long_text( 'NOMBRE O RAZON SOCIAL' ).
+
+    lo_column = lo_columns->get_column( 'DOCUMENTO' ).
+    lo_column->set_long_text( 'Nº FACTURA/DOCUMENTO' ).
+    lo_column->set_medium_text( 'Nº FACTURA/DOCUMENTO' ).
+    lo_column->set_short_text( 'Nº FACTURA' ).
+
+
+*Inicio Modificacion 1000106861 22/02/2023 VGMEZVZ
+    lo_column = lo_columns->get_column( 'BELNR' ).
+    lo_column->set_long_text( 'Nº DOCUMENTO' ).
+    lo_column->set_medium_text( 'Nº DOCUMENTO' ).
+    lo_column->set_short_text( 'DOCUMENTO' ).
+*Fin Modificacion 1000106861 22/02/2023 VGMEZVZ
+
+
+    lo_column = lo_columns->get_column( 'MONTO_GRAVADO' ).
+    lo_column->set_long_text( 'MONTO GRAVADO ITBMS' ).
+    lo_column->set_medium_text( 'MONTO GRAVADO ITBMS' ).
+    lo_column->set_short_text( 'MONTO GRAV' ).
+*       lo_column->SET_ZERO( 'X' ).
+
+    lo_column = lo_columns->get_column( 'ITBMS_CAUSADO' ).
+    lo_column->set_long_text( 'ITBMS CAUSADO' ).
+    lo_column->set_medium_text( 'ITBMS CAUSADO' ).
+    lo_column->set_short_text( 'ITBMS CAUS' ).
+
+    lo_column = lo_columns->get_column( 'OBJ_RETENCION' ).
+    lo_column->set_long_text( 'OBJETO DE LA RETENCION' ).
+    lo_column->set_medium_text( 'OBJETO RETENCION' ).
+    lo_column->set_short_text( 'OBJ RET' ).
+
+    lo_column = lo_columns->get_column( 'ITBMS_RETENIDO' ).
+    lo_column->set_long_text( 'ITBMS RETENIDO' ).
+    lo_column->set_medium_text( 'ITBMS RETENIDO' ).
+    lo_column->set_short_text( 'ITBMS RETE' ).
+
+  ENDMETHOD.                    "do_fieldcat
+
+  METHOD set_layout.
+
+    CONSTANTS: lc_variant TYPE slis_vari VALUE 'DEFAULT'.
+
+    DATA: lo_layout  TYPE REF TO cl_salv_layout,
+          lf_variant TYPE slis_vari,
+          lv_variant TYPE slis_vari,
+          ls_key     TYPE salv_s_layout_key,
+          lv_title   TYPE lvc_title,
+          lo_display TYPE REF TO cl_salv_display_settings.
+
+    lo_layout     = mo_alv->get_layout( ).
+    ls_key-report = sy-repid.
+
+    lo_layout->set_key( ls_key ).
+    lo_layout->set_save_restriction( if_salv_c_layout=>restrict_none ).
+
+*Read variants
+    CLEAR lv_variant.
+
+    lo_layout->set_initial_layout( lv_variant ).
+
+*Zebra pattern (Paint each line with a different gray)
+    lo_display = go_main->mo_alv->get_display_settings( ).
+    lo_display->set_striped_pattern( abap_true ).
+
+*Report title
+    CLEAR lv_title.
+    lv_title = text-m02. "Title report
+    lo_display->set_list_header( value = lv_title ).
+
+  ENDMETHOD.                    "set_layout
+
+  METHOD show.
+    DATA: lo_functions  TYPE REF TO cl_salv_functions_list,
+          lr_events     TYPE REF TO cl_salv_events_table,
+          lr_selections TYPE REF TO cl_salv_selections,
+          lcx_salv_msg  TYPE REF TO cx_salv_msg,
+          lr_con        TYPE REF TO cl_gui_custom_container,
+          lv_msg        TYPE string.
+
+    TRY.
+        CALL METHOD cl_salv_table=>factory
+          IMPORTING
+            r_salv_table = mo_alv     "Global object
+          CHANGING
+            t_table      = mt_outtab. "Output table
+
+      CATCH cx_salv_msg INTO lcx_salv_msg.
+        lv_msg = lcx_salv_msg->get_text( ).
+        MESSAGE lv_msg TYPE 'E'.
+    ENDTRY.
+
+*Modify gui status
+    CALL METHOD mo_alv->set_screen_status(
+      EXPORTING
+        report        = sy-repid
+        pfstatus      = '0200'  "Create gui status (Copy program: SAPLSALV, Status: STANDARD)
+        set_functions = mo_alv->c_functions_all ). "All standard push buttons
+
+*Select records in the report (Mark row)
+    lr_selections = mo_alv->get_selections( ).
+
+*Modify fieldcat
+    do_fieldcat( ).
+
+*Modify layout
+    set_layout( ).
+
+**Events
+    lr_events = mo_alv->get_event( ).
+
+*Object events
+    CREATE OBJECT mo_events.
+*Register event User_command
+    SET HANDLER mo_events->on_user_command FOR lr_events.
+*Register event Double_click
+*    SET HANDLER mo_events->on_double_click FOR lr_events.
+**Register event Link_click
+*    SET HANDLER mo_events->on_link_click FOR lr_events.
+
+*Run ALV
+    CALL METHOD mo_alv->display( ).
+
+  ENDMETHOD.                    "Show
+ENDCLASS.                    "lcl_main IMPLEMENTATION
+*&---------------------------------------------------------------------*
+*&  Include           ZITBMS_EXCEL_PROV_TOP
+*&---------------------------------------------------------------------*
+
+*Tables definition
+TABLES: BKPF.
+
+*Class definition
+CLASS:  lcl_main DEFINITION DEFERRED,
+        lcl_handle_events DEFINITION DEFERRED.
+
+*Internals types
+
+
+TYPES: BEGIN OF ty_alv.
+        INCLUDE STRUCTURE ZST_ITBMS_PROVEEDORES.
+TYPES:
+*  icon        TYPE icon_d,    "Icon
+**  check       TYPE flag,      "Flag
+*  color       TYPE lvc_t_scol, "Color line
+*  cellcolors  TYPE lvc_t_scol, "Color cell
+*  field_style TYPE lvc_t_styl, "Style field
+  END OF ty_alv.
+
+*Globals data
+
+DATA it_itbms_prov TYPE STANDARD TABLE OF ty_alv.
+DATA: go_main    TYPE REF TO lcl_main.
+
+*Definition of selection parameters
+SELECTION-SCREEN BEGIN OF BLOCK a1 WITH FRAME TITLE text-001.
+SELECT-OPTIONS: s_bukrs FOR bkpf-bukrs OBLIGATORY, "NO-EXTENSION,
+                s_belnr FOR bkpf-belnr,
+                s_blart FOR bkpf-blart,
+                s_year  FOR bkpf-gjahr,
+                s_monat FOR bkpf-monat.
+SELECTION-SCREEN END OF BLOCK a1.
