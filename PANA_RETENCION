@@ -1,4 +1,347 @@
+Paso 1 – Vista básica ZMFI_I_PANA_RETENCION
 
+Esta vista replica el SELECT ... ENDSELECT:
+
+WITH_ITEM es la tabla principal.
+BKPF, BSEG, BSET y LFA1 van con left outer join, porque el original hace clear cuando no encuentra el registro y aun así conserva la fila.
+T001 va con inner join, porque siempre existe.
+
+Los sumatorios se calculan como en la query: DMBTR + (QBSHH * -1). Paso los importes a DEC para restar y luego los vuelvo a CURR, así se conserva el formato interno. El coalesce replica el caso en que BSEG no se encuentra y queda en cero.
+
+En ADT o VS Code: New → Data Definition → nombre ZMFI_I_PANA_RETENCION.
+
+abap
+@AccessControl.authorizationCheck: #NOT_REQUIRED
+@EndUserText.label: 'Retenciones Panamá - Vista básica'
+@Metadata.ignorePropagatedAnnotations: true
+define view entity ZMFI_I_PANA_RETENCION
+  as select from    with_item as wi
+    inner join      t001      as t1 on  t1.bukrs = wi.bukrs
+    left outer join bkpf      as bk on  bk.bukrs = wi.bukrs
+                                    and bk.belnr = wi.belnr
+                                    and bk.gjahr = wi.gjahr
+    left outer join bseg      as bs on  bs.bukrs = wi.bukrs
+                                    and bs.belnr = wi.belnr
+                                    and bs.gjahr = wi.gjahr
+                                    and bs.buzei = wi.buzei
+    left outer join bset      as bt on  bt.bukrs = wi.bukrs
+                                    and bt.belnr = wi.belnr
+                                    and bt.gjahr = wi.gjahr
+                                    and bt.buzei = wi.buzei   // replica el join original (ver obs. 3)
+    left outer join lfa1      as lf on  lf.lifnr = wi.wt_acco
+{
+  key wi.bukrs     as CompanyCode,
+  key wi.belnr     as AccountingDocument,
+  key wi.gjahr     as FiscalYear,
+  key wi.buzei     as AccountingDocumentItem,
+  key wi.witht     as WithholdingTaxType,
+      wi.wt_withcd as WithholdingTaxCode,
+      wi.wt_acco   as Supplier,
+
+      // Cabecera documento
+      bk.xblnr     as DocumentReferenceID,
+      bk.monat     as FiscalPeriod,
+      bk.blart     as AccountingDocumentType,
+      bk.bldat     as DocumentDate,
+      bk.budat     as PostingDate,
+      bk.stblg     as ReverseDocument,
+      bk.kursf     as ExchangeRate,
+      bk.waers     as DocumentCurrency,
+      t1.waers     as CompanyCodeCurrency,
+
+      // Impuesto / posición
+      bt.mwskz     as TaxCode,
+      bs.sgtxt     as DocumentItemText,
+
+      // Tercero
+      lf.ktokk     as SupplierAccountGroup,
+      lf.name1     as SupplierName,
+      lf.land1     as Country,
+      lf.stcd1     as TaxNumber1,
+
+      // Importes moneda documento
+      @Semantics.amount.currencyCode: 'DocumentCurrency'
+      bs.wrbtr     as AmountInDocCurrency,
+
+      @Semantics.amount.currencyCode: 'DocumentCurrency'
+      wi.wt_qbshb  as WhldgTaxAmtInDocCrcy,
+
+      // Z_SUMA_MD = BSEG-WRBTR + ( WT_QBSHB * -1 )
+      @Semantics.amount.currencyCode: 'DocumentCurrency'
+      cast( coalesce( cast( bs.wrbtr as abap.dec(23,2) ), cast( 0 as abap.dec(23,2) ) )
+            - cast( wi.wt_qbshb as abap.dec(23,2) )
+            as abap.curr(23,2) ) as SumAmountInDocCurrency,
+
+      // Importes moneda local
+      @Semantics.amount.currencyCode: 'CompanyCodeCurrency'
+      bs.dmbtr     as AmountInCompanyCodeCurrency,
+
+      @Semantics.amount.currencyCode: 'CompanyCodeCurrency'
+      wi.wt_qsshh  as WhldgTaxBaseAmtInCCCrcy,
+
+      @Semantics.amount.currencyCode: 'CompanyCodeCurrency'
+      wi.wt_qbshh  as WhldgTaxAmtInCCCrcy,
+
+      // Z_SUMA_ML = BSEG-DMBTR + ( WT_QBSHH * -1 )
+      @Semantics.amount.currencyCode: 'CompanyCodeCurrency'
+      cast( coalesce( cast( bs.dmbtr as abap.dec(23,2) ), cast( 0 as abap.dec(23,2) ) )
+            - cast( wi.wt_qbshh as abap.dec(23,2) )
+            as abap.curr(23,2) ) as SumAmountInCCCrcy
+}
+
+Actívala y compara en la Data Preview contra la query, filtrando la misma sociedad y ejercicio. El número de registros debe ser idéntico, porque todos los joins van por clave completa y no duplican filas.
+
+Paso 2 – Vista de consumo ZMFI_C_PANA_RETENCION
+
+Aquí van los filtros, las ayudas de búsqueda y la búsqueda libre. Las anotaciones de UI quedan en la metadata extension del paso 3.
+
+Fecha de contabilización usa #INTERVAL para que salga como rango, como el select-option. Los demás filtros aceptan valores múltiples por defecto en Fiori.
+
+abap
+@AccessControl.authorizationCheck: #NOT_REQUIRED
+@EndUserText.label: 'Listado de Retenciones Panamá'
+@Metadata.allowExtensions: true
+@Search.searchable: true
+define view entity ZMFI_C_PANA_RETENCION
+  as select from ZMFI_I_PANA_RETENCION
+{
+      @Consumption.valueHelpDefinition: [{ entity: { name: 'I_CompanyCodeStdVH', element: 'CompanyCode' } }]
+      // @Consumption.filter.mandatory: true     // recomendado
+  key CompanyCode,
+      @Search.defaultSearchElement: true
+  key AccountingDocument,
+  key FiscalYear,
+  key AccountingDocumentItem,
+  key WithholdingTaxType,
+      WithholdingTaxCode,
+
+      @Consumption.valueHelpDefinition: [{ entity: { name: 'I_Supplier_VH', element: 'Supplier' } }]
+      @Search.defaultSearchElement: true
+      Supplier,
+
+      @Search.defaultSearchElement: true
+      DocumentReferenceID,
+      FiscalPeriod,
+      @Consumption.valueHelpDefinition: [{ entity: { name: 'I_AccountingDocumentType', element: 'AccountingDocumentType' } }]
+      AccountingDocumentType,
+      DocumentDate,
+      @Consumption.filter.selectionType: #INTERVAL
+      PostingDate,
+      ReverseDocument,
+      ExchangeRate,
+      DocumentCurrency,
+      CompanyCodeCurrency,
+      TaxCode,
+      DocumentItemText,
+      SupplierAccountGroup,
+      @Search.defaultSearchElement: true
+      SupplierName,
+      Country,
+      @Search.defaultSearchElement: true
+      TaxNumber1,
+
+      @Semantics.amount.currencyCode: 'DocumentCurrency'
+      AmountInDocCurrency,
+      @Semantics.amount.currencyCode: 'DocumentCurrency'
+      WhldgTaxAmtInDocCrcy,
+      @Semantics.amount.currencyCode: 'DocumentCurrency'
+      SumAmountInDocCurrency,
+
+      @Semantics.amount.currencyCode: 'CompanyCodeCurrency'
+      AmountInCompanyCodeCurrency,
+      @Semantics.amount.currencyCode: 'CompanyCodeCurrency'
+      WhldgTaxBaseAmtInCCCrcy,
+      @Semantics.amount.currencyCode: 'CompanyCodeCurrency'
+      WhldgTaxAmtInCCCrcy,
+      @Semantics.amount.currencyCode: 'CompanyCodeCurrency'
+      SumAmountInCCCrcy
+}
+Paso 3 – Metadata extension ZMFI_C_PANA_RETENCION
+
+En ADT o VS Code: New → Metadata Extension, con el mismo nombre que la vista de consumo.
+
+Los filtros siguen el orden de la pantalla de selección (SP$00001 a SP$00009).
+Las columnas siguen el orden exacto del layout G00.
+Las etiquetas salen de los textos A/B de la query.
+Sociedad, Posición y Doc. anulación no eran columnas en el original. Sociedad y Doc. anulación quedan solo como filtro.
+abap
+@Metadata.layer: #CUSTOMER
+@UI.headerInfo: { typeName: 'Retención', typeNamePlural: 'Retenciones' }
+@UI.presentationVariant: [{
+  sortOrder:      [ { by: 'Supplier', direction: #ASC },
+                    { by: 'AccountingDocument', direction: #ASC } ],
+  visualizations: [ { type: #AS_LINEITEM } ]
+}]
+annotate view ZMFI_C_PANA_RETENCION with
+{
+  @EndUserText.label: 'Sociedad'
+  @UI.selectionField: [{ position: 10 }]
+  CompanyCode;
+
+  @EndUserText.label: 'Ejercicio'
+  @UI.selectionField: [{ position: 20 }]
+  @UI.lineItem:       [{ position: 40 }]
+  FiscalYear;
+
+  @EndUserText.label: 'Nº doc.'
+  @UI.selectionField: [{ position: 30 }]
+  @UI.lineItem:       [{ position: 70 }]
+  AccountingDocument;
+
+  @EndUserText.label: 'Posición'
+  AccountingDocumentItem;
+
+  @EndUserText.label: 'Tipo retención'
+  @UI.selectionField: [{ position: 40 }]
+  @UI.lineItem:       [{ position: 100 }]
+  WithholdingTaxType;
+
+  @EndUserText.label: 'Ind. retención'
+  @UI.selectionField: [{ position: 50 }]
+  @UI.lineItem:       [{ position: 110 }]
+  WithholdingTaxCode;
+
+  @EndUserText.label: 'Nº cta. A/D'
+  @UI.selectionField: [{ position: 60 }]
+  @UI.lineItem:       [{ position: 10 }]
+  Supplier;
+
+  @EndUserText.label: 'Fe. contab.'
+  @UI.selectionField: [{ position: 70 }]
+  @UI.lineItem:       [{ position: 170 }]
+  PostingDate;
+
+  @EndUserText.label: 'Clase doc.'
+  @UI.selectionField: [{ position: 80 }]
+  @UI.lineItem:       [{ position: 60 }]
+  AccountingDocumentType;
+
+  @EndUserText.label: 'Doc. anulación'
+  @UI.selectionField: [{ position: 90 }]
+  ReverseDocument;
+
+  @EndUserText.label: 'Grupo'
+  @UI.lineItem:       [{ position: 20 }]
+  SupplierAccountGroup;
+
+  @EndUserText.label: 'Referencia'
+  @UI.lineItem:       [{ position: 30 }]
+  DocumentReferenceID;
+
+  @EndUserText.label: 'Período'
+  @UI.lineItem:       [{ position: 50 }]
+  FiscalPeriod;
+
+  @EndUserText.label: 'Fecha doc.'
+  @UI.lineItem:       [{ position: 80 }]
+  DocumentDate;
+
+  @EndUserText.label: 'Indicador IVA'
+  @UI.lineItem:       [{ position: 90 }]
+  TaxCode;
+
+  @EndUserText.label: 'Tipo cambio'
+  @UI.lineItem:       [{ position: 120 }]
+  ExchangeRate;
+
+  @EndUserText.label: 'Moneda'
+  @UI.lineItem:       [{ position: 130 }]
+  DocumentCurrency;
+
+  @EndUserText.label: 'Importe'
+  @UI.lineItem:       [{ position: 140 }]
+  AmountInDocCurrency;
+
+  @EndUserText.label: 'Imp. retención MD'
+  @UI.lineItem:       [{ position: 150 }]
+  WhldgTaxAmtInDocCrcy;
+
+  @EndUserText.label: 'Sumatorio Importe Documento'
+  @UI.lineItem:       [{ position: 160 }]
+  SumAmountInDocCurrency;
+
+  @EndUserText.label: 'Texto'
+  @UI.lineItem:       [{ position: 180 }]
+  DocumentItemText;
+
+  @EndUserText.label: 'Nombre 1'
+  @UI.lineItem:       [{ position: 190 }]
+  SupplierName;
+
+  @EndUserText.label: 'País'
+  @UI.lineItem:       [{ position: 200 }]
+  Country;
+
+  @EndUserText.label: 'Nº id. fiscal'
+  @UI.lineItem:       [{ position: 210 }]
+  TaxNumber1;
+
+  @EndUserText.label: 'Moneda local'
+  CompanyCodeCurrency;
+
+  @EndUserText.label: 'Importe ML'
+  @UI.lineItem:       [{ position: 220 }]
+  AmountInCompanyCodeCurrency;
+
+  @EndUserText.label: 'Base imponible ret.'
+  @UI.lineItem:       [{ position: 230 }]
+  WhldgTaxBaseAmtInCCCrcy;
+
+  @EndUserText.label: 'Importe de retención'
+  @UI.lineItem:       [{ position: 240 }]
+  WhldgTaxAmtInCCCrcy;
+
+  @EndUserText.label: 'Sumatorio Importe Local'
+  @UI.lineItem:       [{ position: 250 }]
+  SumAmountInCCCrcy;
+}
+Paso 4 – Service definition ZMFI_UI_PANA_RETENCION
+abap
+@EndUserText.label: 'Listado de Retenciones Panamá'
+define service ZMFI_UI_PANA_RETENCION {
+  expose ZMFI_C_PANA_RETENCION as Retenciones;
+}
+Paso 5 – Service binding ZMFI_UI_PANA_RETENCION_O4
+Clic derecho sobre la service definition → New Service Binding.
+Binding type: OData V4 - UI.
+Actívalo y dale Publish. Si en tu sistema el publish local no está permitido, publícalo desde /IWFND/V4_ADMIN, en el grupo de servicios.
+Selecciona la entidad Retenciones y haz Preview para validar filtros y columnas antes de generar la app.
+Paso 6 – App Fiori Elements en VS Code (GridTable)
+Ctrl+Shift+P → Fiori: Open Application Generator → List Report Page.
+Data source: Connect to a System, tu sistema S/4, y el servicio ZMFI_UI_PANA_RETENCION_O4.
+Main entity: Retenciones. Si el generador te muestra la opción Table Type, elige Grid.
+Pon el nombre del proyecto, el namespace y el título. Ten cuidado de no poner mayúsculas en el module name.
+En webapp/manifest.json, en el target de la List Report, deja los settings así. Si el generador ya puso GridTable, solo agrega initialLoad y el resto:
+json
+"RetencionesList": {
+  "type": "Component",
+  "id": "RetencionesList",
+  "name": "sap.fe.templates.ListReport",
+  "options": {
+    "settings": {
+      "contextPath": "/Retenciones",
+      "variantManagement": "Page",
+      "initialLoad": "Disabled",
+      "controlConfiguration": {
+        "@com.sap.vocabularies.UI.v1.LineItem": {
+          "tableSettings": {
+            "type": "GridTable",
+            "enableExport": true,
+            "condensedTableLayout": true,
+            "widthIncludingColumnHeader": true,
+            "selectionMode": "None"
+          }
+        }
+      }
+    }
+  }
+}
+
+Con initialLoad: Disabled la app no lee nada hasta que el usuario pulse “Ir”, igual que la pantalla de selección de la query. Así evitas que se lea toda WITH_ITEM al abrir.
+
+Prueba con Preview Application (npm start) y compara contra la query: mismos filtros, mismo número de filas, y revisa los dos sumatorios en algunos documentos.
+
+Para producción, la query original solo validaba los grupos de autorización de tablas. Puedes dejar #NOT_REQUIRED como en tus otras migraciones, o agregarle un DCL por sociedad (F_BKPF_BUK) a la vista de consumo. Si quieres, te lo paso.
 *****************************Textos Seleccion*****
 %ABC	Análisis ABC
 %ALV	List Viewer ABAP
