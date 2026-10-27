@@ -97,11 +97,6 @@
           "pattern": ":?query:",
           "name": "MexInformeList",
           "target": "MexInformeList"
-        },
-        {
-          "pattern": "MexInforme({key}):?query:",
-          "name": "MexInformeObjectPage",
-          "target": "MexInformeObjectPage"
         }
       ],
       "targets": {
@@ -113,31 +108,21 @@
             "settings": {
               "contextPath": "/MexInforme",
               "variantManagement": "Page",
-              "navigation": {
-                "MexInforme": {
-                  "detail": {
-                    "route": "MexInformeObjectPage"
-                  }
-                }
-              },
+              "initialLoad": false,
               "controlConfiguration": {
                 "@com.sap.vocabularies.UI.v1.LineItem": {
                   "tableSettings": {
-                    "type": "GridTable"
+                    "type": "GridTable",
+                    "selectionMode": "Multi",
+                    "personalization": {
+                      "column": true,
+                      "sort": true,
+                      "filter": true,
+                      "group": true
+                    }
                   }
                 }
               }
-            }
-          }
-        },
-        "MexInformeObjectPage": {
-          "type": "Component",
-          "id": "MexInformeObjectPage",
-          "name": "sap.fe.templates.ObjectPage",
-          "options": {
-            "settings": {
-              "editableHeaderContent": false,
-              "contextPath": "/MexInforme"
             }
           }
         }
