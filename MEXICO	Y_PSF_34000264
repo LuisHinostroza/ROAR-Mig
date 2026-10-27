@@ -1,3 +1,467 @@
+Paso a paso
+
+En Eclipse ADT (paquete de desarrollo y orden de transporte del proyecto):
+
+Vista basic: clic derecho en el paquete → New → Other ABAP Repository Object → Core Data Services → Data Definition → nombre ZI_RETENMXWITHITEM. Pega el código 1 y activa.
+Vista composite: igual, con nombre ZC_RETENMX. Pega el código 2 y activa.
+Vista de consumo: igual, con nombre ZCP_RETENMX. Pega el código 3 y activa.
+Metadata Extension: New → Core Data Services → Metadata Extension → nombre ZCP_RETENMX. Pega el código 4 y activa.
+DCL: New → Core Data Services → Access Control → nombre ZRL_RETENMX_AUTH. Pega el código 5 y activa.
+Service Definition: New → Business Services → Service Definition → nombre ZSD_RETENMX. Pega el código 6 y activa.
+Service Binding: New → Business Services → Service Binding → nombre ZSB_RETENMX, tipo OData V4 - UI, service definition ZSD_RETENMX. Activa y presiona Publish. Ahí mismo, con Preview sobre la entidad Retenciones, ya puedes probar los datos antes de hacer la app.
+
+En VS Code (Fiori tools):
+
+Ctrl+Shift+P → Fiori: Open Application Generator → List Report Page → Data source: Connect to a system → selecciona el sistema y el servicio ZSB_RETENMX (OData V4) → Main entity: Retenciones → sin navegación a Object Page.
+Datos del proyecto: module name retencionesmx, namespace mapfre.fi. Con eso el id queda mapfre.fi.retencionesmx.
+Reemplaza el contenido de webapp/manifest.json, webapp/Component.js y webapp/i18n/i18n.properties con los códigos 7, 8 y 9.
+Prueba local con npm start. Luego npm run build, que genera la carpeta dist.
+
+Despliegue (igual que Contrapartida):
+
+SE38 → /UI5/UI5_REPOSITORY_LOAD → BSP ZMFI_RETENMX, sube la carpeta dist, con paquete y orden de transporte.
+Launchpad: target mapping con semantic object ZRetencionesMx, acción display, apuntando a la BSP ZMFI_RETENMX (id mapfre.fi.retencionesmx). Asígnalo al catálogo y rol que corresponda.
+
+Validación:
+
+Corre la query original y la app con la misma sociedad, ejercicio y periodo. Compara el número de líneas y la suma del importe de retención (WT_QBSHB).
+1. ZI_RetenMxWithItem (Data Definition)
+abap
+@AccessControl.authorizationCheck: #NOT_REQUIRED
+@EndUserText.label: 'Retenciones MX - Partida retención (basic)'
+@Metadata.ignorePropagatedAnnotations: true
+@VDM.viewType: #BASIC
+@ObjectModel.usageType: {
+  serviceQuality: #C,
+  sizeCategory:   #XL,
+  dataClass:      #TRANSACTIONAL
+}
+/*
+  Origen: SAP Query ZRETEN_MEXA (InfoSet ZZRETENCIONES)
+  - WITH_ITEM            -> partida de retención
+  - BKPF (I_JournalEntry)-> fecha contab., clase doc., moneda documento
+  - T001 (I_CompanyCode) -> moneda local (en la query nunca se leía: T001-WAERS iba vacía)
+*/
+define view entity ZI_RetenMxWithItem
+  as select from with_item      as wi
+    inner join   I_JournalEntry as je on  je.CompanyCode        = wi.bukrs
+                                      and je.AccountingDocument = wi.belnr
+                                      and je.FiscalYear         = wi.gjahr
+    inner join   I_CompanyCode  as cc on  cc.CompanyCode = wi.bukrs
+{
+  key wi.bukrs                  as CompanyCode,
+  key wi.belnr                  as AccountingDocument,
+  key wi.gjahr                  as FiscalYear,
+  key wi.buzei                  as AccountingDocumentItem,
+  key wi.witht                  as WithholdingTaxType,
+      wi.wt_withcd              as WithholdingTaxCode,
+      wi.wt_acco                as Supplier,
+      wi.hkont                  as GLAccount,
+      wi.hkont_opp              as OffsettingGLAccount,
+      wi.augbl                  as ClearingAccountingDocument,
+      wi.qsatz                  as WithholdingTaxPercent,
+
+      je.PostingDate            as PostingDate,
+      je.AccountingDocumentType as AccountingDocumentType,
+
+      je.TransactionCurrency    as TransactionCurrency,
+      cc.Currency               as CompanyCodeCurrency,
+
+      @Semantics.amount.currencyCode: 'CompanyCodeCurrency'
+      wi.wt_qsshh               as WhldgTaxBaseAmtInCoCodeCrcy,
+
+      @Semantics.amount.currencyCode: 'TransactionCurrency'
+      wi.wt_qbshb               as WhldgTaxAmtInTransacCrcy
+}
+2. ZC_RetenMx (Data Definition)
+abap
+@AccessControl.authorizationCheck: #NOT_REQUIRED
+@EndUserText.label: 'Retenciones MX - Composite'
+@Metadata.ignorePropagatedAnnotations: true
+@VDM.viewType: #COMPOSITE
+@ObjectModel.usageType: {
+  serviceQuality: #C,
+  sizeCategory:   #XL,
+  dataClass:      #TRANSACTIONAL
+}
+/*
+  - BSEG-ZUONR -> I_OperationalAcctgDocItem.AssignmentReference (llave completa con BUZEI, 1:1)
+  - LFA1       -> NAME1 / STCD1 por WT_ACCO (left outer, igual que la query)
+*/
+define view entity ZC_RetenMx
+  as select from    ZI_RetenMxWithItem        as wi
+    left outer join I_OperationalAcctgDocItem as it  on  it.CompanyCode            = wi.CompanyCode
+                                                     and it.AccountingDocument     = wi.AccountingDocument
+                                                     and it.FiscalYear             = wi.FiscalYear
+                                                     and it.AccountingDocumentItem = wi.AccountingDocumentItem
+    left outer join lfa1                      as sup on  sup.lifnr = wi.Supplier
+{
+  key wi.CompanyCode,
+  key wi.AccountingDocument,
+  key wi.FiscalYear,
+  key wi.AccountingDocumentItem,
+  key wi.WithholdingTaxType,
+      wi.WithholdingTaxCode,
+      wi.Supplier,
+      sup.name1                 as SupplierName,
+      sup.stcd1                 as TaxNumber1,
+      wi.PostingDate,
+      wi.AccountingDocumentType,
+      wi.GLAccount,
+      wi.OffsettingGLAccount,
+      wi.ClearingAccountingDocument,
+      it.AssignmentReference,
+      wi.WithholdingTaxPercent,
+
+      wi.TransactionCurrency,
+      wi.CompanyCodeCurrency,
+
+      @Semantics.amount.currencyCode: 'TransactionCurrency'
+      wi.WhldgTaxAmtInTransacCrcy,
+
+      @Semantics.amount.currencyCode: 'CompanyCodeCurrency'
+      wi.WhldgTaxBaseAmtInCoCodeCrcy
+}
+3. ZCP_RetenMx (Data Definition)
+abap
+@AccessControl.authorizationCheck: #CHECK
+@EndUserText.label: 'Retenciones México'
+@Metadata.allowExtensions: true
+@VDM.viewType: #CONSUMPTION
+@Search.searchable: true
+@ObjectModel.usageType: {
+  serviceQuality: #C,
+  sizeCategory:   #XL,
+  dataClass:      #TRANSACTIONAL
+}
+define root view entity ZCP_RetenMx
+  as select from ZC_RetenMx
+{
+      @EndUserText.label: 'Sociedad'
+      @Consumption.filter.mandatory: true
+      @Consumption.valueHelpDefinition: [{ entity: { name: 'I_CompanyCodeStdVH', element: 'CompanyCode' } }]
+  key CompanyCode,
+
+      @EndUserText.label: 'Documento'
+      @Search.defaultSearchElement: true
+  key AccountingDocument,
+
+      @EndUserText.label: 'Ejercicio'
+  key FiscalYear,
+
+      @EndUserText.label: 'Posición'
+  key AccountingDocumentItem,
+
+      @EndUserText.label: 'Tipo de retención'
+  key WithholdingTaxType,
+
+      @EndUserText.label: 'Indicador de retención'
+      WithholdingTaxCode,
+
+      @EndUserText.label: 'Acreedor'
+      @Search.defaultSearchElement: true
+      @Consumption.valueHelpDefinition: [{ entity: { name: 'I_Supplier_VH', element: 'Supplier' } }]
+      Supplier,
+
+      @EndUserText.label: 'Nombre'
+      @Search.defaultSearchElement: true
+      @Search.fuzzinessThreshold: 0.8
+      SupplierName,
+
+      @EndUserText.label: 'RFC'
+      @Search.defaultSearchElement: true
+      TaxNumber1,
+
+      @EndUserText.label: 'Fecha contabilización'
+      PostingDate,
+
+      @EndUserText.label: 'Clase de documento'
+      AccountingDocumentType,
+
+      @EndUserText.label: 'Cuenta de mayor'
+      GLAccount,
+
+      @EndUserText.label: 'Cuenta contrapartida'
+      OffsettingGLAccount,
+
+      @EndUserText.label: 'Doc. compensación'
+      ClearingAccountingDocument,
+
+      @EndUserText.label: 'Asignación'
+      AssignmentReference,
+
+      @EndUserText.label: '% Retención'
+      WithholdingTaxPercent,
+
+      @EndUserText.label: 'Moneda documento'
+      TransactionCurrency,
+
+      @EndUserText.label: 'Moneda local'
+      CompanyCodeCurrency,
+
+      @EndUserText.label: 'Importe retención (MD)'
+      @Semantics.amount.currencyCode: 'TransactionCurrency'
+      WhldgTaxAmtInTransacCrcy,
+
+      @EndUserText.label: 'Base imponible (ML)'
+      @Semantics.amount.currencyCode: 'CompanyCodeCurrency'
+      WhldgTaxBaseAmtInCoCodeCrcy
+}
+4. ZCP_RetenMx (Metadata Extension)
+abap
+@Metadata.layer: #CUSTOMER
+@UI: {
+  headerInfo: {
+    typeName:       'Retención',
+    typeNamePlural: 'Retenciones'
+  },
+  presentationVariant: [{
+    sortOrder: [
+      { by: 'SupplierName', direction: #ASC },
+      { by: 'TaxNumber1',   direction: #ASC },
+      { by: 'Supplier',     direction: #ASC }
+    ],
+    visualizations: [{ type: #AS_LINEITEM }]
+  }]
+}
+annotate entity ZCP_RetenMx with
+{
+  /* ---------- Filtros (mismo set que la pantalla de selección de la query) ---------- */
+  @UI.selectionField: [{ position: 10 }]
+  CompanyCode;
+
+  @UI.selectionField: [{ position: 20 }]
+  FiscalYear;
+
+  @UI.selectionField: [{ position: 30 }]
+  AccountingDocumentType;
+
+  @UI.selectionField: [{ position: 40 }]
+  @UI.lineItem:       [{ position: 30, importance: #HIGH }]
+  Supplier;
+
+  @UI.selectionField: [{ position: 50 }]
+  @UI.lineItem:       [{ position: 40, importance: #HIGH }]
+  AccountingDocument;
+
+  @UI.selectionField: [{ position: 60 }]
+  @UI.lineItem:       [{ position: 50, importance: #HIGH }]
+  PostingDate;
+
+  @UI.selectionField: [{ position: 70 }]
+  @UI.lineItem:       [{ position: 70, importance: #HIGH }]
+  WithholdingTaxType;
+
+  @UI.selectionField: [{ position: 80 }]
+  @UI.lineItem:       [{ position: 60, importance: #HIGH }]
+  WithholdingTaxCode;
+
+  @UI.selectionField: [{ position: 90 }]
+  GLAccount;
+
+  @UI.selectionField: [{ position: 100 }]
+  ClearingAccountingDocument;
+
+  /* ---------- Columnas (orden de la lista básica) ---------- */
+  @UI.lineItem: [{ position: 10, importance: #HIGH }]
+  SupplierName;
+
+  @UI.lineItem: [{ position: 20, importance: #HIGH }]
+  TaxNumber1;
+
+  @UI.lineItem: [{ position: 80, importance: #HIGH }]
+  WithholdingTaxPercent;
+
+  @UI.lineItem: [{ position: 90, importance: #HIGH }]
+  WhldgTaxAmtInTransacCrcy;
+
+  @UI.lineItem: [{ position: 100, importance: #HIGH }]
+  WhldgTaxBaseAmtInCoCodeCrcy;
+
+  @UI.lineItem: [{ position: 110, importance: #HIGH }]
+  OffsettingGLAccount;
+
+  @UI.lineItem: [{ position: 120, importance: #HIGH }]
+  AssignmentReference;
+}
+5. ZRL_RETENMX_AUTH (Access Control)
+abap
+@EndUserText.label: 'Retenciones MX - Autorización por sociedad'
+@MappingRole: true
+define role ZRL_RETENMX_AUTH {
+  grant select on ZCP_RetenMx
+    where ( CompanyCode ) = aspect pfcg_auth( F_BKPF_BUK, BUKRS, ACTVT = '03' );
+}
+6. ZSD_RETENMX (Service Definition)
+abap
+@EndUserText.label: 'Retenciones México'
+define service ZSD_RETENMX {
+  expose ZCP_RetenMx as Retenciones;
+}
+
+Service Binding ZSB_RETENMX: tipo OData V4 - UI sobre ZSD_RETENMX, activar y Publish. La URL resultante es la que usa el manifest:
+/sap/opu/odata4/sap/zsb_retenmx/srvd/sap/zsd_retenmx/0001/
+
+7. webapp/manifest.json
+json
+{
+  "_version": "1.59.0",
+  "sap.app": {
+    "id": "mapfre.fi.retencionesmx",
+    "type": "application",
+    "i18n": "i18n/i18n.properties",
+    "applicationVersion": {
+      "version": "0.0.1"
+    },
+    "title": "{{appTitle}}",
+    "description": "{{appDescription}}",
+    "sourceTemplate": {
+      "id": "@sap/generator-fiori:lrop",
+      "version": "1.15.0"
+    },
+    "dataSources": {
+      "mainService": {
+        "uri": "/sap/opu/odata4/sap/zsb_retenmx/srvd/sap/zsd_retenmx/0001/",
+        "type": "OData",
+        "settings": {
+          "annotations": [],
+          "odataVersion": "4.0"
+        }
+      }
+    },
+    "crossNavigation": {
+      "inbounds": {
+        "ZRetencionesMx-display": {
+          "semanticObject": "ZRetencionesMx",
+          "action": "display",
+          "title": "{{appTitle}}",
+          "signature": {
+            "parameters": {},
+            "additionalParameters": "allowed"
+          }
+        }
+      }
+    }
+  },
+  "sap.ui": {
+    "technology": "UI5",
+    "icons": {
+      "icon": "",
+      "favIcon": "",
+      "phone": "",
+      "phone@2": "",
+      "tablet": "",
+      "tablet@2": ""
+    },
+    "deviceTypes": {
+      "desktop": true,
+      "tablet": true,
+      "phone": true
+    }
+  },
+  "sap.ui5": {
+    "flexEnabled": true,
+    "dependencies": {
+      "minUI5Version": "1.120.0",
+      "libs": {
+        "sap.m": {},
+        "sap.ui.core": {},
+        "sap.fe.templates": {}
+      }
+    },
+    "contentDensities": {
+      "compact": true,
+      "cozy": true
+    },
+    "models": {
+      "i18n": {
+        "type": "sap.ui.model.resource.ResourceModel",
+        "settings": {
+          "bundleName": "mapfre.fi.retencionesmx.i18n.i18n"
+        }
+      },
+      "": {
+        "dataSource": "mainService",
+        "preload": true,
+        "settings": {
+          "operationMode": "Server",
+          "autoExpandSelect": true,
+          "earlyRequests": true
+        }
+      },
+      "@i18n": {
+        "type": "sap.ui.model.resource.ResourceModel",
+        "uri": "i18n/i18n.properties"
+      }
+    },
+    "resources": {
+      "css": []
+    },
+    "routing": {
+      "config": {},
+      "routes": [
+        {
+          "pattern": ":?query:",
+          "name": "RetencionesList",
+          "target": "RetencionesList"
+        }
+      ],
+      "targets": {
+        "RetencionesList": {
+          "type": "Component",
+          "id": "RetencionesList",
+          "name": "sap.fe.templates.ListReport",
+          "options": {
+            "settings": {
+              "contextPath": "/Retenciones",
+              "variantManagement": "Page",
+              "initialLoad": "Disabled",
+              "controlConfiguration": {
+                "@com.sap.vocabularies.UI.v1.LineItem": {
+                  "tableSettings": {
+                    "type": "GridTable",
+                    "selectionMode": "None",
+                    "enableExport": true,
+                    "enableFullScreen": true,
+                    "condensedTableLayout": true
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "sap.fiori": {
+    "registrationIds": [],
+    "archeType": "transactional"
+  }
+}
+8. webapp/Component.js
+javascript
+sap.ui.define(["sap/fe/core/AppComponent"], function (Component) {
+    "use strict";
+
+    return Component.extend("mapfre.fi.retencionesmx.Component", {
+        metadata: {
+            manifest: "json"
+        }
+    });
+});
+9. webapp/i18n/i18n.properties
+properties
+# Retenciones México (migración SAP Query ZRETEN_MEXA)
+appTitle=Retenciones México
+appDescription=Listado de partidas de retención por acreedor
+
+Si algo no activa:
+
+hkont_opp no existe en WITH_ITEM del S/4 (revísalo en SE11): quita OffsettingGLAccount de las vistas 1, 2 y 3 y de la Metadata Extension.
+I_CompanyCodeStdVH o I_Supplier_VH dan error: quita solo esa anotación @Consumption.valueHelpDefinition. El filtro sigue funcionando, solo sin ayuda de búsqueda.
+El generador de VS Code puso otro id de app: el id dentro de manifest.json (sap.app.id), el bundleName del modelo i18n y el nombre en Component.js deben coincidir entre sí.
+
+
 *****************Base de datos logica
 Base de datos lógica __S                   Proceso sin base de datos
 **************************Textos seleccion
