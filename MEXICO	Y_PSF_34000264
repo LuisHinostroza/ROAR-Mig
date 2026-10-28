@@ -1,3 +1,53 @@
+@AccessControl.authorizationCheck: #NOT_REQUIRED
+@EndUserText.label: 'Retenciones MX - Composite'
+@Metadata.ignorePropagatedAnnotations: true
+@VDM.viewType: #COMPOSITE
+@ObjectModel.usageType: {
+  serviceQuality: #C,
+  sizeCategory:   #XL,
+  dataClass:      #TRANSACTIONAL
+}
+/*
+  - BSEG-ZUONR -> I_OperationalAcctgDocItem.AssignmentReference (llave completa con BUZEI, 1:1)
+  - BSEG-GKONT -> I_OperationalAcctgDocItem.OffsettingAccount de la posición del acreedor
+                  (WITH_ITEM-HKONT_OPP viene vacío en facturas normales)
+  - LFA1       -> NAME1 / STCD1 por WT_ACCO (left outer, igual que la query)
+*/
+define view entity ZC_RetenMx
+  as select from    ZI_RetenMxWithItem        as wi
+    left outer join I_OperationalAcctgDocItem as it  on  it.CompanyCode            = wi.CompanyCode
+                                                     and it.AccountingDocument     = wi.AccountingDocument
+                                                     and it.FiscalYear             = wi.FiscalYear
+                                                     and it.AccountingDocumentItem = wi.AccountingDocumentItem
+    left outer join lfa1                      as sup on  sup.lifnr = wi.Supplier
+{
+  key wi.CompanyCode,
+  key wi.AccountingDocument,
+  key wi.FiscalYear,
+  key wi.AccountingDocumentItem,
+  key wi.WithholdingTaxType,
+      wi.WithholdingTaxCode,
+      wi.Supplier,
+      sup.name1                 as SupplierName,
+      sup.stcd1                 as TaxNumber1,
+      wi.PostingDate,
+      wi.AccountingDocumentType,
+      wi.GLAccount,
+      it.OffsettingAccount      as OffsettingGLAccount,
+      wi.ClearingAccountingDocument,
+      it.AssignmentReference,
+      wi.WithholdingTaxPercent,
+
+      wi.TransactionCurrency,
+      wi.CompanyCodeCurrency,
+
+      @Semantics.amount.currencyCode: 'TransactionCurrency'
+      wi.WhldgTaxAmtInTransacCrcy,
+
+      @Semantics.amount.currencyCode: 'CompanyCodeCurrency'
+      wi.WhldgTaxBaseAmtInCoCodeCrcy
+}
+************************************************+
 {
   "_version": "1.60.0",
   "sap.app": {
