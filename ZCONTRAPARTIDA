@@ -1,3 +1,38 @@
+Memoria recuperada
+Tiene razón: esos dos campos no se incluyeron en la cadena de CDS. Las 18 columnas del selector son exactamente lo que expone ZCP_Contrapartida, así que no es un tema de UI. Hay que agregar los campos en cada capa.
+
+Antes de tocar código, revisa en el InfoSet de la query (SQ02) cómo se calcula CTA_ALTERNATIVA. Por el nombre, parece un campo adicional con código ABAP propio y no un campo de tabla. Lo normal es que lea SKB1-ALTKT (cuenta alternativa de la cuenta de mayor en la sociedad), pero confírmalo. También revisa de qué línea sale el centro de coste: en un informe de contrapartida suele ser la línea de gasto, no la del proveedor o deudor.
+
+Si es lo habitual, quedaría así:
+
+1. Capa basic (ZI_Contrapartida), donde lees la línea de contrapartida:
+
+abap
+  @ObjectModel.foreignKey.association: '_CostCenter'
+  Item.CostCenter,
+  Item._GLAccountInCompanyCode.AlternativeGLAccount as AlternativeGLAccount,
+Verifica con F2 el nombre exacto del campo en I_GLAccountInCompanyCode. Si no te convence, haz un JOIN directo a skb1 por bukrs/saknr y toma altkt.
+
+2. Composite (ZC_Contrapartida) y consumption (ZCP_Contrapartida): propaga los dos campos:
+
+abap
+  CostCenter,
+  AlternativeGLAccount,
+3. Metadata Extension: para que salgan visibles por defecto y como filtro:
+
+abap
+  @UI.lineItem: [{ position: 190, label: 'Ce coste' }]
+  @UI.selectionField: [{ position: 90 }]
+  CostCenter;
+  @UI.lineItem: [{ position: 200, label: 'Cta. alternativa' }]
+  AlternativeGLAccount;
+Activa todo, refresca el Service Binding y vacía la caché del navegador. Si es V4, a veces también hace falta /IWFND/CACHE_CLEANUP.
+
+Otro punto importante: dice “algunos de ellos”, así que probablemente faltan más campos. Te conviene sacar la lista completa de columnas de la query original (SQ01/SQ02, campos de salida del AQCS01) y compararla contra tus 18. Así cierras todo en una sola entrega y no campo por campo. Si me pasas esa lista o el código actual de ZI_Contrapartida, te devuelvo los archivos completos ya ajustados.
+
+**************************************************************************
+
+
 https://<host>/sap/opu/odata4/sap/zsb_lp_listadopagos/srvd/sap/zsd_lp_listadopagos/0001/$metadata?sap-client=XXX
 https://<host>/sap/opu/odata4/sap/zsb_contrapartida/srvd/sap/zsd_contrapartida/0001/$metadata?sap-client=XXX
 
