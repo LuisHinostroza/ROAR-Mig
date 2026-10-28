@@ -1,3 +1,48 @@
+Es igual que los otros dos campos, y más sencillo porque la clase de documento (BLART) es de cabecera: es la misma para todas las líneas del documento, así que no importa de qué línea la tomes.
+
+1. Basic (ZI_Contrapartida):
+
+abap
+  @ObjectModel.foreignKey.association: '_AccountingDocumentType'
+  Item.AccountingDocumentType,
+
+Si quieres mostrar también el texto (“Factura acreedor”, etc.), expón la asociación en la lista de campos:
+
+abap
+  Item._AccountingDocumentType,
+
+2. Composite (ZC_Contrapartida) y consumption (ZCP_Contrapartida): propágalo en las dos.
+
+abap
+  AccountingDocumentType,
+  _AccountingDocumentType,
+
+En la consumption, para que Fiori pinte la descripción junto al código y te dé ayuda de búsqueda en el filtro:
+
+abap
+  @ObjectModel.text.element: ['AccountingDocumentTypeName']
+  @Consumption.valueHelpDefinition: [{ entity: { name: 'I_AccountingDocumentType',
+                                                 element: 'AccountingDocumentType' } }]
+  AccountingDocumentType,
+  _AccountingDocumentType._Text[1: Language = $session.system_language].AccountingDocumentTypeName
+      as AccountingDocumentTypeName,
+
+Verifica con F2 los nombres de la asociación de texto y del campo de nombre en I_AccountingDocumentType. Si no te cuadran, usa I_AccountingDocumentTypeText directamente.
+
+3. Metadata Extension:
+
+abap
+  @UI.lineItem: [{ position: 15, label: 'Clase doc.' }]
+  @UI.selectionField: [{ position: 20 }]
+  AccountingDocumentType;
+
+Ajusta la position para que quede donde la tenía la query original. Normalmente va cerca del número de documento.
+
+Activa las capas de abajo hacia arriba (basic → composite → consumption → MDE) y refresca el Service Binding.
+
+Ya que estás agregando campos, te recomiendo hacer de una vez la comparación completa contra las columnas de la query original. Así no se te escapa otro campo en la siguiente revisión.
+***********************************************
+
 Memoria recuperada
 Tiene razón: esos dos campos no se incluyeron en la cadena de CDS. Las 18 columnas del selector son exactamente lo que expone ZCP_Contrapartida, así que no es un tema de UI. Hay que agregar los campos en cada capa.
 
