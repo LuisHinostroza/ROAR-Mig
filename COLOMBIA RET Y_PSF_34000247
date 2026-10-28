@@ -1,3 +1,212 @@
+
+Esto no es un error de la CDS. La columna muestra tal cual el campo WITH_ITEM-QSATZ, que es exactamente lo que mostraba la query original de R/3, solo que ahí la columna se llamaba “Tipo de retención” y por eso nadie lo leía como porcentaje. El problema es que ese campo no es fiable como tasa:
+
+Sale 0 aunque sí hay retención. Es el caso A1/A1, con base -100 e importe -1,50, o sea 1,5% real. Esto pasa cuando la retención se calcula por fórmula o con otra lógica, y SAP no guarda la tasa en QSATZ.
+Sale una tasa que no cuadra con el importe. En el documento 50000034, la línea IC/01 muestra 0,4140 con importe 0. Hay tasa, pero no se practicó retención (por mínimo no alcanzado, retención en pago, etc.).
+En cambio, R7/01 (1,0000 con -1 sobre -100) sí cuadra.
+
+Para confirmarlo, revisa ese documento en SE16N sobre WITH_ITEM (sociedad 0180, documento 50000034, ejercicio 2026). Vas a ver los mismos valores en QSATZ.
+
+Propuesta: quitar QSATZ y mostrar dos columnas:
+
+Tasa efectiva (%): importe de retención / base, ambos en moneda documento (WT_QBSHB / WT_QSSHB × 100). Es lo que de verdad se retuvo y siempre cuadra con los importes.
+Tasa configurada (%): T059Z-QSATZ por país, tipo e indicador. Ojo: en los indicadores que calculan por fórmula también puede salir 0, así que es informativa.
+
+Uso la base en moneda documento (WT_QSSHB) y no la base en moneda local que ya mostramos, para que el cálculo no se rompa si el documento no está en COP. Aquí van los tres objetos completos.
+
+Interface: ZMFI_I_RetAndi
+abap
+@AccessControl.authorizationCheck: #NOT_REQUIRED
+@EndUserText.label: 'Retenciones ANDI - Base'
+define view entity ZMFI_I_RetAndi
+  as select from    with_item as wi
+    inner join      t001      as cc on cc.bukrs = wi.bukrs
+    left outer join bkpf      as hd on  hd.bukrs = wi.bukrs
+                                    and hd.belnr = wi.belnr
+                                    and hd.gjahr = wi.gjahr
+    left outer join lfa1      as su on su.lifnr = wi.wt_acco
+    left outer join t059z     as wc on  wc.land1     = cc.land1
+                                    and wc.witht     = wi.witht
+                                    and wc.wt_withcd = wi.wt_withcd
+{
+  key wi.bukrs     as CompanyCode,
+  key wi.belnr     as AccountingDocument,
+  key wi.gjahr     as FiscalYear,
+  key wi.buzei     as AccountingDocumentItem,
+  key wi.witht     as WithholdingTaxType,
+
+      wi.wt_withcd as WithholdingTaxCode,
+      wi.wt_acco   as Supplier,
+      su.name1     as SupplierName,
+      su.stcd1     as TaxNumber1,
+      hd.budat     as PostingDate,
+
+      // Tasa configurada en customizing (T059Z)
+      wc.qsatz     as ConfiguredWhldgTaxRate,
+
+      // Tasa efectiva = importe retención / base (ambos en moneda documento)
+      case
+        when cast( wi.wt_qsshb as abap.dec(23,2) ) = 0
+          then cast( 0 as abap.dec(13,4) )
+        else cast( division( cast( wi.wt_qbshb as abap.dec(23,2) ) * 100,
+                             cast( wi.wt_qsshb as abap.dec(23,2) ),
+                             4 ) as abap.dec(13,4) )
+      end          as EffectiveWhldgTaxRate,
+
+      @Semantics.amount.currencyCode: 'DocumentCurrency'
+      wi.wt_qbshb  as WhldgTaxAmtInDocCrcy,
+      hd.waers     as DocumentCurrency,
+
+      @Semantics.amount.currencyCode: 'CompanyCodeCurrency'
+      wi.wt_qsshh  as WhldgTaxBaseAmtInCoCrcy,
+      cc.waers     as CompanyCodeCurrency,
+
+      wi.hkont     as GLAccount
+}
+Consumption: ZMFI_C_RetAndi
+abap
+@AccessControl.authorizationCheck: #NOT_REQUIRED
+@EndUserText.label: 'Listado de Retenciones Colombia'
+@Metadata.allowExtensions: true
+@Search.searchable: true
+define view entity ZMFI_C_RetAndi
+  as select from ZMFI_I_RetAndi
+{
+      @EndUserText.label: 'Sociedad'
+      @Consumption.valueHelpDefinition: [{ entity: { name: 'I_CompanyCodeStdVH', element: 'CompanyCode' } }]
+  key CompanyCode,
+
+      @EndUserText.label: 'Nº documento'
+  key AccountingDocument,
+
+      @EndUserText.label: 'Ejercicio'
+  key FiscalYear,
+
+      @EndUserText.label: 'Posición'
+  key AccountingDocumentItem,
+
+      @EndUserText.label: 'Tipo de retenciones'
+  key WithholdingTaxType,
+
+      @EndUserText.label: 'Indicador de retención'
+      WithholdingTaxCode,
+
+      @EndUserText.label: 'Nº cuenta acreedor/deudor'
+      @Consumption.valueHelpDefinition: [{ entity: { name: 'I_Supplier_VH', element: 'Supplier' } }]
+      Supplier,
+
+      @EndUserText.label: 'Nombre 1'
+      @Search.defaultSearchElement: true
+      @Search.fuzzinessThreshold: 0.8
+      SupplierName,
+
+      @EndUserText.label: 'Nº id. fiscal 1'
+      @Search.defaultSearchElement: true
+      TaxNumber1,
+
+      @EndUserText.label: 'Fecha contabilización'
+      @Consumption.filter.selectionType: #INTERVAL
+      PostingDate,
+
+      @EndUserText.label: 'Tasa efectiva (%)'
+      EffectiveWhldgTaxRate,
+
+      @EndUserText.label: 'Tasa configurada (%)'
+      ConfiguredWhldgTaxRate,
+
+      @EndUserText.label: 'Importe retención (mon. doc.)'
+      @Semantics.amount.currencyCode: 'DocumentCurrency'
+      WhldgTaxAmtInDocCrcy,
+
+      @EndUserText.label: 'Moneda documento'
+      DocumentCurrency,
+
+      @EndUserText.label: 'Base imponible ret. (mon. local)'
+      @Semantics.amount.currencyCode: 'CompanyCodeCurrency'
+      WhldgTaxBaseAmtInCoCrcy,
+
+      @EndUserText.label: 'Moneda local'
+      CompanyCodeCurrency,
+
+      @EndUserText.label: 'Cuenta de mayor'
+      GLAccount
+}
+Metadata Extension: ZMFI_C_RetAndi
+abap
+@Metadata.layer: #CUSTOMER
+@UI.headerInfo: { typeName: 'Retención', typeNamePlural: 'Listado de Retenciones' }
+@UI.presentationVariant: [{
+  sortOrder: [ { by: 'Supplier',     direction: #ASC },
+               { by: 'SupplierName', direction: #ASC },
+               { by: 'TaxNumber1',   direction: #ASC } ],
+  visualizations: [{ type: #AS_LINEITEM }]
+}]
+annotate entity ZMFI_C_RetAndi with
+{
+  @UI.selectionField: [{ position: 10 }]
+  @UI.lineItem:       [{ position: 140 }]
+  CompanyCode;
+
+  @UI.selectionField: [{ position: 40 }]
+  @UI.lineItem:       [{ position: 40 }]
+  AccountingDocument;
+
+  @UI.selectionField: [{ position: 20 }]
+  @UI.lineItem:       [{ position: 150 }]
+  FiscalYear;
+
+  @UI.hidden: true
+  AccountingDocumentItem;
+
+  @UI.selectionField: [{ position: 60 }]
+  @UI.lineItem:       [{ position: 70 }]
+  WithholdingTaxType;
+
+  @UI.selectionField: [{ position: 70 }]
+  @UI.lineItem:       [{ position: 60 }]
+  WithholdingTaxCode;
+
+  @UI.selectionField: [{ position: 30 }]
+  @UI.lineItem:       [{ position: 30 }]
+  Supplier;
+
+  @UI.lineItem:       [{ position: 10 }]
+  SupplierName;
+
+  @UI.lineItem:       [{ position: 20 }]
+  TaxNumber1;
+
+  @UI.selectionField: [{ position: 50 }]
+  @UI.lineItem:       [{ position: 50 }]
+  PostingDate;
+
+  @UI.lineItem:       [{ position: 80 }]
+  EffectiveWhldgTaxRate;
+
+  @UI.lineItem:       [{ position: 85 }]
+  ConfiguredWhldgTaxRate;
+
+  @UI.lineItem:       [{ position: 90 }]
+  WhldgTaxAmtInDocCrcy;
+
+  @UI.lineItem:       [{ position: 110 }]
+  WhldgTaxBaseAmtInCoCrcy;
+
+  @UI.lineItem:       [{ position: 130 }]
+  GLAccount;
+}
+
+Para validar, con el mismo documento 50000034 deberías ver lo siguiente:
+
+IC/01: efectiva 0,0000 (no hubo retención) y configurada 0,4140.
+R7/01: efectiva 1,0000.
+Filas A1: efectiva 1,5000.
+IC/06 de 50000004: efectiva 0,7000 (-7 sobre -1.000).
+
+Si al activar te marca algún error en el case/division (con campos CURR, la view entity es estricta según el release), pásame el mensaje y lo ajusto.
+
+Para responder el correo, podrías decir algo así: “La columna mostraba el campo QSATZ de WITH_ITEM, igual que la query de R/3, y ese campo no siempre se informa (retenciones por fórmula, mínimos, retención en pago). Lo sustituimos por la tasa efectiva calculada (importe/base) y, como referencia, la tasa configurada en customizing.”
+*********************************************************************************************************************
 {
   "_version": "1.60.0",
   "sap.app": {
