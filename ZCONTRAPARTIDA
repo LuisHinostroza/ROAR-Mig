@@ -1,3 +1,163 @@
+Buscó chats anteriores
+Te paso las tres vistas que cambian, completas, partiendo de la última versión que armamos (la de ZC_Contrapartida como root). Si después de eso les hiciste más ajustes, compáralas antes de pegarlas.
+
+Al revisarlas encontré algo: AccountingDocumentType ya venía en ZI_Contrapartida y en ZC_Contrapartida, pero nunca se proyectó en ZCP_Contrapartida. Por eso no aparece en la app. Además, como la basic filtra FinancialAccountType = 'S', el centro de coste se toma directamente de esa misma línea de mayor, que es la correcta.
+
+1. ZI_Contrapartida (basic)
+abap
+@AccessControl.authorizationCheck: #NOT_REQUIRED
+@VDM.viewType: #BASIC
+@EndUserText.label: 'Contrapartida - Base'
+define view entity ZI_Contrapartida
+  as select from I_OperationalAcctgDocItem as Item
+
+  association [0..1] to I_GLAccountInCompanyCode as _GLAcctCoCode
+    on  _GLAcctCoCode.CompanyCode = Item.CompanyCode
+    and _GLAcctCoCode.GLAccount   = Item.GLAccount
+
+{
+  key Item.CompanyCode,
+  key Item.FiscalYear,
+  key Item.AccountingDocument,
+  key Item.AccountingDocumentItem,
+      Item.GLAccount,
+      Item.PostingKey,
+      Item.AbsoluteAmountInCoCodeCrcy      as Amount,
+      Item.CompanyCodeCurrency,
+      Item.DocumentItemText,
+      Item.PostingDate,
+      Item.AccountingDocumentType,
+      Item.TreasuryContractType,
+      Item.AssetContract,
+      Item.TaxAbsltBaseAmountInCoCodeCrcy  as TaxBaseAmount,
+      Item.CostCenter,                                        // KOSTL
+      _GLAcctCoCode.AlternativeGLAccount   as AlternativeGLAccount  // SKB1-ALTKT -- confirmar nombre con F2
+}
+where Item.FinancialAccountType = 'S'
+2. ZC_Contrapartida (composite, root)
+abap
+@AccessControl.authorizationCheck: #NOT_REQUIRED
+@VDM.viewType: #COMPOSITE
+@EndUserText.label: 'Contrapartida - Composite'
+define root view entity ZC_Contrapartida
+  as select from ZI_Contrapartida as Item
+
+  association [0..1] to ZI_CtrapProveedor as _Proveedor
+    on  _Proveedor.CompanyCode        = Item.CompanyCode
+    and _Proveedor.FiscalYear         = Item.FiscalYear
+    and _Proveedor.AccountingDocument = Item.AccountingDocument
+
+  association [0..1] to ZI_CtrapDeudor as _Deudor
+    on  _Deudor.CompanyCode        = Item.CompanyCode
+    and _Deudor.FiscalYear         = Item.FiscalYear
+    and _Deudor.AccountingDocument = Item.AccountingDocument
+
+  association [0..1] to I_AccountingDocumentTypeText as _DocTypeText
+    on  _DocTypeText.AccountingDocumentType = Item.AccountingDocumentType
+    and _DocTypeText.Language               = $session.system_language
+
+{
+  key Item.CompanyCode,
+  key Item.FiscalYear,
+  key Item.AccountingDocument,
+  key Item.AccountingDocumentItem,
+      Item.GLAccount,
+      Item.PostingKey,
+      Item.Amount,
+      Item.CompanyCodeCurrency,
+      Item.DocumentItemText,
+      Item.PostingDate,
+      Item.AccountingDocumentType,
+      _DocTypeText.AccountingDocumentTypeName as AccountingDocumentTypeName,
+      Item.TreasuryContractType,
+      Item.AssetContract,
+      Item.TaxBaseAmount,
+      Item.CostCenter,
+      Item.AlternativeGLAccount,
+      _Proveedor.Supplier      as Proveedor,
+      _Proveedor.SupplierName  as NombreProveedor,
+      _Proveedor.TaxNumber1    as NifProveedor,
+      _Deudor.Customer         as Deudor,
+      _Deudor.TaxNumber1       as NifCliente
+}
+3. ZCP_Contrapartida (consumption)
+abap
+@AccessControl.authorizationCheck: #CHECK
+@OData.publish: true
+@VDM.viewType: #CONSUMPTION
+@EndUserText.label: 'Contrapartida - Consumo'
+@UI.headerInfo: { typeName: 'Contrapartida', typeNamePlural: 'Contrapartidas' }
+define root view entity ZCP_Contrapartida
+  as projection on ZC_Contrapartida as Item
+{
+  @UI.selectionField: [{ position: 10 }]
+  key Item.CompanyCode,
+  key Item.FiscalYear,
+  key Item.AccountingDocument,
+  key Item.AccountingDocumentItem,
+
+  @UI.lineItem: [{ position: 10 }]
+  Item.GLAccount,
+
+  @UI.lineItem: [{ position: 20 }]
+  Item.PostingKey,
+
+  @Semantics.amount.currencyCode: 'CompanyCodeCurrency'
+  @UI.lineItem: [{ position: 30 }]
+  Item.Amount,
+
+  Item.CompanyCodeCurrency,
+
+  @UI.selectionField: [{ position: 20 }]
+  @UI.lineItem: [{ position: 40 }]
+  Item.PostingDate,
+
+  @UI.selectionField: [{ position: 30 }]
+  @UI.lineItem: [{ position: 45, label: 'Clase doc.' }]
+  @ObjectModel.text.element: ['AccountingDocumentTypeName']
+  @UI.textArrangement: #TEXT_FIRST
+  @Consumption.valueHelpDefinition: [{ entity: { name: 'I_AccountingDocumentType',
+                                                 element: 'AccountingDocumentType' } }]
+  Item.AccountingDocumentType,
+
+  @UI.hidden: true
+  Item.AccountingDocumentTypeName,
+
+  @UI.lineItem: [{ position: 50 }]
+  Item.Proveedor,
+
+  @UI.lineItem: [{ position: 60 }]
+  Item.NombreProveedor,
+
+  Item.NifProveedor,
+
+  @UI.lineItem: [{ position: 70 }]
+  Item.DocumentItemText,
+
+  @Semantics.amount.currencyCode: 'CompanyCodeCurrency'
+  @UI.lineItem: [{ position: 80 }]
+  Item.TaxBaseAmount,
+
+  @UI.selectionField: [{ position: 40 }]
+  @UI.lineItem: [{ position: 90, label: 'Ce coste' }]
+  Item.CostCenter,
+
+  @UI.lineItem: [{ position: 100, label: 'Cta. alternativa' }]
+  Item.AlternativeGLAccount,
+
+  Item.Deudor,
+  Item.NifCliente,
+  Item.TreasuryContractType,
+  Item.AssetContract
+}
+La Metadata Extension, el DCL, la Service Definition y el Service Binding no cambian. El DCL sigue funcionando porque CompanyCode sigue en la proyección.
+
+Orden de activación: ZI_Contrapartida → ZC_Contrapartida → ZCP_Contrapartida. Después refresca el Service Binding y limpia la caché (/IWFND/CACHE_CLEANUP y la del navegador).
+
+Hay dos puntos que debes confirmar en tu sistema con F2 o con el autocompletado. El primero es el nombre del campo de cuenta alternativa en I_GLAccountInCompanyCode; si no existe con ese nombre, cambia la asociación por un join a skb1 y toma altkt. El segundo es el nombre del campo de texto en I_AccountingDocumentTypeText. Y antes de entregar, valida contra la query original que CTA_ALTERNATIVA realmente sea SKB1-ALTKT y no un campo calculado del InfoSet.
+
+***************************************************************
+
 Es igual que los otros dos campos, y más sencillo porque la clase de documento (BLART) es de cabecera: es la misma para todas las líneas del documento, así que no importa de qué línea la tomes.
 
 1. Basic (ZI_Contrapartida):
