@@ -1,3 +1,484 @@
+Lo revisé completo contra la versión actual de las CDS. Sí hay diferencias importantes, y una explica algo que ya se ve en tu captura: la columna de base imponible sale en 0,00 en todas las filas.
+
+Diferencias encontradas
+
+De lógica (afectan los datos):
+
+BASE no es la base imponible de BSET. El original hace base = bseg-TXBHW, el importe base original de la propia línea. Nosotros usamos TaxAbsltBaseAmountInCoCodeCrcy (HWBAS), que solo se llena en las líneas de impuesto, no en las de mayor. Por eso sale todo en cero.
+IMPORTE lleva signo. El original pone DMBTR positivo si es debe (S) y negativo si es haber (H). Nosotros usamos AbsoluteAmountInCoCodeCrcy, que va sin signo. Error mío en su momento.
+No se filtra por tipo de cuenta. El GET BSEG procesa todas las líneas del documento (S, K, D, A…); el koart solo se usa en los SELECT SINGLE de proveedor, deudor y fecha de compensación. Nuestra basic filtra FinancialAccountType = 'S', así que si un usuario filtra por la cuenta asociada del proveedor, en Fiori no sale nada. Quito el filtro y dejo el tipo de cuenta como campo filtrable.
+Falta IVA. Se calcula como TXBHW * KBETR / 1000, donde KBETR sale de BSET por documento y código de IVA.
+Falta IMPORTE_MD, que es WRBTR con signo en moneda del documento.
+Falta FECHA_COMP, que es la AUGDT de una línea del documento con koart <> 'S'.
+
+Campos de salida que faltan: País, Nombre deudor, Asignación, Referencia, Texto de cabecera, Usuario, Período, División, Documento de compensación, Fecha de documento, Fecha de compensación, Indicador de IVA, D/H, Fecha de entrada, Sociedad GL asociada, y los campos Z de BSEG (ZZC01 Lugar de ocurrencia, ZZC02 Tipo de negocio, ZZC03 Contrato, ZZC04 Producto, ZZC05 Cliente, ZZC07 Servicio). Estos últimos los leo directo de bseg, porque I_OperationalAcctgDocItem no los trae a menos que esté extendida.
+
+Lo que dejo fuera, a propósito:
+
+CONCEPTOAC: es exactamente lo mismo que el nombre del proveedor (lfa1-name1). Sería una columna duplicada.
+La lista estadística T01 (totales por cuenta y clave de contabilización convertidos a USD). Eso no cabe en un List Report sencillo. Si los usuarios la usan, sería una segunda app analítica; confírmalo con ellos.
+Los filtros por importe de IVA y de BASE. Se pueden agregar, pero casi nunca se usan.
+Vistas
+
+ZI_OpAcctgItem_MinLine y el DCL no cambian. Hay dos vistas nuevas de apoyo.
+
+ZI_CtrapTaxRate (nueva)
+abap
+@AccessControl.authorizationCheck: #NOT_REQUIRED
+@VDM.viewType: #BASIC
+@EndUserText.label: 'Contrapartida - % IVA por documento'
+define view entity ZI_CtrapTaxRate
+  as select from bset
+{
+  key bukrs as CompanyCode,
+  key gjahr as FiscalYear,
+  key belnr as AccountingDocument,
+  key mwskz as TaxCode,
+      max( cast( kbetr as abap.dec(11,2) ) ) as TaxRate
+}
+group by bukrs, gjahr, belnr, mwskz
+ZI_CtrapFechaComp (nueva)
+abap
+@AccessControl.authorizationCheck: #NOT_REQUIRED
+@VDM.viewType: #BASIC
+@EndUserText.label: 'Contrapartida - Fecha compensación'
+define view entity ZI_CtrapFechaComp
+  as select from I_OperationalAcctgDocItem
+{
+  key CompanyCode,
+  key FiscalYear,
+  key AccountingDocument,
+      max( ClearingDate ) as FechaCompensacion
+}
+where FinancialAccountType <> 'S'
+group by CompanyCode, FiscalYear, AccountingDocument
+ZI_CtrapProveedor
+abap
+@AccessControl.authorizationCheck: #NOT_REQUIRED
+@VDM.viewType: #BASIC
+@EndUserText.label: 'Contrapartida - Datos Proveedor'
+define view entity ZI_CtrapProveedor
+  as select from I_OperationalAcctgDocItem as K
+
+  inner join ZI_OpAcctgItem_MinLine as Min
+    on  Min.CompanyCode               = K.CompanyCode
+    and Min.FiscalYear                = K.FiscalYear
+    and Min.AccountingDocument        = K.AccountingDocument
+    and Min.FinancialAccountType      = K.FinancialAccountType
+    and Min.MinAccountingDocumentItem = K.AccountingDocumentItem
+
+  association [0..1] to I_Supplier as _Supplier
+    on _Supplier.Supplier = K.Supplier
+
+{
+  key K.CompanyCode,
+  key K.FiscalYear,
+  key K.AccountingDocument,
+      K.Supplier,
+      _Supplier.SupplierName,
+      _Supplier.TaxNumber1,
+      _Supplier.Country
+}
+where K.FinancialAccountType = 'K'
+ZI_CtrapDeudor
+abap
+@AccessControl.authorizationCheck: #NOT_REQUIRED
+@VDM.viewType: #BASIC
+@EndUserText.label: 'Contrapartida - Datos Deudor'
+define view entity ZI_CtrapDeudor
+  as select from I_OperationalAcctgDocItem as D
+
+  inner join ZI_OpAcctgItem_MinLine as Min
+    on  Min.CompanyCode               = D.CompanyCode
+    and Min.FiscalYear                = D.FiscalYear
+    and Min.AccountingDocument        = D.AccountingDocument
+    and Min.FinancialAccountType      = D.FinancialAccountType
+    and Min.MinAccountingDocumentItem = D.AccountingDocumentItem
+
+  association [0..1] to I_Customer as _Customer
+    on _Customer.Customer = D.Customer
+
+{
+  key D.CompanyCode,
+  key D.FiscalYear,
+  key D.AccountingDocument,
+      D.Customer,
+      _Customer.CustomerName,
+      _Customer.TaxNumber1
+}
+where D.FinancialAccountType = 'D'
+ZI_Contrapartida
+abap
+@AccessControl.authorizationCheck: #NOT_REQUIRED
+@VDM.viewType: #BASIC
+@EndUserText.label: 'Contrapartida - Base'
+define view entity ZI_Contrapartida
+  as select from I_OperationalAcctgDocItem as Item
+
+  association [1..1] to I_JournalEntry as _Header
+    on  _Header.CompanyCode        = Item.CompanyCode
+    and _Header.FiscalYear         = Item.FiscalYear
+    and _Header.AccountingDocument = Item.AccountingDocument
+
+  association [0..1] to bseg as _Bseg
+    on  _Bseg.bukrs = Item.CompanyCode
+    and _Bseg.gjahr = Item.FiscalYear
+    and _Bseg.belnr = Item.AccountingDocument
+    and _Bseg.buzei = Item.AccountingDocumentItem
+
+  association [0..1] to I_GLAccountInCompanyCode as _GLAcctCoCode
+    on  _GLAcctCoCode.CompanyCode = Item.CompanyCode
+    and _GLAcctCoCode.GLAccount   = Item.GLAccount
+
+  association [0..1] to ZI_CtrapTaxRate as _TaxRate
+    on  _TaxRate.CompanyCode        = Item.CompanyCode
+    and _TaxRate.FiscalYear         = Item.FiscalYear
+    and _TaxRate.AccountingDocument = Item.AccountingDocument
+    and _TaxRate.TaxCode            = Item.TaxCode
+
+{
+  key Item.CompanyCode,
+  key Item.FiscalYear,
+  key Item.AccountingDocument,
+  key Item.AccountingDocumentItem,
+      Item.FinancialAccountType,
+      Item.GLAccount,
+      Item.PostingKey,
+      Item.DebitCreditCode,                                  // SHKZG
+      Item.AccountingDocumentType,
+      Item.PostingDate,
+      Item.DocumentDate,                                     // BLDAT
+      Item.FiscalPeriod,                                     // MONAT
+      _Header.AccountingDocumentCreationDate,                // CPUDT
+      _Header.AccountingDocumentHeaderText,                  // BKTXT
+      _Header.DocumentReferenceID,                           // XBLNR
+      _Header.AccountingDocCreatedByUser,                    // USNAM
+      _Header.ReverseDocument,                               // STBLG
+      Item.DocumentItemText,
+      Item.AssignmentReference,                              // ZUONR
+      Item.CostCenter,
+      Item.BusinessArea,                                     // GSBER
+      Item.TaxCode,                                          // MWSKZ
+      Item.PartnerCompany,                                   // VBUND
+      Item.ClearingAccountingDocument,                       // AUGBL
+      Item.ClearingDate,                                     // AUGDT
+      Item.TreasuryContractType,
+      Item.AssetContract,
+
+      @Semantics.amount.currencyCode: 'CompanyCodeCurrency'
+      Item.AmountInCompanyCodeCurrency      as Amount,       // IMPORTE (con signo)
+      Item.CompanyCodeCurrency,
+
+      @Semantics.amount.currencyCode: 'TransactionCurrency'
+      Item.AmountInTransactionCurrency      as AmountInTransCrcy,  // IMPORTE_MD (con signo)
+      Item.TransactionCurrency,
+
+      @Semantics.amount.currencyCode: 'CompanyCodeCurrency'
+      _Bseg.txbhw                           as TaxBaseAmount,      // BASE = BSEG-TXBHW
+
+      @Semantics.amount.currencyCode: 'CompanyCodeCurrency'
+      cast( division( cast( _Bseg.txbhw as abap.dec(15,2) ) * _TaxRate.TaxRate, 1000, 2 )
+            as abap.curr(23,2) )            as TaxAmount,          // IVA = TXBHW * KBETR / 1000
+
+      _Bseg.zzc01                           as LugarOcurrencia,
+      _Bseg.zzc02                           as TipoNegocio,
+      _Bseg.zzc03                           as Contrato,
+      _Bseg.zzc04                           as Producto,
+      _Bseg.zzc05                           as ClienteZ,
+      _Bseg.zzc07                           as Servicio,
+
+      _GLAcctCoCode.AlternativeGLAccount    as AlternativeGLAccount  // SKB1-ALTKT
+}
+ZC_Contrapartida
+abap
+@AccessControl.authorizationCheck: #NOT_REQUIRED
+@VDM.viewType: #COMPOSITE
+@EndUserText.label: 'Contrapartida - Composite'
+define root view entity ZC_Contrapartida
+  as select from ZI_Contrapartida as Item
+
+  association [0..1] to ZI_CtrapProveedor as _Proveedor
+    on  _Proveedor.CompanyCode        = Item.CompanyCode
+    and _Proveedor.FiscalYear         = Item.FiscalYear
+    and _Proveedor.AccountingDocument = Item.AccountingDocument
+
+  association [0..1] to ZI_CtrapDeudor as _Deudor
+    on  _Deudor.CompanyCode        = Item.CompanyCode
+    and _Deudor.FiscalYear         = Item.FiscalYear
+    and _Deudor.AccountingDocument = Item.AccountingDocument
+
+  association [0..1] to ZI_CtrapFechaComp as _FechaComp
+    on  _FechaComp.CompanyCode        = Item.CompanyCode
+    and _FechaComp.FiscalYear         = Item.FiscalYear
+    and _FechaComp.AccountingDocument = Item.AccountingDocument
+
+  association [0..1] to I_AccountingDocumentTypeText as _DocTypeText
+    on  _DocTypeText.AccountingDocumentType = Item.AccountingDocumentType
+    and _DocTypeText.Language               = $session.system_language
+
+  association [0..1] to I_BusinessAreaText as _BusAreaText
+    on  _BusAreaText.BusinessArea = Item.BusinessArea
+    and _BusAreaText.Language     = $session.system_language
+
+  association [0..1] to I_User as _User
+    on _User.UserID = Item.AccountingDocCreatedByUser
+
+{
+  key Item.CompanyCode,
+  key Item.FiscalYear,
+  key Item.AccountingDocument,
+  key Item.AccountingDocumentItem,
+      Item.FinancialAccountType,
+      Item.GLAccount,
+      Item.PostingKey,
+      Item.DebitCreditCode,
+      Item.AccountingDocumentType,
+      _DocTypeText.AccountingDocumentTypeName   as AccountingDocumentTypeName,
+      Item.PostingDate,
+      Item.DocumentDate,
+      Item.FiscalPeriod,
+      Item.AccountingDocumentCreationDate,
+      Item.AccountingDocumentHeaderText,
+      Item.DocumentReferenceID,
+      Item.AccountingDocCreatedByUser,
+      _User.UserDescription                     as CreatedByUserName,
+      Item.ReverseDocument,
+      Item.DocumentItemText,
+      Item.AssignmentReference,
+      Item.CostCenter,
+      Item.BusinessArea,
+      _BusAreaText.BusinessAreaName             as BusinessAreaName,
+      Item.TaxCode,
+      Item.PartnerCompany,
+      Item.ClearingAccountingDocument,
+      Item.ClearingDate,
+      _FechaComp.FechaCompensacion              as FechaCompensacion,
+      Item.TreasuryContractType,
+      Item.AssetContract,
+      Item.Amount,
+      Item.CompanyCodeCurrency,
+      Item.AmountInTransCrcy,
+      Item.TransactionCurrency,
+      Item.TaxBaseAmount,
+      Item.TaxAmount,
+      Item.LugarOcurrencia,
+      Item.TipoNegocio,
+      Item.Contrato,
+      Item.Producto,
+      Item.ClienteZ,
+      Item.Servicio,
+      Item.AlternativeGLAccount,
+      _Proveedor.Supplier       as Proveedor,
+      _Proveedor.SupplierName   as NombreProveedor,
+      _Proveedor.TaxNumber1     as NifProveedor,
+      _Proveedor.Country        as PaisProveedor,
+      _Deudor.Customer          as Deudor,
+      _Deudor.CustomerName      as NombreDeudor,
+      _Deudor.TaxNumber1        as NifCliente
+}
+ZCP_Contrapartida
+
+Las columnas van en el orden y con las etiquetas cortas de la query original. Los filtros son los del selection screen original.
+
+abap
+@AccessControl.authorizationCheck: #CHECK
+@OData.publish: true
+@VDM.viewType: #CONSUMPTION
+@EndUserText.label: 'Contrapartida - Consumo'
+@UI.headerInfo: { typeName: 'Contrapartida', typeNamePlural: 'Contrapartidas' }
+define root view entity ZCP_Contrapartida
+  as projection on ZC_Contrapartida as Item
+{
+  @UI.selectionField: [{ position: 10 }]
+  @Consumption.filter.mandatory: true
+  key Item.CompanyCode,
+  key Item.FiscalYear,
+  @UI.lineItem: [{ position: 20, label: 'Nº doc.' }]
+  key Item.AccountingDocument,
+  key Item.AccountingDocumentItem,
+
+  @UI.selectionField: [{ position: 200 }]
+  @EndUserText.label: 'Tipo de cuenta'
+  Item.FinancialAccountType,
+
+  @UI.selectionField: [{ position: 40 }]
+  @UI.lineItem: [{ position: 10, label: 'Lib.mayor' }]
+  Item.GLAccount,
+
+  @UI.lineItem: [{ position: 30, label: 'Clase doc.' }]
+  @UI.selectionField: [{ position: 50 }]
+  @ObjectModel.text.element: ['AccountingDocumentTypeName']
+  @UI.textArrangement: #TEXT_FIRST
+  @Consumption.valueHelpDefinition: [{ entity: { name: 'I_AccountingDocumentType',
+                                                 element: 'AccountingDocumentType' } }]
+  Item.AccountingDocumentType,
+  @UI.hidden: true
+  Item.AccountingDocumentTypeName,
+
+  @UI.selectionField: [{ position: 60 }]
+  @UI.lineItem: [{ position: 40, label: 'CT' }]
+  Item.PostingKey,
+
+  @UI.selectionField: [{ position: 70 }]
+  @UI.lineItem: [{ position: 50, label: 'País' }]
+  Item.PaisProveedor,
+
+  @UI.selectionField: [{ position: 80 }]
+  @UI.lineItem: [{ position: 60, label: 'Acreedor' }]
+  Item.Proveedor,
+
+  @UI.selectionField: [{ position: 90 }]
+  @UI.lineItem: [{ position: 70, label: 'Ocur' }]
+  Item.LugarOcurrencia,
+
+  @UI.lineItem: [{ position: 80, label: 'Nombre proveedor' }]
+  Item.NombreProveedor,
+
+  @UI.lineItem: [{ position: 90, label: 'Texto' }]
+  Item.DocumentItemText,
+
+  @UI.selectionField: [{ position: 100 }]
+  @UI.lineItem: [{ position: 100, label: 'Ce.coste' }]
+  Item.CostCenter,
+
+  @UI.lineItem: [{ position: 110, label: 'Asignación' }]
+  Item.AssignmentReference,
+
+  @UI.lineItem: [{ position: 120, label: 'Referencia' }]
+  Item.DocumentReferenceID,
+
+  @UI.lineItem: [{ position: 130, label: 'Texto cab.documento' }]
+  Item.AccountingDocumentHeaderText,
+
+  @UI.selectionField: [{ position: 110 }]
+  @UI.lineItem: [{ position: 140, label: 'Usuario' }]
+  @ObjectModel.text.element: ['CreatedByUserName']
+  @UI.textArrangement: #TEXT_LAST
+  Item.AccountingDocCreatedByUser,
+  @UI.hidden: true
+  Item.CreatedByUserName,
+
+  @UI.lineItem: [{ position: 150, label: 'Período' }]
+  Item.FiscalPeriod,
+
+  @UI.selectionField: [{ position: 120 }]
+  @UI.lineItem: [{ position: 160, label: 'División' }]
+  @ObjectModel.text.element: ['BusinessAreaName']
+  @UI.textArrangement: #TEXT_LAST
+  Item.BusinessArea,
+  @UI.hidden: true
+  Item.BusinessAreaName,
+
+  @UI.selectionField: [{ position: 130 }]
+  @UI.lineItem: [{ position: 170, label: 'NIF proveedor' }]
+  Item.NifProveedor,
+
+  @UI.selectionField: [{ position: 140 }]
+  @UI.lineItem: [{ position: 180, label: 'Doc.comp.' }]
+  Item.ClearingAccountingDocument,
+
+  @Semantics.amount.currencyCode: 'CompanyCodeCurrency'
+  @UI.lineItem: [{ position: 190, label: 'Importe' }]
+  Item.Amount,
+  Item.CompanyCodeCurrency,
+
+  @UI.selectionField: [{ position: 20 }]
+  @UI.lineItem: [{ position: 200, label: 'Fe.contab.' }]
+  Item.PostingDate,
+
+  @UI.selectionField: [{ position: 30 }]
+  @UI.lineItem: [{ position: 210, label: 'Fecha doc.' }]
+  Item.DocumentDate,
+
+  @UI.lineItem: [{ position: 220, label: 'Compens.' }]
+  Item.ClearingDate,
+
+  @Semantics.amount.currencyCode: 'CompanyCodeCurrency'
+  @UI.lineItem: [{ position: 230, label: 'BASE' }]
+  Item.TaxBaseAmount,
+
+  @Semantics.amount.currencyCode: 'CompanyCodeCurrency'
+  @UI.lineItem: [{ position: 240, label: 'IVA' }]
+  Item.TaxAmount,
+
+  @UI.lineItem: [{ position: 250, label: 'Ind. IVA' }]
+  Item.TaxCode,
+
+  @UI.lineItem: [{ position: 260, label: 'TdN' }]
+  Item.TipoNegocio,
+
+  @UI.selectionField: [{ position: 150 }]
+  @UI.lineItem: [{ position: 270, label: 'Deudor' }]
+  Item.Deudor,
+
+  @UI.lineItem: [{ position: 280, label: 'Nombre deudor' }]
+  Item.NombreDeudor,
+
+  @UI.lineItem: [{ position: 290, label: 'D/H' }]
+  Item.DebitCreditCode,
+
+  @UI.lineItem: [{ position: 300, label: 'FECHA_COMP' }]
+  Item.FechaCompensacion,
+
+  @UI.lineItem: [{ position: 310, label: 'Contrato' }]
+  Item.Contrato,
+
+  @Semantics.amount.currencyCode: 'TransactionCurrency'
+  @UI.lineItem: [{ position: 320, label: 'IMPORTE_MD' }]
+  Item.AmountInTransCrcy,
+
+  @UI.selectionField: [{ position: 160 }]
+  Item.TransactionCurrency,
+
+  @UI.lineItem: [{ position: 330, label: 'Prod.' }]
+  Item.Producto,
+
+  @UI.selectionField: [{ position: 170 }]
+  @UI.lineItem: [{ position: 340, label: 'NIF Cliente' }]
+  Item.NifCliente,
+
+  @UI.lineItem: [{ position: 350, label: 'Cliente' }]
+  Item.ClienteZ,
+
+  @UI.lineItem: [{ position: 360, label: 'FechaEntr' }]
+  Item.AccountingDocumentCreationDate,
+
+  @UI.lineItem: [{ position: 370, label: 'SocGLA' }]
+  Item.PartnerCompany,
+
+  @UI.selectionField: [{ position: 180 }]
+  @UI.lineItem: [{ position: 380, label: 'Serv.' }]
+  Item.Servicio,
+
+  @UI.selectionField: [{ position: 190 }]
+  @UI.lineItem: [{ position: 390, label: 'CTA_ALTERNATIVA' }]
+  Item.AlternativeGLAccount,
+
+  @UI.selectionField: [{ position: 210 }]
+  @EndUserText.label: 'Doc. anulación'
+  Item.ReverseDocument,
+
+  Item.TreasuryContractType,
+  Item.AssetContract
+}
+
+Orden de activación: ZI_CtrapTaxRate, ZI_CtrapFechaComp, ZI_CtrapProveedor, ZI_CtrapDeudor, ZI_Contrapartida, ZC_Contrapartida, ZCP_Contrapartida.
+
+Puntos que debes confirmar con F2:
+
+I_User.UserDescription: si no existe con ese nombre, usa I_BusinessUserBasic.PersonFullName.
+I_GLAccountInCompanyCode.AlternativeGLAccount.
+Que los ZZC0x existan en bseg con esos nombres.
+Si el cast de kbetr a abap.dec da error en ZI_CtrapTaxRate, cámbialo por curr_to_decfloat_amount( kbetr ).
+
+Para validar antes de entregar: corre la query original y la app con la misma sociedad, el mismo rango de fechas y la misma cuenta. Compara el número de filas y los totales de Importe, BASE e IVA. Al quitar el filtro de cuentas de mayor van a salir más filas que antes, pero ahora deberían cuadrar con la query.
+
+Relación con lo de las variantes: con este cambio la estructura del servicio cambia bastante, así que las variantes que hayan guardado los usuarios quedan inservibles de todas formas. Cuando despliegues esto, que las borren y las vuelvan a crear. Luego vemos el manifest para resolver el problema de fondo; para eso pásame el manifest.json y lo que salga en la consola con F12 al reproducir el error.
+
+
+
+
+&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
 ********textos de seleccion
 %ABC	Análisis ABC
 %ALV	List Viewer ABAP
