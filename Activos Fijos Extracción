@@ -1,4 +1,542 @@
 *&---------------------------------------------------------------------*
+*&      Form  F_FILL_TABLA_FICHERO
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*  -->  p1        text
+*  <--  p2        text
+*----------------------------------------------------------------------*
+FORM f_fill_tabla_fichero .
+  DATA: lv_tipo TYPE c,
+        lv_maxbt TYPE maxbt.
+
+  DATA wa_centros LIKE LINE OF it_centros.
+*>TINGUAR 16/08/21 Código DGCI Portugal
+  DATA: wa_cod_dgci TYPE ty_cod_dgci.
+*<TINGUAR 16/08/21 Código DGCI Portugal
+*>TINGUAR 07/10/2021 Línea Negocio desde tabla ZMAAT_LIN_NEG
+  DATA: wa_zz0001 TYPE ty_zz0001.
+*<TINGUAR 07/10/2021 Línea Negocio desde tabla ZMAAT_LIN_NEG
+
+*>LUISHIN 29.10.2026 Amort. acumulada = KNAFA + NAFAG (sociedades 0117 y 0129)
+  DATA: r_soc_acum_nafag  TYPE RANGE OF bukrs,
+        ls_soc_acum_nafag LIKE LINE OF r_soc_acum_nafag.
+
+  REFRESH r_soc_acum_nafag.
+  ls_soc_acum_nafag-sign   = 'I'.
+  ls_soc_acum_nafag-option = 'EQ'.
+  ls_soc_acum_nafag-low    = '0117'.
+  APPEND ls_soc_acum_nafag TO r_soc_acum_nafag.
+  ls_soc_acum_nafag-low    = '0129'.
+  APPEND ls_soc_acum_nafag TO r_soc_acum_nafag.
+*<LUISHIN 29.10.2026 Amort. acumulada = KNAFA + NAFAG (sociedades 0117 y 0129)
+
+  CLEAR: r_soc_cob[], r_soc_cob, ls_soc_cob,ls_soc_cob.
+
+  SELECT sign
+         opti
+         low
+         high
+    INTO TABLE lt_soc_cob
+    FROM tvarvc
+   WHERE name = c_zmig_soc_cobertura
+     AND type = c_type_select_opt.
+  IF sy-subrc EQ 0.
+    LOOP AT lt_soc_cob INTO ls_soc_cob.
+      CLEAR r_soc_cob.
+      r_soc_cob-sign = ls_soc_cob-sign.
+      r_soc_cob-option = ls_soc_cob-opti.
+      r_soc_cob-low = ls_soc_cob-low.
+      r_soc_cob-high = ls_soc_cob-high.
+      APPEND r_soc_cob.
+    ENDLOOP.
+  ENDIF.
+
+*loop
+  LOOP AT t_anla INTO w_anla WHERE selec = abap_true AND status NE c_error2.
+
+    REPLACE ALL OCCURRENCES OF ';' IN w_anla-txt50 WITH ''.
+    REPLACE ALL OCCURRENCES OF ';' IN w_anla-txa50 WITH ''.
+    wa_tabla_fichero-bukrs = w_anla-bukrs.
+*    wa_tabla_fichero-anln1 = w_anla-anln1.
+*    wa_tabla_fichero-anln2 = w_anla-anln2.
+    wa_tabla_fichero-asset_class = w_anla-anlkl.
+    wa_tabla_fichero-asset_description = w_anla-txt50.
+    wa_tabla_fichero-asset_description2 = w_anla-txa50.
+    wa_tabla_fichero-serial_number = w_anla-sernr.
+    wa_tabla_fichero-inventory_number = w_anla-invnr.
+    wa_tabla_fichero-asset_capital_date = w_anla-aktiv.
+    wa_tabla_fichero-asset_super_number = w_anla-anlue.
+*    wa_tabla_fichero-furniture_machinery_install = w_anla-ord41.
+*    wa_tabla_fichero-info_team_process = w_anla-ord2.
+*    wa_tabla_fichero-info_commerce_establishment = w_anla-ord3.
+    wa_tabla_fichero-investment_portfolio = w_anla-ord4.
+*    wa_tabla_fichero-evaluation_group5 = space.
+    wa_tabla_fichero-id_num_supplier = w_anla-lifnr.
+    wa_tabla_fichero-inventory_indicator = w_anla-inken.
+    wa_tabla_fichero-company_id_trading_partner = w_anla-vbund.
+    wa_tabla_fichero-country_origin = w_anla-land1.
+    wa_tabla_fichero-asset_ty_name = w_anla-anlar.
+    wa_tabla_fichero-zugdt = w_anla-zugdt.
+    wa_tabla_fichero-orig_asset = w_anla-anln1.
+    wa_tabla_fichero-orig_asset_subno = w_anla-anln2.
+
+*>FLOPEZ9 05/08/25 Nuevos campos
+    wa_tabla_fichero-fabricante         = w_anla-herst.
+    wa_tabla_fichero-denominacion_tipo  = w_anla-typbz.
+*<FLOPEZ9 05/08/25 Nuevos campos
+
+*>TINGUAR 17/06/21 Nuevos campos Portugal
+    IF p_bukrs = '0232' OR
+       p_bukrs = '0477' OR
+       p_bukrs = '0648' OR
+       p_bukrs = 'Y003' OR
+       p_bukrs = 'Y423'.
+      wa_tabla_fichero-eval_group_1 = w_anla-ord41.
+      wa_tabla_fichero-eval_group_2 = w_anla-ord2.
+      wa_tabla_fichero-eval_group_3 = w_anla-ord3.
+      wa_tabla_fichero-eval_group_4 = w_anla-ord4.
+*>TINGUAR 16/08/21 Código DGCI Portugal
+      wa_tabla_fichero-eval_group_5 = w_anla-gdlgrp.
+      IF wa_tabla_fichero-eval_group_5 IS INITIAL.
+        CLEAR wa_cod_dgci.
+        READ TABLE t_cod_dgci
+          INTO wa_cod_dgci
+          WITH KEY bukrs = w_anla-bukrs
+                   anln1 = w_anla-anln1
+                   anln2 = w_anla-anln2 BINARY SEARCH.
+        IF sy-subrc = 0.
+          wa_tabla_fichero-eval_group_5 = wa_cod_dgci-ord41.
+        ENDIF.
+*<TINGUAR 16/08/21 Código DGCI Portugal
+      ENDIF.
+    ENDIF.
+
+    IF p_bukrs = '0608' OR
+       p_bukrs = 'S006'.
+      wa_tabla_fichero-urwrt     = w_anla-urwrt.
+      wa_tabla_fichero-aibdt     = w_anla-aibdt.
+      wa_tabla_fichero-urjhr     = w_anla-urjhr.
+    ENDIF.
+*<TINGUAR 17/06/21 Nuevos campos Portugal
+
+
+    READ TABLE t_anlz INTO w_anlz WITH KEY bukrs = w_anla-bukrs
+                                           anln1 = w_anla-anln1
+                                           anln2 = w_anla-anln2.
+    "anln2 = w_anla-anln2.
+
+    IF sy-subrc EQ 0.
+* Inicio AMALON DEVK982921  7000000541: Programa Migración USA - ECC Activos 2
+*      IF p_bukrs = '0028' AND w_anlz-kostl IS NOT INITIAL.
+      IF w_anlz-kostl IS NOT INITIAL.
+* Fin AMALON DEVK982921	7000000541: Programa Migración USA - ECC Activos 2
+        READ TABLE it_cecos INTO wa_cecos WITH KEY kostl = w_anlz-kostl .
+        IF sy-subrc EQ 0.
+          w_anlz-kostl = wa_cecos-kostl_s4.
+        ENDIF.
+      ENDIF.
+
+      wa_tabla_fichero-business_area = w_anlz-gsber.  " liena 11 en el DF
+      wa_tabla_fichero-cost_center = w_anlz-kostl.
+*      wa_tabla_fichero-cost_center_resp_asset = w_anlz-kostlv.
+
+*ini ALF 18.10.2024
+      IF w_anlz-werks IS NOT INITIAL.
+        READ TABLE it_centros INTO wa_centros WITH KEY werks = w_anlz-werks.
+        IF sy-subrc EQ 0.
+          w_anlz-werks = wa_centros-werks_s4.
+        ENDIF.
+      ENDIF.
+
+*fin ALF 18.10.2024
+      wa_tabla_fichero-plant = w_anlz-werks.
+
+      IF w_anlz-imkey IS NOT INITIAL.
+        CALL FUNCTION 'CONVERSION_EXIT_IMKEY_OUTPUT'
+          EXPORTING
+            input     = w_anlz-imkey
+          IMPORTING
+            output    = wa_tabla_fichero-internal_key_re_object
+          EXCEPTIONS
+            not_found = 1
+            OTHERS    = 2.
+        IF sy-subrc <> 0.
+* Implement suitable error handling here
+        ENDIF.
+      ENDIF.
+
+      wa_tabla_fichero-license_no_vehicle = w_anlz-kfzkz.
+      CLEAR lv_tipo.
+      PERFORM f_determina_soc USING w_anla-bukrs CHANGING lv_tipo.
+      READ TABLE t_aufk INTO wa_aufk WITH KEY aufnr = w_anlz-caufn.
+      IF sy-subrc EQ 0.
+
+        IF lv_tipo = abap_false.
+          wa_tabla_fichero-business_line = wa_aufk-zzc01_o.
+        ELSE.
+          wa_tabla_fichero-business_line = wa_aufk-zzc02_o.
+        ENDIF.
+        IF wa_tabla_fichero-business_line IS INITIAL.
+          wa_tabla_fichero-business_line = lv_lin_neg.
+        ENDIF.
+        "
+        IF lv_tipo = abap_false.
+          IF wa_aufk-zzc11_o IS NOT INITIAL.
+            wa_tabla_fichero-channel = wa_aufk-zzc11_o.
+          ELSE.
+            wa_tabla_fichero-channel = lv_canal.
+          ENDIF.
+        ENDIF.
+
+
+*        wa_tabla_fichero-investment_portfolio = wa_aufk-zzc04_o.
+
+      ENDIF.
+
+
+    ENDIF.
+
+*>TINGUAR 07/10/2021 Línea Negocio desde tabla ZMAAT_LIN_NEG
+    IF wa_tabla_fichero-business_line IS INITIAL AND it_zz0001[] IS NOT INITIAL.
+      CLEAR wa_zz0001.
+      READ TABLE it_zz0001 INTO wa_zz0001 WITH KEY bukrs = w_anla-bukrs anlkl = w_anla-anlkl.
+      IF sy-subrc = 0.
+        wa_tabla_fichero-business_line = wa_zz0001-zz0001.
+      ELSE.
+        READ TABLE it_zz0001 INTO wa_zz0001 WITH KEY bukrs = w_anla-bukrs.
+        IF sy-subrc = 0.
+          wa_tabla_fichero-business_line = wa_zz0001-zz0001.
+        ENDIF.
+      ENDIF.
+    ENDIF.
+*<TINGUAR 07/10/2021 Línea Negocio desde tabla ZMAAT_LIN_NEG
+* Inicio AMALON DEVK982921  7000000541: Programa Migración USA - ECC Activos 2
+* Línea Negocio desde tabla ZMFIT_CON_ZZ0001
+    IF it_linneg[] IS NOT INITIAL.
+      READ TABLE it_linneg INTO wa_linneg WITH KEY zzc01 = wa_aufk-zzc01_o.
+      IF sy-subrc EQ 0.
+        wa_tabla_fichero-business_line = wa_linneg-zz0001.
+      ENDIF.
+    ENDIF.
+* Fin AMALON DEVK982921  7000000541: Programa Migración USA - ECC Activos 2
+    READ TABLE t_anlh INTO w_anlh WITH KEY bukrs = w_anla-bukrs
+                                       anln1 = w_anla-anln1.
+
+    IF sy-subrc EQ 0.
+      REPLACE ALL OCCURRENCES OF ';' IN w_anlh-anlhtxt WITH ''.
+      wa_tabla_fichero-asset_main_no_text = w_anlh-anlhtxt.
+    ENDIF.
+* * 24.06.2024 DEVK982531 AMALON S 7000000422: Programa Migración USA - ECC Activos
+    DATA: lv_field1 TYPE c LENGTH 15 VALUE 'val_area',
+          lv_field2 TYPE c LENGTH 15 VALUE 'depr_key',
+          lv_field3 TYPE c LENGTH 15 VALUE 'use_life_yea',
+          lv_field4 TYPE c LENGTH 15 VALUE 'use_life_per',
+          lv_field5 TYPE c LENGTH 15 VALUE 'depr_star_dat',
+          lv_field6 TYPE c LENGTH 15 VALUE 'acq',
+          lv_field7 TYPE c LENGTH 15 VALUE 'ord_depr',
+          lv_field8 TYPE c LENGTH 15 VALUE 'acum_ord_depr',
+* 24.06.2024 DEVK982531 AMALON S 7000000422: Programa Migración USA - ECC Activos
+          lv_field9 TYPE c LENGTH 15 VALUE 'acum_rev_repl',
+          lv_field10 TYPE c LENGTH 15 VALUE 'acum_spe_dep',
+          lv_field11 TYPE c LENGTH 15 VALUE 'acum_unp_dep',
+          lv_field12 TYPE c LENGTH 20 VALUE 'acum_rev_ord_dep',
+          lv_field13 TYPE c LENGTH 15 VALUE 'rev_repl',
+          lv_field14 TYPE c LENGTH 15 VALUE 'spe_dep',
+          lv_field15 TYPE c LENGTH 15 VALUE 'unp_dep',
+
+          lv_field TYPE c LENGTH 80,
+          lv_field_tabla TYPE c LENGTH 30 VALUE 'wa_tabla_fichero-'.
+
+    FIELD-SYMBOLS: <lv_field> TYPE any.
+
+    LOOP AT t_arval_act INTO wa_arval_act.
+      READ TABLE t_anlb INTO wa_anlb WITH KEY bukrs = w_anla-bukrs
+                                              anln1 = w_anla-anln1
+                                              anln2 = w_anla-anln2
+                                              afabe = wa_arval_act-afabe_ecc.
+
+      IF sy-subrc EQ 0.
+
+*       Código en HANA
+        CONCATENATE lv_field_tabla lv_field1 wa_arval_act-afabe_hana INTO lv_field.
+        ASSIGN (lv_field) TO <lv_field>.
+        IF <lv_field> IS ASSIGNED.
+          MOVE: wa_arval_act-afabe_hana TO <lv_field>.
+
+        ENDIF.
+        UNASSIGN <lv_field>.
+
+*       Clave de amortización
+        CONCATENATE lv_field_tabla lv_field2 wa_arval_act-afabe_hana INTO lv_field.
+        ASSIGN (lv_field) TO <lv_field>.
+        IF <lv_field> IS ASSIGNED.
+          MOVE: wa_anlb-afasl TO <lv_field>.
+
+        ENDIF.
+        UNASSIGN <lv_field>.
+*       Vida útil años
+        CONCATENATE lv_field_tabla lv_field3 wa_arval_act-afabe_hana INTO lv_field.
+        ASSIGN (lv_field) TO <lv_field>.
+        IF <lv_field> IS ASSIGNED.
+          MOVE: wa_anlb-ndjar TO <lv_field>.
+
+        ENDIF.
+        UNASSIGN <lv_field>.
+*       Vida útil periodos
+        CONCATENATE lv_field_tabla lv_field4 wa_arval_act-afabe_hana INTO lv_field.
+        ASSIGN (lv_field) TO <lv_field>.
+        IF <lv_field> IS ASSIGNED.
+          MOVE: wa_anlb-ndper TO <lv_field>.
+
+        ENDIF.
+        UNASSIGN <lv_field>.
+
+*       Fecha inicio amortización normal (Depreciation starting date)
+        CONCATENATE lv_field_tabla lv_field5 wa_arval_act-afabe_hana INTO lv_field.
+        ASSIGN (lv_field) TO <lv_field>.
+        IF <lv_field> IS ASSIGNED.
+          MOVE: wa_anlb-afabg TO <lv_field>.
+
+        ENDIF.
+        UNASSIGN <lv_field>.
+
+        READ TABLE t_anlc INTO wa_anlc WITH KEY bukrs = wa_anlb-bukrs
+                                              anln1 = wa_anlb-anln1
+                                              anln2 = wa_anlb-anln2
+                                              afabe = wa_arval_act-afabe_ecc.
+        IF sy-subrc EQ 0.
+
+*       Valor adquisición acumulado
+          CONCATENATE lv_field_tabla lv_field6 wa_arval_act-afabe_hana INTO lv_field.
+          ASSIGN (lv_field) TO <lv_field>.
+          IF <lv_field> IS ASSIGNED.
+*            IF wa_anlc-kansw IS INITIAL AND wa_anlc-answl IS NOT INITIAL.
+*              MOVE: wa_anlc-answl TO <lv_field>.
+*            ELSE.
+            MOVE: wa_anlc-kansw TO <lv_field>.
+*            ENDIF.
+            IF p_ifrs16 = abap_true.
+              CLEAR lv_maxbt.
+              ADD wa_anlc-kansw TO lv_maxbt.
+              ADD wa_anlc-answl TO lv_maxbt.
+              MOVE: lv_maxbt TO <lv_field>.
+            ELSE.
+              MOVE: wa_anlc-kansw TO <lv_field>.
+            ENDIF.
+
+          ENDIF.
+
+          UNASSIGN <lv_field>.
+*          IF rb_act EQ abap_true.
+*       Amortización normal contabilizada en el año
+          CONCATENATE lv_field_tabla lv_field7 wa_arval_act-afabe_hana INTO lv_field.
+          ASSIGN (lv_field) TO <lv_field>.
+          IF <lv_field> IS ASSIGNED.
+            IF p_ifrs16 = abap_true.
+              CLEAR lv_maxbt.
+              LOOP AT gt_anlp INTO gs_anlp WHERE bukrs = wa_anlb-bukrs
+                                             AND anln1 = wa_anlb-anln1
+                                             AND anln2 = wa_anlb-anln2
+                                             AND afaber = wa_arval_act-afabe_ecc.
+                ADD gs_anlp-nafaz TO lv_maxbt.
+              ENDLOOP.
+              MOVE: lv_maxbt TO <lv_field>.
+*>TINGUAR 08/09/2021 No traspasar valores de amortización
+              IF wa_tabla_fichero-depr_key01 = '0000' AND
+               ( lv_field CP '*31' OR lv_field CP '*34' ).
+                CLEAR <lv_field>.
+              ENDIF.
+*>TINGUAR 08/09/2021 No traspasar valores de amortización
+            ENDIF.
+          ENDIF.
+          UNASSIGN <lv_field>.
+
+*          ELSE. " Acumulado
+*            READ TABLE it_anlp INTO wa_anlp WITH KEY bukrs = wa_anlb-bukrs
+*                                                     anln1 = wa_anlb-anln1
+*                                                     anln2 = wa_anlb-anln2
+*                                                     afaber = wa_arval_act-afabe_ecc.
+*            IF sy-subrc EQ 0.
+*              CONCATENATE lv_field_tabla lv_field7 wa_arval_act-afabe_hana INTO lv_field.
+*              ASSIGN (lv_field) TO <lv_field>.
+*              IF <lv_field> IS ASSIGNED.
+*                MOVE: wa_anlp-nafag TO <lv_field>.
+*              ENDIF.
+*            ENDIF.
+*          ENDIF.
+
+
+*       Amortización normal acumulada
+          CONCATENATE lv_field_tabla lv_field8 wa_arval_act-afabe_hana INTO lv_field.
+          ASSIGN (lv_field) TO <lv_field>.
+          IF <lv_field> IS ASSIGNED.
+*            IF wa_anlc-answl IS NOT INITIAL.
+*              MOVE: wa_anlc-nafag TO <lv_field>.
+*            ELSE.
+*>LUISHIN 29.10.2026 Sociedades 0117 y 0129: Amort. acumulada = KNAFA + NAFAG
+*            MOVE: wa_anlc-knafa TO <lv_field>.
+            IF w_anla-bukrs IN r_soc_acum_nafag.
+              CLEAR lv_maxbt.
+              ADD wa_anlc-knafa TO lv_maxbt.
+              ADD wa_anlc-nafag TO lv_maxbt.
+              MOVE: lv_maxbt TO <lv_field>.
+            ELSE.
+              MOVE: wa_anlc-knafa TO <lv_field>.
+            ENDIF.
+*<LUISHIN 29.10.2026 Sociedades 0117 y 0129: Amort. acumulada = KNAFA + NAFAG
+*>TINGUAR 08/09/2021 No traspasar valores de amortización
+            IF wa_tabla_fichero-depr_key01 = '0000' AND
+             ( lv_field CP '*31' OR lv_field CP '*34' ).
+              CLEAR <lv_field>.
+            ENDIF.
+*>TINGUAR 08/09/2021 No traspasar valores de amortización
+*            ENDIF.
+          ENDIF.
+          UNASSIGN <lv_field>.
+* 24.06.2024 DEVK982531 AMALON S 7000000422: Programa Migración USA - ECC Activos
+*       Revalorización acumulada del valor de reposición
+          CONCATENATE lv_field_tabla lv_field9 wa_arval_act-afabe_hana INTO lv_field.
+          ASSIGN (lv_field) TO <lv_field>.
+          IF <lv_field> IS ASSIGNED.
+            MOVE: wa_anlc-kaufw TO <lv_field>.
+          ENDIF.
+          UNASSIGN <lv_field>.
+*       Amortizaciones especiales acumuladas
+          CONCATENATE lv_field_tabla lv_field10 wa_arval_act-afabe_hana INTO lv_field.
+          ASSIGN (lv_field) TO <lv_field>.
+          IF <lv_field> IS ASSIGNED.
+            MOVE: wa_anlc-ksafa TO <lv_field>.
+          ENDIF.
+          UNASSIGN <lv_field>.
+*       Amortización no planificada acumulada
+          CONCATENATE lv_field_tabla lv_field11 wa_arval_act-afabe_hana INTO lv_field.
+          ASSIGN (lv_field) TO <lv_field>.
+          IF <lv_field> IS ASSIGNED.
+            MOVE: wa_anlc-kaafa TO <lv_field>.
+          ENDIF.
+          UNASSIGN <lv_field>.
+*       Revalorización acumulada de la amortización normal
+          CONCATENATE lv_field_tabla lv_field12 wa_arval_act-afabe_hana INTO lv_field.
+          ASSIGN (lv_field) TO <lv_field>.
+          IF <lv_field> IS ASSIGNED.
+            MOVE: wa_anlc-kaufn TO <lv_field>.
+          ENDIF.
+          UNASSIGN <lv_field>.
+*       Revalorización contabilizada del valor de reposición
+          CONCATENATE lv_field_tabla lv_field13 wa_arval_act-afabe_hana INTO lv_field.
+          ASSIGN (lv_field) TO <lv_field>.
+          IF <lv_field> IS ASSIGNED.
+            MOVE: wa_anlc-aufwb TO <lv_field>.
+          ENDIF.
+          UNASSIGN <lv_field>.
+*       Amortización especial contabilizada del ejercicio
+          CONCATENATE lv_field_tabla lv_field14 wa_arval_act-afabe_hana INTO lv_field.
+          ASSIGN (lv_field) TO <lv_field>.
+          IF <lv_field> IS ASSIGNED.
+            MOVE: wa_anlc-safag TO <lv_field>.
+          ENDIF.
+          UNASSIGN <lv_field>.
+*       Amo no planificada contabilizada del ejercicio
+          CONCATENATE lv_field_tabla lv_field15 wa_arval_act-afabe_hana INTO lv_field.
+          ASSIGN (lv_field) TO <lv_field>.
+          IF <lv_field> IS ASSIGNED.
+            MOVE: wa_anlc-aafag TO <lv_field>.
+          ENDIF.
+          UNASSIGN <lv_field>.
+        ENDIF.
+      ENDIF.
+    ENDLOOP.
+
+    CLEAR: "wa_tabla_fichero-inventory_number,
+           wa_tabla_fichero-inventory_indicator.
+
+*   Se añade el registro en la tabla t_int_fichero
+    APPEND wa_tabla_fichero TO t_int_fichero.
+
+    CLEAR wa_tabla_fichero.
+
+
+
+*    CLEAR wa_tabla_fichero.
+
+  ENDLOOP.
+  IF t_int_fichero IS NOT INITIAL.
+    CLEAR wa_tabla_fichero.
+    DO 3 TIMES.
+      CLEAR wa_tabla_fichero.
+      IF sy-index EQ 1."Solo se hará en la tercera iteración
+        PERFORM f_fill_header.
+      ENDIF.
+      INSERT wa_tabla_fichero INTO t_int_fichero INDEX 1.
+    ENDDO.
+
+  ENDIF.
+
+
+
+  IF sy-batch IS INITIAL.
+
+
+    IF t_int_fichero IS NOT INITIAL.
+      PERFORM f_fichero.
+
+      PERFORM f_save.
+
+*IF it_log[] IS NOT INITIAL.
+      PERFORM f_show_log.
+      CLEAR t_int_fichero.
+*  ELSE.
+*    MESSAGE text-008 TYPE c_i.
+*  ENDIF.
+
+    ENDIF.
+  ELSE.
+    IF t_int_fichero IS NOT INITIAL.
+      PERFORM f_fichero.
+      DATA: v_serv(20),
+            v_path(80),
+            lv_fecha TYPE c LENGTH 30.
+      PERFORM ruta_servidor_salida USING v_serv.
+      CONCATENATE sy-datum sy-uzeit INTO lv_fecha SEPARATED BY '_'.
+      CONCATENATE v_serv 'EXT_AF_' lv_fecha c_csv INTO v_path.
+
+      CONDENSE v_path.
+
+      PERFORM save TABLES t_int_fichero_2 USING v_path 'W' 'ASC'.
+
+*    DATA: lv_filename TYPE string,
+*        lv_lin TYPE i.
+*  DESCRIBE TABLE t_int_fichero_2.
+*  IF sy-tfill NE 0.
+*    lv_lin = sy-tfill - 3.
+*  ENDIF.
+*
+*  MOVE: lv_filename TO wa_log-filename,
+*          lv_lin      TO wa_log-lin.
+*  CONDENSE wa_log-lin.
+*  APPEND wa_log TO it_log.
+*  CLEAR wa_log.
+*
+*
+*
+**    PERFORM f_save.
+*
+**IF it_log[] IS NOT INITIAL.
+*    PERFORM f_show_log.
+      CLEAR t_int_fichero.
+*  ELSE.
+*    MESSAGE text-008 TYPE c_i.
+*  ENDIF.
+
+    ENDIF.
+
+  ENDIF.
+*
+ENDFORM.                    " F_FILL_TABLA_FICHERO
+************************************************************************************+
+
+*&---------------------------------------------------------------------*
 *& Report  ZMAFR_GENERAR_FICHERO
 *&
 *&---------------------------------------------------------------------*
