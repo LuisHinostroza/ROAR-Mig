@@ -1,4 +1,59 @@
 @AccessControl.authorizationCheck: #NOT_REQUIRED
+@EndUserText.label: 'Retenciones MX - Partida retención (basic)'
+@Metadata.ignorePropagatedAnnotations: true
+@VDM.viewType: #BASIC
+@ObjectModel.usageType: {
+  serviceQuality: #C,
+  sizeCategory:   #XL,
+  dataClass:      #TRANSACTIONAL
+}
+/*
+  Origen: SAP Query ZRETEN_MEXA (InfoSet ZZRETENCIONES)
+  - WITH_ITEM            -> partida de retención
+  - BKPF (I_JournalEntry)-> fecha contab., clase doc., moneda documento
+  - T001 (I_CompanyCode) -> moneda local
+
+  Importe de retención:
+  - Tipos con contabilización al pago (RI/RP "en el Pago"): en la factura el importe
+    calculado queda en WT_QBUIHH/WT_QBUIHB; WT_QBSHH/WT_QBSHB se llenan al pagar.
+  - Se toma el contabilizado si existe; si no, el calculado en la factura.
+*/
+define view entity ZI_RetenMxWithItem
+  as select from with_item      as wi
+    inner join   I_JournalEntry as je on  je.CompanyCode        = wi.bukrs
+                                      and je.AccountingDocument = wi.belnr
+                                      and je.FiscalYear         = wi.gjahr
+    inner join   I_CompanyCode  as cc on  cc.CompanyCode = wi.bukrs
+{
+  key wi.bukrs                  as CompanyCode,
+  key wi.belnr                  as AccountingDocument,
+  key wi.gjahr                  as FiscalYear,
+  key wi.buzei                  as AccountingDocumentItem,
+  key wi.witht                  as WithholdingTaxType,
+      wi.wt_withcd              as WithholdingTaxCode,
+      wi.wt_acco                as Supplier,
+      wi.hkont                  as GLAccount,
+      wi.hkont_opp              as OffsettingGLAccount,
+      wi.augbl                  as ClearingAccountingDocument,
+      wi.qsatz                  as WithholdingTaxPercent,
+
+      je.PostingDate            as PostingDate,
+      je.AccountingDocumentType as AccountingDocumentType,
+
+      je.TransactionCurrency    as TransactionCurrency,
+      cc.Currency               as CompanyCodeCurrency,
+
+      @Semantics.amount.currencyCode: 'CompanyCodeCurrency'
+      wi.wt_qsshh               as WhldgTaxBaseAmtInCoCodeCrcy,
+
+      @Semantics.amount.currencyCode: 'TransactionCurrency'
+      case when get_numeric_value( wi.wt_qbshb ) <> 0
+           then wi.wt_qbshb
+           else wi.wt_qbuihb
+      end                       as WhldgTaxAmtInTransacCrcy
+}
+********************************************************************************************************
+@AccessControl.authorizationCheck: #NOT_REQUIRED
 @EndUserText.label: 'Retenciones MX - Composite'
 @Metadata.ignorePropagatedAnnotations: true
 @VDM.viewType: #COMPOSITE
