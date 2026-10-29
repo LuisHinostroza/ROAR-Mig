@@ -1,3 +1,29 @@
+Ahí puede estar la causa, aunque antes de registrar nada conviene confirmarlo con una prueba rápida.
+
+El launchpad no busca el servicio por el nombre que le hayan dado al registrarlo. Siempre llama a una URL fija:
+
+/sap/opu/odata/UI2/INTEROP/ para el estado de la app
+/sap/opu/odata/UI2/PAGE_BUILDER_PERS/ para la personalización
+
+Un servicio registrado como ZINTEROP (con prefijo Z, sin el namespace /UI2/) queda publicado en otra ruta, /sap/opu/odata/sap/ZINTEROP/. El launchpad nunca lo llama. Si el estándar no está registrado, el launchpad no puede guardar ni recuperar el estado de la app al cambiar de variante. Eso explica exactamente lo que ves: funciona con el index.html directo y falla dentro del launchpad, en todas las apps.
+
+Además, en lo que encontraste no aparece PAGE_BUILDER_PERS, solo PAGE_BUILDER_PAGE, que es otro servicio.
+
+Cómo confirmarlo antes de tocar nada. Abre estas dos URL en el navegador:
+
+https://sapdfipas.es.mapfre.net:8100/sap/opu/odata/UI2/INTEROP/$metadata?sap-client=200
+https://sapdfipas.es.mapfre.net:8100/sap/opu/odata/UI2/PAGE_BUILDER_PERS/$metadata?sap-client=200
+Si devuelven un XML: los servicios estándar sí están activos aunque no los hayas visto en la lista, y la causa es otra. Sigo con la target mapping.
+Si dan error 403/404 o “No service found for namespace /UI2/”: es esto.
+
+También puedes reproducir el error dentro del launchpad con F12 → Network, filtrando por INTEROP. Si salen peticiones en rojo, queda confirmado.
+
+La solución, si se confirma. En /IWFND/MAINT_SERVICE → Añadir servicio, alias de sistema LOCAL, busca por nombre técnico /UI2/INTEROP y regístralo con el nombre técnico estándar, sin prefijo Z. Haz lo mismo con /UI2/PAGE_BUILDER_PERS si tampoco responde.
+
+No borres ZINTEROP ni ZPAGE_BUILDER_PAGE: alguien los registró por algo y podrían estar en uso. Y como es configuración del Gateway que afecta a todo el launchpad, lo normal es que lo haga Basis. Puedes pedírselo citando la URL que da error como evidencia.
+
+Una vez registrado, borra las variantes viejas, crea una nueva desde el launchpad y prueba. Si funciona, queda resuelto para todas las apps a la vez, sin tocar ningún manifest.
+}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}
 ZI_Contrapartida
 abap
 @AccessControl.authorizationCheck: #NOT_REQUIRED
