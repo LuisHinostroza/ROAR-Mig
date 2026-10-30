@@ -11,6 +11,91 @@
   Origen: SAP Query ZRETEN_MEXA (InfoSet ZZRETENCIONES)
   - WITH_ITEM            -> partida de retención
   - BKPF (I_JournalEntry)-> fecha contab., clase doc., moneda documento
+  - T001 (I_CompanyCode) -> moneda local y país
+  - T059Z                -> tasa configurada del indicador de retención
+
+  Importe de retención:
+  - Tipos con contabilización al pago (RI/RP "en el Pago") con importe manual en la factura:
+    el importe queda en WT_QBUIHB (manual); WT_QBSHB se llena al contabilizar la retención.
+  - Se toma WT_QBSHB si existe; si no, WT_QBUIHB.
+  - El case se resuelve en DEC y se castea a CURR (un case directo sobre CURR arrastra
+    la referencia DDIC de WITH_ITEM -> SD_EXPRESSION 092).
+
+  % Retención (con importe manual QSATZ queda en 0):
+  1. WITH_ITEM-QSATZ si viene informado
+  2. T059Z-QSATZ (tasa configurada del indicador)
+  3. Tasa efectiva = importe retención / base retención * 100 (ambos en moneda documento)
+*/
+define view entity ZI_RetenMxWithItem
+  as select from    with_item      as wi
+    inner join      I_JournalEntry as je on  je.CompanyCode        = wi.bukrs
+                                         and je.AccountingDocument = wi.belnr
+                                         and je.FiscalYear         = wi.gjahr
+    inner join      I_CompanyCode  as cc on  cc.CompanyCode = wi.bukrs
+    left outer join t059z          as wc on  wc.land1     = cc.Country
+                                         and wc.witht     = wi.witht
+                                         and wc.wt_withcd = wi.wt_withcd
+{
+  key wi.bukrs                  as CompanyCode,
+  key wi.belnr                  as AccountingDocument,
+  key wi.gjahr                  as FiscalYear,
+  key wi.buzei                  as AccountingDocumentItem,
+  key wi.witht                  as WithholdingTaxType,
+      wi.wt_withcd              as WithholdingTaxCode,
+      wi.wt_acco                as Supplier,
+      wi.hkont                  as GLAccount,
+      wi.hkont_opp              as OffsettingGLAccount,
+      wi.augbl                  as ClearingAccountingDocument,
+
+      cast(
+        case
+          when cast( wi.qsatz as abap.dec(15,4) ) <> 0
+            then cast( wi.qsatz as abap.dec(15,4) )
+          when cast( wc.qsatz as abap.dec(15,4) ) <> 0
+            then cast( wc.qsatz as abap.dec(15,4) )
+          when cast( wi.wt_qsshb as abap.dec(23,2) ) <> 0
+            then division(
+                   ( case when cast( wi.wt_qbshb as abap.dec(23,2) ) <> 0
+                          then cast( wi.wt_qbshb  as abap.dec(23,2) )
+                          else cast( wi.wt_qbuihb as abap.dec(23,2) )
+                     end ) * 100,
+                   cast( wi.wt_qsshb as abap.dec(23,2) ),
+                   4 )
+          else cast( 0 as abap.dec(15,4) )
+        end
+      as abap.dec(15,4) )       as WithholdingTaxPercent,
+
+      je.PostingDate            as PostingDate,
+      je.AccountingDocumentType as AccountingDocumentType,
+
+      je.TransactionCurrency    as TransactionCurrency,
+      cc.Currency               as CompanyCodeCurrency,
+
+      @Semantics.amount.currencyCode: 'CompanyCodeCurrency'
+      wi.wt_qsshh               as WhldgTaxBaseAmtInCoCodeCrcy,
+
+      @Semantics.amount.currencyCode: 'TransactionCurrency'
+      cast(
+        case when cast( wi.wt_qbshb as abap.dec(23,2) ) <> 0
+             then cast( wi.wt_qbshb  as abap.dec(23,2) )
+             else cast( wi.wt_qbuihb as abap.dec(23,2) )
+        end
+      as abap.curr(23,2) )      as WhldgTaxAmtInTransacCrcy
+}
+*******************************************************************************************
+@AccessControl.authorizationCheck: #NOT_REQUIRED
+@EndUserText.label: 'Retenciones MX - Partida retención (basic)'
+@Metadata.ignorePropagatedAnnotations: true
+@VDM.viewType: #BASIC
+@ObjectModel.usageType: {
+  serviceQuality: #C,
+  sizeCategory:   #XL,
+  dataClass:      #TRANSACTIONAL
+}
+/*
+  Origen: SAP Query ZRETEN_MEXA (InfoSet ZZRETENCIONES)
+  - WITH_ITEM            -> partida de retención
+  - BKPF (I_JournalEntry)-> fecha contab., clase doc., moneda documento
   - T001 (I_CompanyCode) -> moneda local
 
   Importe de retención:
