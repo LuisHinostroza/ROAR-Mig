@@ -1,3 +1,207 @@
+@AccessControl.authorizationCheck: #CHECK
+@OData.publish: true
+@VDM.viewType: #CONSUMPTION
+@EndUserText.label: 'Contrapartida - Consumo'
+@UI.headerInfo: { typeName: 'Contrapartida', typeNamePlural: 'Contrapartidas' }
+define root view entity ZCP_Contrapartida
+  as projection on ZC_Contrapartida as Item
+{
+  @UI.selectionField: [{ position: 10 }]
+  @Consumption.filter.mandatory: true
+  key Item.CompanyCode,
+  @UI.selectionField: [{ position: 12 }]
+  key Item.FiscalYear,
+  @UI.selectionField: [{ position: 15 }]
+  @UI.lineItem: [{ position: 20, label: 'Nº doc.' }]
+  key Item.AccountingDocument,
+  key Item.AccountingDocumentItem,
+
+  @UI.selectionField: [{ position: 200 }]
+  @EndUserText.label: 'Tipo de cuenta'
+  Item.FinancialAccountType,
+
+  @UI.selectionField: [{ position: 40 }]
+  @UI.lineItem: [{ position: 10, label: 'Lib.mayor' }]
+  Item.GLAccount,
+
+  @UI.lineItem: [{ position: 30, label: 'Clase doc.' }]
+  @UI.selectionField: [{ position: 50 }]
+  @ObjectModel.text.element: ['AccountingDocumentTypeName']
+  @UI.textArrangement: #TEXT_FIRST
+  @Consumption.valueHelpDefinition: [{ entity: { name: 'I_AccountingDocumentType',
+                                                 element: 'AccountingDocumentType' } }]
+  Item.AccountingDocumentType,
+  @UI.hidden: true
+  Item.AccountingDocumentTypeName,
+
+  @UI.selectionField: [{ position: 60 }]
+  @UI.lineItem: [{ position: 40, label: 'CT' }]
+  Item.PostingKey,
+
+  @UI.selectionField: [{ position: 70 }]
+  @UI.lineItem: [{ position: 50, label: 'País' }]
+  Item.PaisProveedor,
+
+  @UI.selectionField: [{ position: 80 }]
+  @UI.lineItem: [{ position: 60, label: 'Acreedor' }]
+  Item.Proveedor,
+
+  @UI.lineItem: [{ position: 80, label: 'Nombre proveedor' }]
+  Item.NombreProveedor,
+
+  @UI.lineItem: [{ position: 90, label: 'Texto' }]
+  Item.DocumentItemText,
+
+  @UI.selectionField: [{ position: 100 }]
+  @UI.lineItem: [{ position: 100, label: 'Ce.coste' }]
+  Item.CostCenter,
+
+  @UI.lineItem: [{ position: 110, label: 'Asignación' }]
+  Item.AssignmentReference,
+
+  @UI.lineItem: [{ position: 120, label: 'Referencia' }]
+  Item.DocumentReferenceID,
+
+  @UI.lineItem: [{ position: 130, label: 'Texto cab.documento' }]
+  Item.AccountingDocumentHeaderText,
+
+  @UI.selectionField: [{ position: 110 }]
+  @UI.lineItem: [{ position: 140, label: 'Usuario' }]
+  @ObjectModel.text.element: ['CreatedByUserName']
+  @UI.textArrangement: #TEXT_LAST
+  Item.AccountingDocCreatedByUser,
+  @UI.hidden: true
+  Item.CreatedByUserName,
+
+  @UI.lineItem: [{ position: 150, label: 'Período' }]
+  Item.FiscalPeriod,
+
+  @UI.selectionField: [{ position: 120 }]
+  @UI.lineItem: [{ position: 160, label: 'División' }]
+  @ObjectModel.text.element: ['BusinessAreaName']
+  @UI.textArrangement: #TEXT_LAST
+  Item.BusinessArea,
+  @UI.hidden: true
+  Item.BusinessAreaName,
+
+  @UI.selectionField: [{ position: 130 }]
+  @UI.lineItem: [{ position: 170, label: 'NIF proveedor' }]
+  Item.NifProveedor,
+
+  @UI.selectionField: [{ position: 140 }]
+  @UI.lineItem: [{ position: 180, label: 'Doc.comp.' }]
+  Item.ClearingAccountingDocument,
+
+  @Semantics.amount.currencyCode: 'CompanyCodeCurrency'
+  @UI.lineItem: [{ position: 190, label: 'Importe' }]
+  Item.Amount,
+  Item.CompanyCodeCurrency,
+
+  @UI.selectionField: [{ position: 20 }]
+  @UI.lineItem: [{ position: 200, label: 'Fe.contab.' }]
+  Item.PostingDate,
+
+  @UI.selectionField: [{ position: 30 }]
+  @UI.lineItem: [{ position: 210, label: 'Fecha doc.' }]
+  Item.DocumentDate,
+
+  @UI.lineItem: [{ position: 220, label: 'Compens.' }]
+  Item.ClearingDate,
+
+  @Semantics.amount.currencyCode: 'CompanyCodeCurrency'
+  @UI.lineItem: [{ position: 230, label: 'BASE' }]
+  Item.TaxBaseAmount,
+
+  @Semantics.amount.currencyCode: 'CompanyCodeCurrency'
+  @UI.lineItem: [{ position: 240, label: 'IVA' }]
+  Item.TaxAmount,
+
+  @UI.lineItem: [{ position: 250, label: 'Ind. IVA' }]
+  Item.TaxCode,
+
+  @UI.selectionField: [{ position: 150 }]
+  @UI.lineItem: [{ position: 270, label: 'Deudor' }]
+  Item.Deudor,
+
+  @UI.lineItem: [{ position: 280, label: 'Nombre deudor' }]
+  Item.NombreDeudor,
+
+  @UI.lineItem: [{ position: 290, label: 'D/H' }]
+  Item.DebitCreditCode,
+
+  @UI.lineItem: [{ position: 300, label: 'FECHA_COMP' }]
+  Item.FechaCompensacion,
+
+  @Semantics.amount.currencyCode: 'TransactionCurrency'
+  @UI.lineItem: [{ position: 320, label: 'IMPORTE_MD' }]
+  Item.AmountInTransCrcy,
+
+  @UI.selectionField: [{ position: 160 }]
+  Item.TransactionCurrency,
+
+  @UI.selectionField: [{ position: 170 }]
+  @UI.lineItem: [{ position: 340, label: 'NIF Cliente' }]
+  Item.NifCliente,
+
+  @UI.lineItem: [{ position: 360, label: 'FechaEntr' }]
+  Item.AccountingDocumentCreationDate,
+
+  @UI.lineItem: [{ position: 370, label: 'SocGLA' }]
+  Item.PartnerCompany,
+
+  @UI.selectionField: [{ position: 190 }]
+  @UI.lineItem: [{ position: 390, label: 'CTA_ALTERNATIVA' }]
+  Item.AlternativeGLAccount,
+
+  // Bloque de imputación CI_COBL
+  @UI.lineItem: [{ position: 400, label: 'Línea de Negocio' }]
+  Item.LineaNegocio,
+
+  @UI.lineItem: [{ position: 410, label: 'Canal' }]
+  Item.Canal,
+
+  @UI.lineItem: [{ position: 420, label: 'Nueva producción/cartera' }]
+  Item.NuevaProdCartera,
+
+  @UI.lineItem: [{ position: 430, label: 'Cart. Invers.' }]
+  Item.CarteraInversion,
+
+  @UI.lineItem: [{ position: 440, label: 'Código de Servicio' }]
+  Item.CodigoServicio,
+
+  @UI.lineItem: [{ position: 450, label: 'Clave productor' }]
+  Item.ClaveProductor,
+
+  @UI.lineItem: [{ position: 460, label: 'Origen seguros' }]
+  Item.OrigenSeguros,
+
+  @UI.lineItem: [{ position: 470, label: 'Destino' }]
+  Item.Destino,
+
+  @UI.lineItem: [{ position: 480, label: 'Origen de Reparto' }]
+  Item.OrigenReparto,
+
+  @UI.lineItem: [{ position: 490, label: 'Tabla de reparto' }]
+  Item.TablaReparto,
+
+  @UI.lineItem: [{ position: 500, label: 'Tipo de Contrato' }]
+  Item.TipoContrato,
+
+  @UI.lineItem: [{ position: 510, label: 'Código de Concepto' }]
+  Item.CodigoConcepto,
+
+  @UI.lineItem: [{ position: 520, label: 'Zona Geográfica de Riesgo' }]
+  Item.ZonaGeoRiesgo,
+
+  @UI.selectionField: [{ position: 210 }]
+  @EndUserText.label: 'Doc. anulación'
+  Item.ReverseDocument,
+
+  Item.TreasuryContractType,
+  Item.AssetContract
+}
+**********************************************************************************************************************************
+
 Ahí puede estar la causa, aunque antes de registrar nada conviene confirmarlo con una prueba rápida.
 
 El launchpad no busca el servicio por el nombre que le hayan dado al registrarlo. Siempre llama a una URL fija:
