@@ -1,0 +1,3810 @@
+*&---------------------------------------------------------------------*
+*& Report  ZMFIR_PABIERTAS_PROV_ACR
+*&
+*&---------------------------------------------------------------------*
+*&
+*&
+*&---------------------------------------------------------------------*
+* 20180703
+* Deloitte - FMG
+* Extracción de terceros vivos
+*  Obtener los datos de los porveedores/acreedores para partidas
+*  abiertas y tranferirlos a archivos
+* 29.05.2024 DEVK982456  AMALON       S 7000000356: Programa Migración para USA
+* Incluir datos de la tabla ZZMAP3T
+*---------------------------------------------------------------------*
+REPORT zmfir_saldos_ctas_mayor.
+
+INCLUDE zmfir_saldos_ctas_mayor_data.
+INCLUDE zmfir_saldos_ctas_mayor_form.
+INCLUDE zmfir_saldos_ctas_mayor_acti.
+
+
+START-OF-SELECTION.
+  REFRESH i_show_aux.
+
+  IF p_alv IS INITIAL AND p_down IS INITIAL.
+    MESSAGE 'Seleccione una opción.'(016) TYPE 'I'.
+    EXIT.
+  ENDIF.
+  IF p_infnum IS INITIAL.
+    MESSAGE 'Seleccione un No. Interfaz.'(017) TYPE 'I'.
+    EXIT.
+  ENDIF.
+  IF p_cam EQ abap_true AND p_rfc IS INITIAL.
+    MESSAGE 'Seleccione un Destino RFC.'(018) TYPE 'I'.
+    EXIT.
+  ENDIF.
+  IF p_part EQ abap_true AND p_down EQ abap_true.
+*    IF p_lines LT 000.
+*      MESSAGE 'Ingrese un número de movimientos por fichero.' TYPE 'I'.
+*      EXIT.
+*    ENDIF.
+  ENDIF.
+  IF p_part EQ abap_true AND p_down EQ abap_false.
+    MESSAGE 'Seleccione descargar fichero.'(019) TYPE 'I'.
+    EXIT.
+  ENDIF.
+***EY ***AJUSTES ROLL-OUT IT/PT***************START
+  IF P_COMBI eq abap_true and p_saldo eq abap_true.
+    MESSAGE 'En ejecución combinada no marque arrastre de saldos'(023) TYPE 'I'.
+    EXIT.
+  endif.
+  IF P_COMB2 eq abap_true and p_saldo eq abap_true.
+    MESSAGE 'En ejecución combinada no marque arrastre de saldos'(023) TYPE 'I'.
+    EXIT.
+  endif.
+***EY ***AJUSTES ROLL-OUT IT/PT***************END
+
+  IF p_syst IS INITIAL.
+    MESSAGE 'Indique un Id de sistema S4/Hana'(022) TYPE 'I'.
+    EXIT.
+  ENDIF.
+
+*>TINGUAR 10/12/2021 Ajustes migración
+*  CASE s_rrcty-low.
+*    WHEN c_2.
+*      lv_blart = c_rt.
+*    WHEN c_0.
+*      lv_blart = c_zs.
+*    WHEN OTHERS.
+*      MESSAGE 'Seleccione tipo de registro válido.'(020) TYPE 'I'.
+*      EXIT.
+*  ENDCASE.
+  lv_cont_cty = 0.
+  LOOP AT s_rrcty INTO ls_rrcty.
+    CASE ls_rrcty-low.
+      WHEN c_2.
+        lv_blart = c_rt.
+        lv_cont_cty = lv_cont_cty + 1.
+      WHEN c_0.
+        lv_blart = c_zs.
+        lv_cont_cty = lv_cont_cty + 1.
+      WHEN OTHERS.
+        MESSAGE 'Seleccione tipo de registro válido.'(020) TYPE 'I'.
+        lv_cont_cty = 0.
+        EXIT.
+    ENDCASE.
+  ENDLOOP.
+  IF lv_cont_cty = 2.
+    lv_blart = c_zs.
+  ENDIF.
+*<TINGUAR 10/12/2021 Ajustes migración
+
+  PERFORM f_extraccion_datos TABLES i_zzmap1t.      " -->
+
+  IF lv_kunnr_gen IS INITIAL AND lv_lifnr_gen IS INITIAL.
+    CONCATENATE 'Falta BP genérico para sistema'(021) p_syst INTO lv_message.
+    MESSAGE lv_message TYPE 'I'.
+    EXIT.
+  ENDIF.
+
+  PERFORM f_construye_output TABLES i_zzmap1t       " <--
+                                    i_final_out  " -->
+                                    i_show_aux.
+
+*&---------------------------------------------------------------------*
+*&  Include           ZMFIR_PABIERTAS_PROV_ACR_DATA
+*&---------------------------------------------------------------------*
+CONSTANTS: c_si TYPE c VALUE 'X',
+           c_no TYPE c VALUE space,
+           c_ceros TYPE c LENGTH 18 VALUE '000000000000000000',
+           c_hslvt TYPE c LENGTH 5 VALUE 'HSLVT',
+           c_tslvt TYPE c LENGTH 5 VALUE 'TSLVT',
+           c_pses TYPE ska1-ktopl VALUE 'PSES',
+           c_zs TYPE blart VALUE 'ZS',
+           c_rt TYPE blart VALUE 'RT',
+           c_0 TYPE c VALUE '0',
+           c_2 TYPE c VALUE '2',
+           c_4ceros TYPE c LENGTH 4 VALUE '0000'.
+
+TABLES: t001, zzmap1t, zzmap2t, bpbk.
+
+TYPES: BEGIN OF ty_key,
+            rldnr TYPE rldnr,
+            rrcty TYPE rrcty,
+            rvers TYPE rvers,
+            ryear TYPE gjahr,
+            robjnr TYPE gobjnr_r,
+            cobjnr TYPE gobjnr_c,
+            sobjnr TYPE gobjnr_s,
+            rtcur TYPE rtcur,
+            runit TYPE meins,
+            drcrk TYPE shkzg,
+            rpmax TYPE rpmax,
+       END OF   ty_key,
+       BEGIN OF ty_importes,
+            hsl01 TYPE hslxx9,
+            hsl02 TYPE hslxx9,
+            hsl03 TYPE hslxx9,
+            hsl04 TYPE hslxx9,
+            hsl05 TYPE hslxx9,
+            hsl06 TYPE hslxx9,
+            hsl07 TYPE hslxx9,
+            hsl08 TYPE hslxx9,
+            hsl09 TYPE hslxx9,
+            hsl10 TYPE hslxx9,
+            hsl11 TYPE hslxx9,
+            hsl12 TYPE hslxx9,
+            hsl13 TYPE hslxx9,
+            hsl14 TYPE hslxx9,
+            hsl15 TYPE hslxx9,
+            hsl16 TYPE hslxx9,
+       END OF   ty_importes,
+       BEGIN OF ty_zzmap1t_fields,
+            rbukrs TYPE bukrs,
+            rzzc01 TYPE zzc01,
+            rzzc02 TYPE zzc02,
+            rzzc03 TYPE zzc03,
+            rzzc08 TYPE zzc08,
+            rzzc11 TYPE zzc11,
+            rzzc12 TYPE zzc12,
+            racct TYPE racct,
+            rcntr TYPE kostl,
+            rbusa TYPE gsber,
+            vbund TYPE vbund,
+            zzc04 TYPE zzc04.
+        INCLUDE TYPE ty_importes.
+TYPES:
+       END OF   ty_zzmap1t_fields,
+       BEGIN OF ty_zzmap2t_fields,
+            rzzc06 TYPE zzc06,
+            rzzc07 TYPE zzc07,
+            rzzc13 TYPE zzc13,
+            zzc09  TYPE zzc09,
+            vbund_2  TYPE vbund,
+            anln1  TYPE anln1,
+       END OF   ty_zzmap2t_fields,
+       BEGIN OF ty_zzmapxt_extras,
+            hslxx TYPE hslxx9,
+       END OF ty_zzmapxt_extras,
+       BEGIN OF ty_zzmap1t.
+        INCLUDE TYPE: ty_key,
+                      ty_zzmap1t_fields.
+TYPES:
+       END OF   ty_zzmap1t,
+       BEGIN OF ty_zzmap2t.
+        INCLUDE TYPE: ty_key.
+TYPES:         rbukrs TYPE  bukrs,
+               racct  TYPE racct.
+        INCLUDE TYPE: ty_zzmap2t_fields.
+        INCLUDE TYPE: ty_importes.
+TYPES:
+       END OF   ty_zzmap2t,
+       BEGIN OF ty_zzmapxt.
+        INCLUDE TYPE: ty_key,
+                      ty_zzmap1t_fields,
+                      ty_zzmap2t_fields,
+                      ty_zzmapxt_extras.
+TYPES:
+       END OF   ty_zzmapxt,
+       BEGIN OF ty_outheader,
+            rectyp(2)," Tipo de Registro
+            rbukrs(4)," Código de la Sociedad Financiera
+            infnum(3)," Número de Interface
+            sernum(1)," Número de serie
+            offcod(4),"
+            posdat(8)," Fecha de contabilización
+            curr(3)," Moneda del saldo cuenta de mayor
+            intcod(2)," Clase de documento del asiento de migración
+            docdate(8)," Fecha de documento
+            gruled(2)," Ledger
+       END OF   ty_outheader,
+       BEGIN OF ty_outitems,
+            rectyp(2)," Tipo de Registro
+            rbukrs(4)," Código de la Sociedad Financiera
+            intnum(3)," Número de Interface
+            senum(1)," Número de serie
+            offcod(4),"
+            posdat(8)," Fecha de contabilización
+            curr(3)," Moneda del saldo cuenta de mayor
+            racct(10)," Cuenta de Mayor GL
+            rzzc08(3)," Origen grupo 6
+            thirp(16),"
+            valdate(8)," Fecha Valor
+            zzc09(3)," Código Concepto
+            vbund(6)," Sociedad GL
+            trant(3)," Tipo de Transacción
+            rbusa(4)," División
+            rcntr(10)," Centro de Coste
+            rzzc07(16)," Clave Productor
+            rzzc01(5)," Línea de Negocio (Cobertura actual en ECC)
+            rzzc02(4)," Línea de Negocio (Modalidad actual en ECC)
+            rzzc03(1)," Nueva Producción Cartera
+            anln1(12)," Activo Fijo
+            othea(10)," Otras asignaciones
+            rzzc13(6)," Código de Empleado
+            rzzc06(8)," Código de Servicio
+            zzc04(3)," Cartera de Inversión
+            assia(18)," Asignación
+            negap(1)," Contabilización negativa
+            debitcr(1)," Indicador Debe / Haber
+** MVSALV2 - Aumentar tamaño de importes - INICIO
+*            hslxx(14)," Importe en moneda documento
+*            hslxx2(14)," Importe en moneda local
+            tslxx(18)," Importe en moneda documento
+            hslxx2(18)," Importe en moneda local
+** MVSALV2 - FIN
+            concc(50)," Texto posición de documento
+            rzzc11(4)," Canal
+            taxc(2)," Código Impuesto
+            expi(8)," Cargos por tipo de cambio
+            issu(8)," Cargos por tipo de cambio de la fecha de emisión
+            prev(10)," Número de registro maestro previo
+            partner(4)," Tipo de Banco Interlocutor
+            custo(10)," Pedido de Compra
+            asset(8)," Fecha valor Activo Fijo
+            paymm(1)," Método de Pago
+            housb(5)," Banco Propio
+            anln2(4)," Subnúmero de activo fijo
+            swenr(8)," Unidad Económica
+            clave(4)," Clave de Gastos
+            sempsl(5)," Unidad Liquidadora
+            fecliq(8)," Fecha referencia Liquidación
+            recnnr(30)," Número de Contrato
+            paymb(1)," Bloqueo de Pago
+            taxt(2)," Tipo de Impuesto
+            brokb(20)," Broker
+            reasr(12)," Reasegurador
+            segms(10)," Segmento
+            nro12(4)," Contrato de Reaseguro
+            paisp(4)," País
+            zz0010(10)," Tabla de reparto
+            zz0008(10)," Destino
+            zz0001(9),
+            imkey(50),
+            dabrz(8),
+       END OF   ty_outitems,
+       BEGIN OF ty_outfoot,
+            rectyp(2)," Tipo de Registro
+            rbukrs(4)," Código de la Sociedad Financiera
+            infnum(3)," Número de Interface
+            sernum(1)," Número de serie
+            ofcc(4),"
+            postd(8)," Fecha de contabilización
+            curr(3)," Moneda del saldo cuenta de mayor
+* MVSALV2 - Aumentar tamaños de importes - INICIO
+*            totald(14)," Importe Total Documento: DEBE
+*            totalcr(14)," Importe Total Documento: HABER
+            totald(18)," Importe Total Documento: DEBE
+            totalcr(18)," Importe Total Documento: HABER
+* MVSALV2 - FIN
+       END OF   ty_outfoot,
+       BEGIN OF ty_final_out,
+            linea(1200),
+       END OF ty_final_out,
+
+       BEGIN OF ty_cta_res,
+         saknr TYPE ska1-saknr,
+       END OF ty_cta_res,
+
+       BEGIN OF ty_cta_bal,
+         saknr TYPE ska1-saknr,
+       END OF ty_cta_bal,
+
+       BEGIN OF ty_cartera,
+         aufnr TYPE aufnr,
+         zzc04 TYPE zzc04,
+       END OF ty_cartera,
+
+       BEGIN OF ty_vbund,
+         vbund TYPE zmfit_mig_vbund-vbund,
+         vbund_s4 TYPE zmfit_mig_vbund-vbund_s4,
+       END OF ty_vbund,
+
+       BEGIN OF ty_hkont,
+         hkont TYPE zmfit_hkont_gen-hkont,
+         hkont_s4h TYPE zmfit_hkont_gen-hkont_s4h,
+       END OF ty_hkont,
+
+       BEGIN OF ty_skb1,
+         saknr TYPE skb1-saknr,
+         mitkz TYPE skb1-mitkz,
+       END OF ty_skb1.
+TYPES: BEGIN OF ty_cecos,
+         kostl TYPE kostl,
+         kostl_s4 TYPE kostl,
+       END OF ty_cecos.
+** MVSALV2 - Nuevas declaraciones - INICIO
+TYPES: BEGIN OF ty_monedas,
+        bukrs TYPE t001-bukrs,
+        waers TYPE t001-waers,
+       END OF ty_monedas.
+** MVSALV2 - Nuevas declaraciones - FIN
+
+
+** CRG INI 31102025
+TYPES: BEGIN OF ty_alv,
+  rtcur	 TYPE	rtcur,
+  rbukrs   TYPE bukrs,
+  ryear	 TYPE	gjahr,
+  docdate	 TYPE	rl_docdate,
+  rbusa	 TYPE	gsber,
+  racct	 TYPE	racct,
+  shkzg	 TYPE	shkzg,
+  negap	 TYPE	xnegp,
+  rzzc01   TYPE zzc01,
+  rzzc02   TYPE zzc02,
+  rzzc03   TYPE zzc03,
+  rzzc08   TYPE zzc08,
+  rzzc11   TYPE zzc11,
+  rzzc12   TYPE zzc12,
+  rcntr	 TYPE	kostl,
+  vbund	 TYPE	vbund,
+  zzc04	 TYPE	zzc04,
+  hslxx	 TYPE	hslxx9,
+  tslxx	 TYPE	tslxx9,
+  rzzc06   TYPE zzc06,
+  rzzc07   TYPE zzc07,
+  rzzc13   TYPE zzc13,
+  zzc09	 TYPE	zzc09,
+  anln1	 TYPE	anln1,
+  zz0001   TYPE zz0001,
+  END OF ty_alv.
+** CRG FIN 31102025
+
+data: i_zzmap1t        TYPE STANDARD TABLE OF ty_zzmap1t,
+      w_zzmap1t       TYPE ty_zzmap1t,
+      i_zzmap2t       TYPE STANDARD TABLE OF ty_zzmap2t,
+      w_zzmap2t       TYPE ty_zzmap2t,
+      i_zzmapxt       TYPE STANDARD TABLE OF ty_zzmapxt,
+      w_zzmapxt       TYPE ty_zzmapxt,
+      w_outheader     TYPE ty_outheader,
+      w_outitem       TYPE ty_outitems,
+*ini 19/12/2924 RDJOSE2 cta puente signos diferentes
+      i_outitem TYPE STANDARD TABLE OF ty_outitems,
+*fini 19/12/2924 RDJOSE2 cta puente signos diferentes
+      w_outfoot       TYPE ty_outfoot,
+      i_final_out     TYPE STANDARD TABLE OF ty_final_out,
+      w_final_out     TYPE ty_final_out,
+      i_show_aux      TYPE STANDARD TABLE OF zmfir_saldos_proce,
+      w_show_aux      TYPE zmfir_saldos_proce,
+      lt_alv          TYPE STANDARD TABLE OF ty_alv WITH HEADER LINE,
+      ls_alv          type ty_alv.
+
+
+DATA: r_rldnr         TYPE RANGE OF rldnr WITH HEADER LINE,
+      r_rrcty         TYPE RANGE OF rrcty WITH HEADER LINE,
+      r_rvers         TYPE RANGE OF rvers WITH HEADER LINE,
+      it_zzmap2t TYPE STANDARD TABLE OF zzmap2t,
+      wa_zzmap2t LIKE LINE OF it_zzmap2t,
+      it_zzmap1t TYPE STANDARD TABLE OF zzmap1t,
+      wa_zzmap1t LIKE LINE OF it_zzmap1t,
+      it_zzmap4t TYPE STANDARD TABLE OF zzmap4t, " MVSALV2 - 2022.11.21
+      wa_zzmap4t LIKE LINE OF it_zzmap4t,        " MVSALV2 - 2022.11.21
+      it_zzmap3t TYPE STANDARD TABLE OF zzmap3t, " AMALON - 29.05.2024 USA
+      wa_zzmap3t LIKE LINE OF it_zzmap3t,        " AMALON - 29.05.2024 USA
+      it_bpgen TYPE STANDARD TABLE OF zmfit_bp_gen,
+      wa_bpgen LIKE LINE OF it_bpgen,
+      wa_importes TYPE ty_importes,
+      it_cta_res TYPE STANDARD TABLE OF ty_cta_res,
+      wa_cta_res LIKE LINE OF it_cta_res,
+      it_cta_bal TYPE STANDARD TABLE OF ty_cta_bal,
+      wa_cta_bal LIKE LINE OF it_cta_bal,
+      it_cartera TYPE STANDARD TABLE OF ty_cartera,
+      wa_cartera LIKE LINE OF it_cartera,
+      it_vbund TYPE STANDARD TABLE OF ty_vbund,
+      wa_vbund LIKE LINE OF it_vbund,
+      it_hkont TYPE STANDARD TABLE OF ty_hkont,
+      wa_hkont LIKE LINE OF it_hkont,
+      it_skb1 TYPE STANDARD TABLE OF ty_skb1,
+      wa_skb1 LIKE LINE OF it_skb1,
+      it_zzc11 TYPE STANDARD TABLE OF zmfit_mig_zzc11,
+      wa_zzc11 LIKE LINE OF it_zzc11,
+      it_cecos TYPE STANDARD TABLE OF ty_cecos,
+      wa_cecos LIKE LINE OF it_cecos,
+      gt_zz0001 TYPE STANDARD TABLE OF zmfit_con_zz0001,
+      gs_zz0001 LIKE LINE OF gt_zz0001,
+      gs_zfi73 TYPE zfi73,  "JULIOF3 rollout IT-PT ADD
+** MVSALV2 - Nuevas declaraciones - INICIO
+      it_monedas TYPE STANDARD TABLE OF ty_monedas,
+      wa_monedas LIKE LINE OF it_monedas.
+** MVSALV2 - Nuevas declaraciones - FIN
+DATA:
+      g_location_flag TYPE dxlocation,
+      g_server        TYPE msname2,
+      g_path          TYPE dxlpath,
+      g_error,
+      lv_shkzg TYPE bseg-shkzg.
+DATA: l_docdate       TYPE rl_docdate,
+      l_lastmonth(2)  TYPE n,
+      l_hslxxs        TYPE hslxx9,
+      l_hslxxh        TYPE hslxx9,
+      l_hslxx_99      TYPE hslxx9,
+      l_hslxx2_99     TYPE hslxx9,
+      l_tabix         TYPE sytabix,
+      lv_rpmax TYPE zzmap1t-rpmax,
+      lv_cont TYPE i,
+      lv_offcod TYPE ty_outheader-offcod,
+      p_map1 TYPE c VALUE 'X',
+      lv_file_cont TYPE i,
+      lv_flag_neg TYPE c,
+      lv_filename TYPE localfile,
+      p_csv TYPE c VALUE 'X',
+      p_txt ,
+      lv_blart TYPE blart,
+      lv_kunnr_gen TYPE bu_partner,
+      lv_lifnr_gen TYPE bu_partner,
+      lv_message TYPE string.
+
+RANGES: r_saknr_8_9 FOR wa_cta_bal-saknr.
+*>TINGUAR 23/09/2021 nuevas cuentas res
+RANGES: r_saknr_res FOR wa_cta_bal-saknr.
+*<TINGUAR 23/09/2021 nuevas cuentas res
+*>TINGUAR 15/11/2021 Tabla de conversión cobertura
+DATA: gt_conv_cob TYPE STANDARD TABLE OF zmfit_conv_cob.
+*<TINGUAR 15/11/2021 Tabla de conversión cobertura
+
+SELECTION-SCREEN BEGIN OF BLOCK p1 WITH FRAME TITLE text-001.
+SELECT-OPTIONS: s_bukrs FOR zzmap1t-rbukrs NO INTERVALS NO-EXTENSION,
+*>TINGUAR 10/12/2021 Ajustes migración
+*                s_rrcty FOR zzmap1t-rrcty NO INTERVALS NO-EXTENSION.
+                s_rrcty FOR zzmap1t-rrcty NO INTERVALS OBLIGATORY.
+*<TINGUAR 10/12/2021 Ajustes migración
+SELECT-OPTIONS s_rpmax FOR zzmap1t-rpmax.
+PARAMETERS:     p_ryear	TYPE gjahr.
+SELECT-OPTIONS: s_racct FOR zzmap1t-racct,
+                s_rzzs01 FOR zzmap1t-rzzs01.
+PARAMETERS:     p_infnum TYPE ty_outheader-infnum,
+*ini 1000106812, Adaptar Programa Migración Saldos por LI JOSEPHH 02.03.2023
+                p_ledge  TYPE fagl_rldnr.
+*fin 1000106812, Adaptar Programa Migración Saldos por LI JOSEPHH 02.03.2023
+*ini ALF 25.10.2024 selecccion por moneda
+SELECT-OPTIONS p_rtcur FOR zzmap1t-rtcur.
+*fin ALF 25.10.2024 selecccion por moneda
+SELECTION-SCREEN BEGIN OF BLOCK p12 WITH FRAME TITLE text-010.
+PARAMETERS: p_delta RADIOBUTTON GROUP calc DEFAULT 'X' USER-COMMAND sy-ucomm .
+PARAMETERS: p_total RADIOBUTTON GROUP calc,
+***EY ***AJUSTES ROLL-OUT IT/PT***************START
+            p_combi RADIOBUTTON GROUP calc,
+            p_comb2 RADIOBUTTON GROUP calc.
+PARAMETERS: p_cero  AS CHECKBOX DEFAULT space.
+***EY ***AJUSTES ROLL-OUT IT/PT***************END
+PARAMETERS: p_saldo AS CHECKBOX DEFAULT space.
+PARAMETERS: p_montr AS CHECKBOX DEFAULT space.
+PARAMETERS: p_inver AS CHECKBOX DEFAULT space.
+SELECTION-SCREEN END OF BLOCK p12.
+*DATA: p_montr.
+
+**SELECTION-SCREEN BEGIN OF BLOCK p14 WITH FRAME TITLE text-013.
+*PARAMETERS: p_csv RADIOBUTTON GROUP tip DEFAULT 'X' USER-COMMAND sy-ucomm.
+*PARAMETERS: p_txt RADIOBUTTON GROUP tip.
+*SELECTION-SCREEN END OF BLOCK p14.
+SELECTION-SCREEN END OF BLOCK p1 .
+
+SELECTION-SCREEN BEGIN OF BLOCK p2 WITH FRAME TITLE text-002.
+PARAMETERS p_alv AS CHECKBOX DEFAULT abap_true.
+PARAMETERS p_down AS CHECKBOX.
+SELECTION-SCREEN: BEGIN OF LINE.
+PARAMETERS p_part AS CHECKBOX.
+SELECTION-SCREEN: COMMENT 3(15) text-c01.
+SELECTION-SCREEN: COMMENT 18(15) text-c02.
+PARAMETERS: p_lines TYPE i DEFAULT 10000.
+SELECTION-SCREEN: END OF LINE.
+PARAMETERS p_cam AS CHECKBOX USER-COMMAND cmd DEFAULT 'X'.
+PARAMETERS: p_rfc   TYPE rfcdest  MATCHCODE OBJECT f4_rfcdes3 MODIF ID b3,
+            p_dlay TYPE p LENGTH 4 DECIMALS 2 MODIF ID b3.
+PARAMETERS: p_hst  AS CHECKBOX MODIF ID b3,
+            p_hast TYPE i MODIF ID b3.
+SELECTION-SCREEN BEGIN OF BLOCK p3 WITH FRAME TITLE text-003.
+PARAMETERS: p_pres RADIOBUTTON GROUP fs DEFAULT 'X' USER-COMMAND sy-ucomm.
+PARAMETERS: p_appl RADIOBUTTON GROUP fs .
+PARAMETERS: p_rfc2   TYPE rfcdest  MATCHCODE OBJECT f4_rfcdes3 .
+PARAMETERS: p_syst TYPE zmfi_ed_sysid_s4h NO-DISPLAY. "CRG 08042025
+SELECTION-SCREEN END OF BLOCK p3 .
+PARAMETERS: p_filna TYPE string LOWER CASE .
+SELECTION-SCREEN END OF BLOCK p2 .
+
+*>TINGUAR 10/12/2021 Ajustes migración
+DATA: ls_rrcty    LIKE LINE OF s_rrcty,
+      lv_cont_cty TYPE i VALUE 0.
+*<TINGUAR 10/12/2021 Ajustes migración
+*&---------------------------------------------------------------------*
+*&  Include           ZMFIR_PABIERTAS_PROV_ACR_FORM
+*&---------------------------------------------------------------------*
+*&---------------------------------------------------------------------*
+*&      Form  F_OBTIENE_NOMBRE_ARCHIV
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*      <--P_P_FILNA  text
+*----------------------------------------------------------------------*
+FORM f_obtiene_nombre_archiv  CHANGING p_filna.
+  DATA:
+
+          l_filename  TYPE  string,
+          l_path  TYPE  string.
+  DATA: l_name(45).
+
+  CONCATENATE sy-datum sy-uzeit 'ABAC.txt' INTO l_name.
+  IF p_pres = c_si.
+    CALL METHOD cl_gui_frontend_services=>file_save_dialog
+      CHANGING
+        filename                  = l_filename
+        path                      = l_path
+        fullpath                  = p_filna
+      EXCEPTIONS
+        cntl_error                = 1
+        error_no_gui              = 2
+        not_supported_by_gui      = 3
+        invalid_default_file_name = 4
+        OTHERS                    = 5.
+    IF sy-subrc <> 0.
+* Implement suitable error handling here
+    ENDIF.
+  ENDIF.
+  IF p_appl = c_si.
+*    CALL FUNCTION '/SAPDMC/LSM_F4_SERVER_FILE'
+** EXPORTING
+**   DIRECTORY              = ' '
+**   FILEMASK               = ' '
+* IMPORTING
+*   serverfile             =
+* exceptions
+*   canceled_by_user       = 1
+*   others                 = 2
+*              .
+*    IF sy-subrc <> 0.
+** Implement suitable error handling here
+*    ENDIF.
+
+  ENDIF.
+ENDFORM.                    " F_OBTIENE_NOMBRE_ARCHIV
+*&---------------------------------------------------------------------*
+*&      Form  F_EXTRACCION_DATOS
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*      -->P_I_BSIK  text
+*----------------------------------------------------------------------*
+FORM f_extraccion_datos  TABLES   p_i_zzmapxt STRUCTURE w_zzmap1t.
+
+** MVSALV2 - Z4 para Sociedad 0496 - 2022.11.21 - Inicio
+  CONSTANTS: lc_cr TYPE bukrs VALUE '0496'.
+  DATA: lv_ledger TYPE rldnr.
+** MVSALV2 - Z4 para Sociedad 0496 - 2022.11.21 - Fin
+  PERFORM f_rangos .
+
+** MVSALV2 - Recuperar monedas loclaes de sociedades - INICIO
+  SELECT bukrs waers
+    INTO TABLE it_monedas
+    FROM t001
+    WHERE bukrs IN s_bukrs.
+** MVSALV2 - FIN
+
+  SELECT saknr
+         mitkz
+    INTO TABLE it_skb1
+    FROM skb1
+   WHERE bukrs IN s_bukrs.
+  IF sy-subrc = 0.
+    SORT it_skb1 BY saknr.
+  ENDIF.
+
+  REFRESH: it_cta_bal, it_cta_res, it_cartera.
+  SELECT a~saknr
+    INTO TABLE it_cta_bal
+    FROM ska1 AS a
+   INNER JOIN t001 AS b
+      ON a~ktopl = b~ktopl
+   WHERE ( a~saknr IN s_racct
+     AND a~xbilk NE abap_false )
+** Inicio Modificacion MSFRAN9 08/11/2022
+*      OR ( a~saknr IN s_racct
+*     AND a~saknr IN r_saknr_8_9 )
+** Fin Modificacion MSFRAN9 08/11/2022
+     AND b~bukrs IN s_bukrs.
+  IF sy-subrc = 0.
+    SORT it_cta_bal BY saknr.
+  ENDIF.
+
+  SELECT a~saknr
+    INTO TABLE it_cta_res
+    FROM ska1 AS a
+   INNER JOIN t001 AS b
+      ON a~ktopl = b~ktopl
+   WHERE ( a~saknr IN s_racct
+     AND a~gvtyp NE abap_false )
+** Inicio Modificacion MSFRAN9 08/11/2022
+*     AND ( a~saknr NOT IN r_saknr_8_9 )
+** Fin Modificacion MSFRAN9 08/11/2022
+     AND b~bukrs IN s_bukrs.
+  IF sy-subrc = 0.
+    SORT it_cta_res BY saknr.
+  ENDIF.
+
+*>TINGUAR 23/09/2021 nuevas cuentas res
+  IF r_saknr_res[] IS NOT INITIAL.
+    SELECT a~saknr
+      APPENDING TABLE it_cta_res
+      FROM ska1 AS a
+      INNER JOIN t001 AS b
+        ON a~ktopl = b~ktopl
+      WHERE a~saknr IN s_racct
+        AND a~saknr IN r_saknr_res
+        AND b~bukrs IN s_bukrs.
+    IF sy-subrc = 0.
+      SORT it_cta_res BY saknr.
+      CLEAR wa_cta_bal.
+      LOOP AT it_cta_bal INTO wa_cta_bal WHERE saknr IN r_saknr_res.
+        DELETE it_cta_bal INDEX sy-tabix.
+      ENDLOOP.
+    ENDIF.
+  ENDIF.
+*<TINGUAR 23/09/2021 nuevas cuentas res
+
+  SELECT aufnr
+         zzc04
+  INTO TABLE it_cartera
+  FROM zmfit_aufnr_zzc4
+  WHERE bukrs IN s_bukrs.
+  IF sy-subrc EQ 0.
+    SORT it_cartera BY aufnr.
+  ENDIF.
+
+** MVSALV2 - Z4 para Sociedad 0496 - 2022.11.21 - Inicio
+  SELECT SINGLE rldnr
+         INTO lv_ledger
+      FROM zmfit_soc_ledger WHERE bukrs = s_bukrs-low.
+  IF sy-subrc NE 0.
+    CLEAR lv_ledger. " Si no está la sociedad se seguirá haciendo como hasta el momento
+  ENDIF.
+  CASE lv_ledger.
+    WHEN 'Z4'.
+      PERFORM f_leer_ledger_z4.
+    WHEN 'Z1'.
+      PERFORM f_leer_ledger_z1.
+    WHEN 'Z3'.
+      PERFORM f_leer_ledger_z3. "AMALON 29.05.2024 USA
+    WHEN OTHERS.
+
+** MVSALV2 - Z4 para Sociedad 0496 - 2022.11.21 - Fin
+
+
+      IF it_cta_res IS NOT INITIAL.
+        SELECT *
+          INTO TABLE it_zzmap1t
+          FROM zzmap1t
+          FOR ALL ENTRIES IN it_cta_res
+          WHERE zzmap1t~rbukrs IN s_bukrs
+          AND zzmap1t~racct  = it_cta_res-saknr
+          AND zzmap1t~rldnr  IN r_rldnr
+          AND zzmap1t~rrcty  IN s_rrcty "r_rrcty
+          AND zzmap1t~rvers  IN r_rvers
+          AND zzmap1t~ryear  = p_ryear
+          AND zzmap1t~rtcur  IN p_rtcur
+          AND zzmap1t~rzzs01 IN s_rzzs01.
+        IF sy-subrc EQ 0.
+
+        ENDIF.
+      ENDIF.
+
+
+      IF it_cta_bal IS NOT INITIAL.
+        SELECT *
+            FROM zzmap2t
+            INTO TABLE  it_zzmap2t
+             FOR ALL ENTRIES IN it_cta_bal
+           WHERE rbukrs IN s_bukrs
+             AND racct  = it_cta_bal-saknr
+             AND rldnr  IN r_rldnr
+             AND rrcty  IN s_rrcty
+             AND rvers  IN r_rvers
+             AND rtcur  IN p_rtcur
+             AND ryear  = p_ryear.
+        IF sy-subrc EQ 0.
+
+        ENDIF.
+      ENDIF.
+
+  ENDCASE. "MVSALV2 - Z4 para Sociedad 0496
+
+  CLEAR: lv_lifnr_gen, lv_kunnr_gen.
+
+  SELECT * FROM zmfit_bp_gen
+    INTO TABLE it_bpgen
+   WHERE sysid = p_syst.
+  IF sy-subrc EQ 0.
+    LOOP AT it_bpgen INTO wa_bpgen.
+      CASE wa_bpgen-mitkz.
+        WHEN 'D'.
+          lv_kunnr_gen = wa_bpgen-generico.
+        WHEN 'K'.
+          lv_lifnr_gen = wa_bpgen-generico.
+      ENDCASE.
+    ENDLOOP.
+  ENDIF.
+
+  SELECT vbund
+         vbund_s4
+    INTO TABLE it_vbund
+    FROM zmfit_mig_vbund
+   WHERE bukrs IN s_bukrs.
+  IF sy-subrc EQ 0.
+    SORT it_vbund BY vbund.
+  ENDIF.
+
+  SELECT hkont
+         hkont_s4h
+    INTO TABLE it_hkont
+    FROM zmfit_hkont_gen.
+  IF sy-subrc EQ 0.
+    SORT it_hkont BY hkont.
+  ENDIF.
+
+  SELECT kostl
+         kostl_s4
+    INTO TABLE it_cecos
+    FROM zmfit_sal_cecos
+   WHERE bukrs IN s_bukrs.
+  IF sy-subrc EQ 0.
+
+  ENDIF.
+
+  SELECT *
+    INTO TABLE it_zzc11
+    FROM zmfit_mig_zzc11.
+  IF sy-subrc EQ 0.
+
+  ENDIF.
+
+  SELECT *
+    INTO TABLE gt_zz0001
+    FROM zmfit_con_zz0001.
+  IF sy-subrc = 0.
+
+  ENDIF.
+
+*** JULIOF3 03/08/2021 ROLLOUT IT-PT *******START***
+  CLEAR: t001, gs_zfi73.
+  SELECT SINGLE bukrs waers ktopl fstva spras
+    INTO CORRESPONDING FIELDS OF t001
+    FROM t001
+   WHERE bukrs IN s_bukrs.
+  IF sy-subrc EQ 0.
+    SELECT SINGLE mandt ktopl hkont_interfase hkont_saldo_inic
+                  hkont_puente_sl hkont_tra_saldo
+      FROM zfi73
+      INTO gs_zfi73
+     WHERE ktopl EQ t001-ktopl.
+
+  ENDIF.
+
+*** JULIOF3 03/08/2021 ROLLOUT IT-PT *******END*****
+
+ENDFORM.                    " F_EXTRACCION_DATOS
+*&---------------------------------------------------------------------*
+*&      Form  F_CONSTRUYE_OUTPUT
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*      -->P_I_BSIK  text
+*      -->P_I_OUT_HEADER  text
+*      -->P_I_OUT_ITEM  text
+*      -->P_I_FINAL_OUT  text
+*----------------------------------------------------------------------*
+FORM f_construye_output    TABLES p_i_zzmapxt     STRUCTURE w_zzmap1t
+                                  p_i_final_out   STRUCTURE w_final_out
+                                  p_i_show_aux    STRUCTURE w_show_aux.
+  DATA: p_i_show LIKE TABLE OF w_show_aux WITH HEADER LINE,
+        p_i_show_neg LIKE TABLE OF w_show_aux WITH HEADER LINE,
+        lv_lines TYPE i,
+        lv_flag_err,
+*Ini RDJOSE2 19.12.2024 ajuste por diferencia en signo en cta puente
+        lv_lin.
+*fIni RDJOSE2 19.12.2024 ajuste por diferencia en signo en cta puente
+  FIELD-SYMBOLS: <ls_show> LIKE w_show_aux.
+
+*Ini RDJOSE2 19.12.2024 ajuste por diferencia en signo en cta puente
+  REFRESH i_outitem.
+*fIni RDJOSE2 19.12.2024 ajuste por diferencia en signo en cta puente
+***EY ***AJUSTES ROLL-OUT IT/PT***************START
+**  Se separa la creación de fecha para p_combi y p_combi2
+  IF p_combi = abap_true OR
+     p_comb2 = abap_true.
+    DATA: l_month(2) TYPE n,
+          lv_year TYPE gjahr.
+    IF p_combi = abap_true.
+      lv_year = p_ryear - 1. " DEVK982456 AMALON S 7000000356: Programa Migración para USA
+      CONCATENATE lv_year '1231' INTO l_docdate.
+    ELSEIF p_comb2 = abap_true.
+      lv_year = p_ryear .
+      CONCATENATE lv_year '1231' INTO l_docdate.
+    ENDIF.
+    l_lastmonth = 12.
+    PERFORM f_llena_show_map1 TABLES p_i_show USING abap_true.
+    PERFORM f_llena_show_map2 TABLES p_i_show USING abap_true.
+    PERFORM f_llena_show_map4 TABLES p_i_show USING abap_true.
+* Inicio 29.05.2024 DEVK982456 AMALON S 7000000356: Programa Migración para USA
+    PERFORM f_llena_show_map3 TABLES p_i_show USING abap_true.
+* Fin 29.05.2024 DEVK982456 AMALON S 7000000356: Programa Migración para USA
+    APPEND LINES OF p_i_show TO p_i_show_aux.
+    CLEAR: l_docdate, l_lastmonth.
+  ENDIF.
+***EY ***AJUSTES ROLL-OUT IT/PT***************END
+  DO 16 TIMES.
+
+    MOVE sy-index TO lv_rpmax.
+    IF NOT lv_rpmax IN s_rpmax.
+      CONTINUE.
+    ENDIF.
+
+    REFRESH p_i_show.
+
+    CLEAR:  l_docdate , l_lastmonth,  l_hslxxs,  l_hslxxh, l_tabix, lv_cont, lv_offcod.
+
+    PERFORM f_obtener_ultimo_dia_mes CHANGING l_docdate  l_lastmonth.
+
+    PERFORM f_llena_show_map1 TABLES p_i_show USING space.
+
+    PERFORM f_llena_show_map2 TABLES p_i_show USING space.
+
+    PERFORM f_llena_show_map4 TABLES p_i_show USING space.
+* Inicio 29.05.2024 DEVK982456 AMALON S 7000000356: Programa Migración para USA
+    PERFORM f_llena_show_map3 TABLES p_i_show USING space.
+* Fin 29.05.2024 DEVK982456 AMALON S 7000000356: Programa Migración para USA
+    APPEND LINES OF p_i_show TO p_i_show_aux.
+    IF p_saldo = abap_true.
+      EXIT.
+    ENDIF.
+  ENDDO.
+  IF p_inver = abap_true.
+    LOOP AT p_i_show_aux ASSIGNING <ls_show>.
+      IF <ls_show>-shkzg = 'H'.
+        <ls_show>-shkzg = 'D'.
+      ELSE.
+        <ls_show>-shkzg = 'H'.
+      ENDIF.
+      <ls_show>-hslxx = <ls_show>-hslxx * -1.
+      <ls_show>-tslxx = <ls_show>-tslxx * -1.
+    ENDLOOP.
+  ENDIF.
+  " Revisa la longitud de los importes, que no sean mayores a 13 caracteres
+  PERFORM f_check_long TABLES p_i_show_aux.
+
+  IF p_alv EQ abap_true.
+    PERFORM f_muestra_info     TABLES p_i_show_aux.      " <--
+  ENDIF.
+  REFRESH: p_i_show_neg.
+  LOOP AT p_i_show_aux WHERE negap = abap_true.
+    APPEND p_i_show_aux TO p_i_show_neg.
+  ENDLOOP.
+
+  DELETE p_i_show_aux WHERE negap = abap_true.
+  CLEAR lv_flag_neg.
+***EY ***AJUSTES ROLL-OUT IT/PT***************START
+  IF p_cero IS NOT INITIAL.
+    PERFORM f_saldo_cero TABLES p_i_show_aux.
+  ENDIF.
+***EY ***AJUSTES ROLL-OUT IT/PT***************END
+
+  IF p_down EQ abap_true.
+    IF p_part IS INITIAL.  "************************* <--- NO Particiona el Archivo.
+      SORT p_i_show_aux BY rbukrs
+                           ryear
+                           docdate
+                           rtcur
+                           racct "CRG Se añade la cuenta
+                           rbusa.
+** CRG INI 31102025
+      LOOP  AT p_i_show_aux INTO w_show_aux.
+        MOVE-CORRESPONDING w_show_aux TO ls_alv.
+        APPEND ls_alv TO lt_alv.
+      ENDLOOP.
+** CRG INI 31102025
+
+      LOOP AT lt_alv. "** CRG INI 31102025    p_i_show_aux.
+        l_tabix = sy-tabix.
+        DATA ls_aux TYPE ty_alv.
+        MOVE lt_alv TO ls_aux.
+        AT NEW rtcur.
+
+          ADD 1 TO lv_cont.
+          MOVE lv_cont TO lv_offcod.
+          CONDENSE lv_offcod.
+          CALL FUNCTION 'CONVERSION_EXIT_ALPHA_INPUT'
+            EXPORTING
+              input  = lv_offcod
+            IMPORTING
+              output = lv_offcod.
+
+
+          PERFORM f_crea_header     USING     ls_aux"** CRG INI 31102025     p_i_show_aux
+                                              ls_aux-docdate "** CRG INI 31102025 p_i_show_aux-docdate
+                                   CHANGING   w_outheader.
+          PERFORM f_agrega_linea    TABLES     p_i_final_out
+                                    USING      w_outheader.
+        ENDAT.
+        CLEAR lv_shkzg.
+        PERFORM f_crea_item       USING      lt_alv "** CRG INI 31102025 p_i_show_aux
+                                             c_no
+                                             lt_alv-docdate "** CRG INI 31102025 p_i_show_aux-docdate
+                                  CHANGING   w_outitem.
+        PERFORM f_agrega_linea    TABLES     p_i_final_out
+                                  USING      w_outitem.
+
+        IF w_outitem-debitcr = 'H'.
+          l_hslxxh = l_hslxxh + lt_alv-tslxx." CRG 04112025 p_i_show_aux-tslxx.
+        ELSE.
+          l_hslxxs = l_hslxxs + lt_alv-tslxx. " CRG 04112025 p_i_show_aux-tslxx.
+        ENDIF.
+        MOVE w_outitem-debitcr TO lv_shkzg.
+
+        l_hslxx_99 = l_hslxx_99 - lt_alv-hslxx." CRG 04112025 p_i_show_aux-hslxx.
+        l_hslxx2_99 = l_hslxx2_99 - lt_alv-tslxx. " CRG 04112025 p_i_show_aux-tslxx.
+
+        AT END OF rtcur.
+          IF l_hslxx_99 IS NOT INITIAL OR l_hslxx2_99 IS NOT INITIAL.
+            CLEAR lv_flag_err.
+            PERFORM f_check_long_pte USING    l_hslxx_99
+                                              l_hslxx2_99
+                                     CHANGING lv_flag_err.
+            IF lv_flag_err = space.
+              PERFORM f_crea_item       USING  ls_aux "** CRG INI 31102025 p_i_show_aux
+                                               c_si
+                                               ls_aux-docdate "** CRG INI 31102025 p_i_show_aux-docdate
+                                    CHANGING   w_outitem.
+*Ini RDJOSE2 19.12.2024 ajuste por diferencia en signo en cta puente
+              CLEAR lv_lin.
+              DESCRIBE TABLE i_outitem LINES lv_lin.
+              IF lv_lin GT 0.
+                CLEAR w_outitem.
+                LOOP AT i_outitem INTO w_outitem.
+                  PERFORM f_agrega_linea    TABLES     p_i_final_out
+                                    USING      w_outitem.
+                ENDLOOP.
+              ELSE.
+
+                PERFORM f_agrega_linea    TABLES     p_i_final_out
+                                     USING      w_outitem.
+              ENDIF.
+*              PERFORM f_agrega_linea    TABLES     p_i_final_out
+*                                        USING      w_outitem.
+*fin 19.12.2024 RDJOSE2 ajuste por diferncia en signo en cta puente
+            ELSE.
+              PERFORM f_crea_item_10  TABLES p_i_final_out
+                                      USING  ls_aux "** CRG INI 31102025 p_i_show_aux
+                                             c_si
+                                             ls_aux-docdate "** CRG INI 31102025 p_i_show_aux-docdate
+                                  CHANGING   w_outitem .
+            ENDIF.
+
+          ENDIF.
+          PERFORM f_crea_pie        USING      ls_aux "** CRG INI 31102025 p_i_show_aux
+                                               l_hslxxs
+                                               l_hslxxh
+                                               ls_aux-docdate "** CRG INI 31102025p_i_show_aux-docdate
+                                    CHANGING   w_outfoot.
+          PERFORM f_agrega_linea    TABLES     p_i_final_out
+                                    USING      w_outfoot.
+
+          CLEAR: l_hslxxs,
+                 l_hslxxh,
+                 l_hslxx_99,
+                 l_hslxx2_99.
+        ENDAT.
+        AT END OF docdate.
+          CLEAR lv_cont.
+        ENDAT.
+      ENDLOOP.
+
+      IF i_final_out[] IS NOT INITIAL.
+        CLEAR lv_filename.
+        PERFORM f_descarga_archivo TABLES i_final_out CHANGING lv_filename. " <--
+        IF p_cam EQ abap_true.
+          PERFORM f_rfc_cam TABLES i_final_out USING lv_filename.
+        ENDIF.
+      ENDIF.
+
+    ELSE. "************************* <--- Particiona el Archivo
+      SORT p_i_show_aux BY rbukrs
+                           ryear
+                           docdate
+                           rtcur
+                           racct
+                           rbusa.
+
+      DESCRIBE TABLE p_i_show_aux LINES lv_lines.
+
+      DATA: lv_mas TYPE i,
+            lv_from TYPE i,
+            lv_to TYPE i.
+
+      CLEAR lv_file_cont.
+
+      WHILE lv_lines GT 0.
+        ADD 1 TO lv_file_cont.
+        IF lv_lines LT p_lines.
+          lv_mas = lv_lines.
+        ELSE.
+          lv_mas = p_lines.
+        ENDIF.
+        lv_lines = lv_lines - lv_mas.
+
+        lv_from = lv_to + 1.
+        lv_to = lv_to + lv_mas.
+
+        REFRESH p_i_show.
+        LOOP AT p_i_show_aux FROM lv_from TO lv_to.
+          APPEND p_i_show_aux TO p_i_show.
+        ENDLOOP.
+
+        LOOP AT p_i_show.
+          l_tabix = sy-tabix.
+          AT NEW rtcur.
+            ADD 1 TO lv_cont.
+            IF lv_cont GE 10000.
+              lv_cont = 1.
+            ENDIF.
+            MOVE lv_cont TO lv_offcod.
+            CONDENSE lv_offcod.
+            CALL FUNCTION 'CONVERSION_EXIT_ALPHA_INPUT'
+              EXPORTING
+                input  = lv_offcod
+              IMPORTING
+                output = lv_offcod.
+
+
+            PERFORM f_crea_header     USING      p_i_show
+                                                 p_i_show-docdate
+                                      CHANGING   w_outheader.
+            PERFORM f_agrega_linea    TABLES     p_i_final_out
+                                      USING      w_outheader.
+          ENDAT.
+          CLEAR lv_shkzg.
+          PERFORM f_crea_item       USING      p_i_show
+                                               c_no
+                                               p_i_show-docdate
+                                    CHANGING   w_outitem.
+          PERFORM f_agrega_linea    TABLES     p_i_final_out
+                                    USING      w_outitem.
+
+          IF w_outitem-debitcr = 'H'.
+            l_hslxxh = l_hslxxh + p_i_show-tslxx.
+          ELSE.
+            l_hslxxs = l_hslxxs + p_i_show-tslxx.
+          ENDIF.
+          MOVE w_outitem-debitcr TO lv_shkzg.
+
+          l_hslxx_99 = l_hslxx_99 - p_i_show-hslxx.
+          l_hslxx2_99 = l_hslxx2_99 - p_i_show-tslxx.
+
+          AT END OF rtcur.
+            IF l_hslxx_99 IS NOT INITIAL OR l_hslxx2_99 IS NOT INITIAL.
+              CLEAR lv_flag_err.
+              PERFORM f_check_long_pte USING    l_hslxx_99
+                                                l_hslxx2_99
+                                       CHANGING lv_flag_err.
+              IF lv_flag_err = space.
+                PERFORM f_crea_item       USING  p_i_show
+                                                 c_si
+                                                 p_i_show-docdate
+                                      CHANGING   w_outitem.
+*Ini RDJOSE2 19.12.2024 ajuste por diferencia en signo en cta puente
+                CLEAR lv_lin.
+                DESCRIBE TABLE i_outitem LINES lv_lin.
+                IF lv_lin GT 0.
+                  CLEAR w_outitem.
+                  LOOP AT i_outitem INTO w_outitem.
+                    PERFORM f_agrega_linea    TABLES     p_i_final_out
+                                      USING      w_outitem.
+                  ENDLOOP.
+                ELSE.
+
+                  PERFORM f_agrega_linea    TABLES     p_i_final_out
+                                       USING      w_outitem.
+                ENDIF.
+*              PERFORM f_agrega_linea    TABLES     p_i_final_out
+*                                        USING      w_outitem.
+*fin 19.12.2024 RDJOSE2 ajuste por diferncia en signo en cta puente
+
+              ELSE.
+                PERFORM f_crea_item_10  TABLES p_i_final_out
+                                        USING  p_i_show
+                                               c_si
+                                               p_i_show-docdate
+                                    CHANGING   w_outitem .
+              ENDIF.
+
+            ENDIF.
+            PERFORM f_crea_pie        USING      p_i_show
+                                                 l_hslxxs
+                                                 l_hslxxh
+                                                 p_i_show-docdate
+                                      CHANGING   w_outfoot.
+            PERFORM f_agrega_linea    TABLES     p_i_final_out
+                                      USING      w_outfoot.
+
+            CLEAR: l_hslxxs,
+                   l_hslxxh,
+                   l_hslxx_99,
+                   l_hslxx2_99.
+          ENDAT.
+        ENDLOOP.
+
+        IF p_hst IS NOT INITIAL.
+          IF lv_file_cont LT p_hast.
+            REFRESH i_final_out[].
+            CONTINUE.
+          ENDIF.
+        ENDIF.
+        IF i_final_out[] IS NOT INITIAL.
+          CLEAR lv_filename.
+          PERFORM f_descarga_archivo TABLES i_final_out CHANGING lv_filename. " <--
+
+          IF p_cam EQ abap_true.
+            PERFORM f_rfc_cam TABLES i_final_out USING lv_filename.
+          ENDIF.
+        ENDIF.
+        REFRESH i_final_out[].
+
+      ENDWHILE.
+    ENDIF.
+
+**********************************************************************   Contabilidad negativa
+    CLEAR: l_hslxxs,
+           l_hslxxh,
+           l_hslxx_99,
+           l_hslxx2_99.
+    REFRESH i_final_out[].
+    SORT p_i_show_neg BY rbukrs
+                         ryear
+                         docdate
+                         rtcur
+                         racct
+                         rbusa.
+
+    LOOP AT p_i_show_neg INTO p_i_show_aux.
+      l_tabix = sy-tabix.
+*        AT NEW rbusa.
+      ADD 1 TO lv_cont.
+      MOVE lv_cont TO lv_offcod.
+      CONDENSE lv_offcod.
+      CALL FUNCTION 'CONVERSION_EXIT_ALPHA_INPUT'
+        EXPORTING
+          input  = lv_offcod
+        IMPORTING
+          output = lv_offcod.
+
+
+      PERFORM f_crea_header     USING      p_i_show_aux
+                                           p_i_show_aux-docdate
+                                CHANGING   w_outheader.
+      PERFORM f_agrega_linea    TABLES     p_i_final_out
+                                USING      w_outheader.
+*        ENDAT.
+      CLEAR lv_shkzg.
+      PERFORM f_crea_item       USING      p_i_show_aux
+                                           c_no
+                                           p_i_show_aux-docdate
+                                CHANGING   w_outitem.
+
+      PERFORM f_agrega_linea    TABLES     p_i_final_out
+                                USING      w_outitem.
+
+      IF w_outitem-debitcr = 'H'.
+        l_hslxxh = l_hslxxh + p_i_show_aux-tslxx.
+      ELSE.
+        l_hslxxs = l_hslxxs + p_i_show_aux-tslxx.
+      ENDIF.
+      MOVE w_outitem-debitcr TO lv_shkzg.
+
+
+
+      l_hslxx_99 = l_hslxx_99 - p_i_show_aux-hslxx.
+      l_hslxx2_99 = l_hslxx2_99 - p_i_show_aux-tslxx.
+
+*        IF l_hslxx_99 IS NOT INITIAL.
+      PERFORM f_crea_item       USING  p_i_show_aux
+                                       c_si
+                                       p_i_show_aux-docdate
+                            CHANGING   w_outitem.
+
+*Ini RDJOSE2 19.12.2024 ajuste por diferencia en signo en cta puente
+      CLEAR lv_lin.
+      DESCRIBE TABLE i_outitem LINES lv_lin.
+      IF lv_lin GT 0.
+        CLEAR w_outitem.
+        LOOP AT i_outitem INTO w_outitem.
+          PERFORM f_agrega_linea    TABLES     p_i_final_out
+                            USING      w_outitem.
+        ENDLOOP.
+      ELSE.
+
+        PERFORM f_agrega_linea    TABLES     p_i_final_out
+                             USING      w_outitem.
+      ENDIF.
+*              PERFORM f_agrega_linea    TABLES     p_i_final_out
+*                                        USING      w_outitem.
+*fin 19.12.2024 RDJOSE2 ajuste por diferncia en signo en cta puente
+
+
+*        ENDIF.
+
+*        AT END OF rbusa.
+      PERFORM f_crea_pie        USING      p_i_show_aux
+                                           l_hslxxs
+                                           l_hslxxh
+                                           p_i_show_aux-docdate
+                                CHANGING   w_outfoot.
+      PERFORM f_agrega_linea    TABLES     p_i_final_out
+                                USING      w_outfoot.
+
+      CLEAR: l_hslxxs,
+             l_hslxxh,
+             l_hslxx_99,
+             l_hslxx2_99.
+*        ENDAT.
+*        AT END OF docdate.
+*          CLEAR lv_cont.
+*        ENDAT.
+    ENDLOOP.
+
+    IF i_final_out[] IS NOT INITIAL.
+      lv_flag_neg = abap_true.
+      CLEAR lv_filename.
+      PERFORM f_descarga_archivo TABLES i_final_out CHANGING lv_filename. " <--
+
+      IF p_cam EQ abap_true.
+        PERFORM f_rfc_cam TABLES i_final_out USING lv_filename.
+      ENDIF.
+    ENDIF.
+
+  ENDIF.
+
+
+ENDFORM.                    " F_CONSTRUYE_OUTPUT
+*&---------------------------------------------------------------------*
+*&      Form  F_AGREGA_HEADER
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*      -->P_P_I_OUT_HEADER  text
+*      -->P_W_BSIK  text
+*      <--P_W_OUT_HEADER  text
+*----------------------------------------------------------------------*
+
+
+*&---------------------------------------------------------------------*
+*&      Form  F_DESCARGA_ARCHIVO
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*      -->P_I_FINAL_OUT  text
+*----------------------------------------------------------------------*
+FORM f_descarga_archivo  TABLES   p_i_final_out
+                         CHANGING p_filename.
+  DATA: l_titel(20),
+        l_txt1(150),
+        l_txt2(150).
+  DATA: lv_file_sep TYPE c,
+        lv_ext TYPE c LENGTH 5,
+        lv_filepath TYPE string,
+        lv_msg TYPE string,
+        lv_char TYPE string,
+        lv_filename TYPE string.
+
+  l_titel = text-007.
+  l_txt1  = text-008.
+  l_txt2  = text-009.
+  IF g_error IS NOT INITIAL.
+    CALL FUNCTION 'POPUP_TO_INFORM'
+      EXPORTING
+        titel = l_titel
+        txt1  = l_txt1
+        txt2  = l_txt2
+*       TXT3  = ' '
+*       TXT4  = ' '
+      .
+  ENDIF.
+  IF p_pres = c_si.
+    CALL METHOD cl_gui_frontend_services=>get_file_separator
+      CHANGING
+        file_separator = lv_file_sep.
+
+    IF p_csv = abap_true.
+      MOVE '.CSV' TO lv_ext.
+    ELSE.
+      MOVE '.TXT' TO lv_ext.
+    ENDIF.
+    IF lv_flag_neg EQ abap_true.
+      CONCATENATE lv_blart s_bukrs-low  sy-datum '_' p_infnum 'SALN' lv_ext INTO p_filename.
+      CONCATENATE p_filna lv_file_sep p_filename INTO lv_filepath.
+    ELSE.
+      CONCATENATE lv_blart s_bukrs-low  sy-datum '_' p_infnum  'SAL' lv_ext INTO p_filename.
+      CONCATENATE p_filna lv_file_sep p_filename INTO lv_filepath.
+    ENDIF.
+    IF p_part EQ abap_true.
+      MOVE lv_file_cont TO lv_char.
+      CONDENSE lv_char.
+      CONCATENATE  lv_char '.CSV' INTO lv_char.
+      REPLACE: '.CSV' INTO lv_filepath WITH lv_char,
+               '.CSV' INTO p_filename WITH lv_char.
+    ENDIF.
+    CALL METHOD cl_gui_frontend_services=>gui_download
+      EXPORTING
+        filename                = lv_filepath
+      CHANGING
+        data_tab                = p_i_final_out[]
+      EXCEPTIONS
+        file_write_error        = 1
+        no_batch                = 2
+        gui_refuse_filetransfer = 3
+        invalid_type            = 4
+        no_authority            = 5
+        unknown_error           = 6
+        header_not_allowed      = 7
+        separator_not_allowed   = 8
+        filesize_not_allowed    = 9
+        header_too_long         = 10
+        dp_error_create         = 11
+        dp_error_send           = 12
+        dp_error_write          = 13
+        unknown_dp_error        = 14
+        access_denied           = 15
+        dp_out_of_memory        = 16
+        disk_full               = 17
+        dp_timeout              = 18
+        file_not_found          = 19
+        dataprovider_exception  = 20
+        control_flush_error     = 21
+        not_supported_by_gui    = 22
+        error_no_gui            = 23
+        OTHERS                  = 24.
+    IF sy-subrc <> 0.
+      MESSAGE ID sy-msgid TYPE sy-msgty NUMBER sy-msgno
+              WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4.
+    ELSE.
+      CONCATENATE 'Se descargo el fichero' lv_filepath 'Satisfactoriamente' INTO lv_msg
+      SEPARATED BY space.
+      MESSAGE lv_msg TYPE 'S' DISPLAY LIKE 'I'.
+    ENDIF.
+  ENDIF.
+  IF p_appl = c_si.
+    DATA: l_targetpath TYPE saepfad .
+
+    IF p_csv = abap_true.
+      MOVE '.CSV' TO lv_ext.
+    ELSE.
+      MOVE '.TXT' TO lv_ext.
+    ENDIF.
+    IF lv_flag_neg EQ abap_true.
+      CONCATENATE lv_blart s_bukrs-low sy-datum '_' p_infnum 'SALN' lv_ext INTO p_filename.
+      CONCATENATE p_filna '/' p_filename INTO l_targetpath.
+    ELSE.
+      CONCATENATE lv_blart s_bukrs-low sy-datum '_' p_infnum 'SAL' lv_ext INTO p_filename.
+      CONCATENATE p_filna '/' p_filename INTO l_targetpath.
+    ENDIF.
+    IF p_part EQ abap_true.
+      MOVE lv_file_cont TO lv_char.
+      CONDENSE lv_char.
+      CONCATENATE  lv_char '.CSV' INTO lv_char.
+      REPLACE: '.CSV' INTO l_targetpath WITH lv_char,
+               '.CSV' INTO p_filename WITH lv_char.
+    ENDIF.
+
+*** CRG INI modif 07.08.2025 subir el fichero al servidor destino.
+    DATA: v_filename TYPE localfile,
+          ls_return TYPE sy-subrc,
+          t_table TYPE swfistring,
+          w_i_final_out LIKE LINE OF i_final_out,
+          w_table LIKE LINE OF t_table.
+
+    v_filename = l_targetpath.
+    LOOP AT p_i_final_out INTO w_i_final_out.
+      w_table = w_i_final_out.
+      APPEND w_table TO t_table.
+    ENDLOOP.
+    CALL FUNCTION 'ZMFIMF_DOWNLOAD_SERV' DESTINATION p_rfc2
+      EXPORTING
+        i_filename = v_filename
+        i_tab      = t_table
+      IMPORTING
+        e_return   = ls_return.
+    IF ls_return EQ 0.
+      MESSAGE text-005 TYPE 'S'.
+    ELSE.
+      MESSAGE text-024 TYPE 'S'.
+    ENDIF.
+*** CRG FIN modif 07.08.2025
+
+*    CALL FUNCTION 'SCMS_DOWNLOAD'
+*      EXPORTING
+*        filename = l_targetpath
+*        binary   = ' '
+*        frontend = ' '
+*      TABLES
+*        data     = p_i_final_out
+*      EXCEPTIONS
+*        error    = 1
+*        OTHERS   = 2.
+*    IF sy-subrc <> 0.
+*      MESSAGE ID sy-msgid TYPE sy-msgty NUMBER sy-msgno
+*              WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4.
+*    ELSE.
+*      MESSAGE text-005 TYPE 'S'.
+*    ENDIF.
+
+  ENDIF.
+
+ENDFORM.                    " F_DESCARGA_ARCHIVO
+*&---------------------------------------------------------------------*
+*&      Form  F_MUESTRA_INFO
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*      -->P_I_BSIK  text
+*----------------------------------------------------------------------*
+FORM f_muestra_info  TABLES   p_i_tabla .
+
+  DATA: i_start_column TYPE  i        VALUE 5,
+        i_start_line   TYPE  i        VALUE 2,
+        i_end_column   TYPE  i        VALUE 190,
+        i_end_line     TYPE  i        VALUE 55,
+        i_title        TYPE  string   VALUE 'ALV',
+        i_popup        TYPE  flag     VALUE ' '.
+  DATA go_alv TYPE REF TO cl_salv_table.
+
+  TRY.
+      cl_salv_table=>factory(
+        IMPORTING
+          r_salv_table = go_alv
+        CHANGING
+          t_table      = p_i_tabla[] ).
+
+    CATCH cx_salv_msg.
+  ENDTRY.
+
+  DATA: lr_functions TYPE REF TO cl_salv_functions_list.
+
+  lr_functions = go_alv->get_functions( ).
+  lr_functions->set_all( 'X' ).
+
+  IF go_alv IS BOUND.
+    IF i_popup = 'X'.
+      go_alv->set_screen_popup(
+        start_column = i_start_column
+        end_column  = i_end_column
+        start_line  = i_start_line
+        end_line    = i_end_line ).
+    ENDIF.
+
+    go_alv->display( ).
+
+  ENDIF.
+
+*
+*  DATA: ct_fieldcat TYPE  slis_t_fieldcat_alv,
+*       l_fieldcat  TYPE  slis_fieldcat_alv,
+*       l_tabix     TYPE  sytabix,
+*       ls_layout   TYPE  slis_layout_alv.
+*
+*  CALL FUNCTION 'REUSE_ALV_FIELDCATALOG_MERGE'
+*    EXPORTING
+**     I_PROGRAM_NAME         = sy-repid
+**     I_INTERNAL_TABNAME     = 'I_SHOW2'
+*      i_structure_name       = 'ZMFIR_ACREDOW_BSIK_SHOW'
+**     I_CLIENT_NEVER_DISPLAY = ' '
+**     I_INCLNAME             = sy-repid
+*      i_bypassing_buffer     = 'X'
+*      i_buffer_active        = 'X'
+*    CHANGING
+*      ct_fieldcat            = ct_fieldcat
+*    EXCEPTIONS
+*      inconsistent_interface = 1
+*      program_error          = 2
+*      OTHERS                 = 3.
+*  IF sy-subrc <> 0.
+** Implement suitable error handling here
+*  ENDIF.
+*  READ TABLE ct_fieldcat INTO  l_fieldcat
+*               WITH KEY fieldname = 'TEXT'.
+*  IF sy-subrc EQ 0.
+*    l_tabix = sy-tabix.
+*    l_fieldcat-outputlen = '000025'.
+*    MODIFY ct_fieldcat FROM l_fieldcat INDEX l_tabix.
+*  ENDIF.
+*
+*  READ TABLE ct_fieldcat INTO  l_fieldcat
+*             WITH KEY fieldname = 'LIGHT'.
+*
+*  IF sy-subrc EQ 0.
+*    l_tabix = sy-tabix.
+*    l_fieldcat-outputlen = '000005'.
+*    l_fieldcat-icon  = c_si.
+*    MODIFY ct_fieldcat FROM l_fieldcat INDEX l_tabix.
+*  ENDIF.
+*
+*  DATA: g_lights_name TYPE lvc_cifnm VALUE 'LIGHT'.
+*  ls_layout-zebra = c_si.
+*
+*  CALL FUNCTION 'REUSE_ALV_GRID_DISPLAY'
+*   EXPORTING
+**     I_INTERFACE_CHECK                 = ' '
+**     I_BYPASSING_BUFFER                = ' '
+**     I_BUFFER_ACTIVE                   = ' '
+**     I_CALLBACK_PROGRAM                = ' '
+**     I_CALLBACK_PF_STATUS_SET          = ' '
+**     I_CALLBACK_USER_COMMAND           = ' '
+**     I_CALLBACK_TOP_OF_PAGE            = ' '
+**     I_CALLBACK_HTML_TOP_OF_PAGE       = ' '
+**     I_CALLBACK_HTML_END_OF_LIST       = ' '
+**     I_STRUCTURE_NAME                  = 'ZMFIR_CLTSDOW_BSID_SHOW'
+**     I_BACKGROUND_ID                   = ' '
+**     I_GRID_TITLE                      =
+**     I_GRID_SETTINGS                   =
+*     is_layout                         = ls_layout
+*     it_fieldcat                       = ct_fieldcat[]
+**     IT_EXCLUDING                      =
+**     IT_SPECIAL_GROUPS                 =
+**     IT_SORT                           =
+**     IT_FILTER                         =
+**     IS_SEL_HIDE                       =
+**     I_DEFAULT                         = 'X'
+**     I_SAVE                            = ' '
+**     IS_VARIANT                        =
+**     IT_EVENTS                         =
+**     IT_EVENT_EXIT                     =
+**     IS_PRINT                          =
+**     IS_REPREP_ID                      =
+**     I_SCREEN_START_COLUMN             = 0
+**     I_SCREEN_START_LINE               = 0
+**     I_SCREEN_END_COLUMN               = 0
+**     I_SCREEN_END_LINE                 = 0
+**     I_HTML_HEIGHT_TOP                 = 0
+**     I_HTML_HEIGHT_END                 = 0
+**     IT_ALV_GRAPHICS                   =
+**     IT_HYPERLINK                      =
+**     IT_ADD_FIELDCAT                   =
+**     IT_EXCEPT_QINFO                   =
+**     IR_SALV_FULLSCREEN_ADAPTER        =
+**   IMPORTING
+**     E_EXIT_CAUSED_BY_CALLER           =
+**     ES_EXIT_CAUSED_BY_USER            =
+*    TABLES
+*      t_outtab                          = p_i_bsik
+*   EXCEPTIONS
+*     program_error                     = 1
+*     OTHERS                            = 2
+*            .
+*  IF sy-subrc <> 0.
+** Implement suitable error handling here
+*  ENDIF.
+*
+*
+*
+
+ENDFORM.                    " F_MUESTRA_INFO
+
+*&---------------------------------------------------------------------*
+*&      Form  F_OBTIENE_NOMBRE_ARCHIV_SERV
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*      <--P_P_FILSE  text
+*----------------------------------------------------------------------*
+FORM f_obtiene_nombre_archiv_serv  CHANGING p_filse.
+  DATA: lv_file TYPE string.
+  IF p_pres IS INITIAL.
+*    CALL FUNCTION 'ZMFIR_BROWSE_FILE'
+*      EXPORTING
+*        i_id   = 'SAL_CTA_MYR'
+*      IMPORTING
+*        e_path = p_filse.
+*
+*    IF p_csv IS NOT INITIAL.
+*      REPLACE '.txt' INTO p_filse WITH '.CSV'.
+*    ENDIF.
+
+    DATA: lv_path TYPE string.
+    CALL FUNCTION '/SAPDMC/LSM_F4_SERVER_FILE'
+      EXPORTING
+        directory        = ''
+        filemask         = 'directory'
+      IMPORTING
+        serverfile       = lv_path
+      EXCEPTIONS
+        canceled_by_user = 1
+        OTHERS           = 2.
+    IF sy-subrc EQ 0.
+      MOVE lv_path TO p_filse.
+    ENDIF.
+  ELSE.
+    CALL METHOD cl_gui_frontend_services=>directory_browse
+*    EXPORTING
+*      window_title         = 'Ruta creación fichero'
+    CHANGING
+      selected_folder      = lv_file
+    EXCEPTIONS
+      cntl_error           = 1
+      error_no_gui         = 2
+      not_supported_by_gui = 3
+      OTHERS               = 4.
+    IF sy-subrc EQ 0.
+      MOVE lv_file TO p_filse.
+    ENDIF.
+  ENDIF.
+
+
+
+ENDFORM.                    " F_OBTIENE_NOMBRE_ARCHIV_SERV
+*&---------------------------------------------------------------------*
+*&      Form  F_VALIDACION
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*  -->  p1        text
+*  <--  p2        text
+*----------------------------------------------------------------------*
+FORM f_validacion .
+
+ENDFORM.                    " F_VALIDACION
+*&---------------------------------------------------------------------*
+*&      Form  F_CONSULTA_PARTNER
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*      -->P_I_BSIK  text
+*      -->P_I_SHOW  text
+*----------------------------------------------------------------------*
+*FORM f_consulta_partner  TABLES   p_i_bsik STRUCTURE w_bsik
+*                                    "Insertar nombre correcto para <...>
+*                                  p_i_show STRUCTURE w_show.
+*
+*  DATA:  lt_conversion TYPE STANDARD TABLE OF zmfir_acredow_conver,
+*         lw_conversion TYPE zmfir_acredow_conver.
+*  DATA:  l_tabix       TYPE sytabix.
+*
+*  LOOP AT p_i_bsik.
+*    lw_conversion-lifnr = p_i_bsik-lifnr.
+*    lw_conversion-bukrs = p_i_bsik-bukrs.
+*    APPEND lw_conversion TO lt_conversion.
+*  ENDLOOP.
+*  SORT lt_conversion.
+*  DELETE ADJACENT DUPLICATES FROM lt_conversion.
+*
+*  PERFORM f_obtiene_conversion TABLES lt_conversion.
+*
+*  LOOP AT p_i_bsik.
+*    l_tabix = sy-tabix.
+*    READ TABLE lt_conversion
+*                  INTO lw_conversion
+*                  WITH KEY lifnr = p_i_bsik-lifnr
+*                           bukrs = p_i_bsik-bukrs.
+*    IF sy-subrc EQ 0 AND lw_conversion-partner IS NOT INITIAL.
+*      p_i_bsik-lifnr = lw_conversion-partner.
+*      MODIFY p_i_bsik INDEX l_tabix.
+*      WRITE icon_green_light AS ICON TO p_i_show-light.
+*    ELSE.
+*      CLEAR p_i_bsik-lifnr.
+*      WRITE icon_red_light AS ICON TO p_i_show-light.
+*      p_i_show-text = text-006.
+*      g_error = c_si.
+*    ENDIF.
+*    MODIFY p_i_bsik INDEX l_tabix.
+**    MOVE-CORRESPONDING p_i_bsid TO p_i_show.
+**    APPEND p_i_show.
+*  ENDLOOP.
+*
+*ENDFORM.                    " F_CONSULTA_PARTNER
+*
+*&---------------------------------------------------------------------*
+*&      Form  f_obtiene_conversion
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*      -->P_LT_CONVERSION  text
+*----------------------------------------------------------------------*
+FORM f_obtiene_conversion
+      TABLES   p_lt_conversion
+              STRUCTURE zmfir_cltsdow_bsid_conver.
+  IF p_rfc IS NOT INITIAL.
+    CALL FUNCTION 'ZMFI_ACREED_A_PARTNER' DESTINATION p_rfc
+      TABLES
+        t_conversion = p_lt_conversion.
+  ENDIF.
+ENDFORM.                    " F_OBTIENE_CONVERSION
+*&---------------------------------------------------------------------*
+*&      Form  F_CREA_HEADER
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*      -->P_P_I_ZZMAPXT  text
+*      <--P_W_OUTHEADER  text
+*----------------------------------------------------------------------*
+FORM f_crea_header  USING    p_i_zzmapxt    STRUCTURE w_show_aux
+                             p_docdate      TYPE datum
+                    CHANGING p_w_outheader  STRUCTURE w_outheader.
+
+  DATA wa_monedas TYPE ty_monedas. "MVSALV2
+
+
+  p_w_outheader-rectyp = '11'. "Tipo de Registro
+  p_w_outheader-rbukrs = p_i_zzmapxt-rbukrs. "Código de la Sociedad Financiera
+  p_w_outheader-infnum = p_infnum. "Número de Interface
+  p_w_outheader-sernum = '9'. "Número de serie
+  p_w_outheader-offcod = lv_offcod. "Office Code
+  p_w_outheader-posdat = p_docdate." '20191231'. "Fecha de contabilización
+
+** MVSALV2 - Recuperar moneda - INICIO
+*  p_w_outheader-curr = 'EUR'. "Moneda del saldo cuenta de mayor
+
+  p_w_outheader-curr = p_i_zzmapxt-rtcur.
+
+** MVSALV2 - FIN
+
+  p_w_outheader-intcod = lv_blart. "Clase de documento del asiento de migración
+  p_w_outheader-docdate = p_docdate. "Fecha de documento
+
+*ini 1000106812, Adaptar Programa Migración Saldos por LI JOSEPHH 02.03.2023
+  p_w_outheader-gruled = p_ledge. "Ledger
+*fin 1000106812, Adaptar Programa Migración Saldos por LI JOSEPHH 02.03.2023
+
+ENDFORM.                    " F_CREA_HEADER
+*&---------------------------------------------------------------------*
+*&      Form  F_CREA_ITEM
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*      -->P_P_I_ZZMAPXT  text
+*      <--P_W_OUTFOOT  text
+*----------------------------------------------------------------------*
+FORM f_crea_item    USING    p_i_zzmapxt    STRUCTURE w_show_aux
+                             p_es_contrapartida
+                             p_docdate
+                    CHANGING p_w_outitem    STRUCTURE w_outitem.
+
+  DATA wa_monedas TYPE ty_monedas. "MVSALV2
+  DATA ls_ref TYPE ty_outitems.
+
+*>TINGUAR 15/11/2021 Tabla de conversión cobertura
+  CONSTANTS: lc_99999(5) TYPE c VALUE '99999'.
+  DATA: wa_conv_cob TYPE zmfit_conv_cob.
+*<TINGUAR 15/11/2021 Tabla de conversión cobertura
+  DATA: lv_docdate TYPE c LENGTH 10.
+  DATA: lv_importe TYPE hslxx9.
+  p_w_outitem-rectyp  = '22'. "Tipo de Registro
+  p_w_outitem-rbukrs  = p_i_zzmapxt-rbukrs. "Código de la Sociedad Financiera
+  p_w_outitem-intnum  = p_infnum. "Número de Interface
+  p_w_outitem-senum   = '9'. "Número de serie
+  p_w_outitem-offcod  = lv_offcod. "Office Code
+  p_w_outitem-posdat  =  p_docdate. " '20191231'. "Fecha de contabilización
+** MVSALV2 - Recuperar moneda - INICIO
+*  p_w_outitem-curr    = 'EUR'. "Moneda del saldo cuenta de mayor
+*  READ TABLE it_monedas INTO wa_monedas
+*      WITH KEY bukrs = p_i_zzmapxt-rbukrs.
+*  IF sy-subrc EQ 0.
+*    p_w_outitem-curr = wa_monedas-waers.
+*  ENDIF.
+  p_w_outitem-curr = p_i_zzmapxt-rtcur.
+** MVSALV2 - FIN
+*** JULIOF3 03/08/2021 ROLLOUT IT-PT *******START***
+*  p_w_outitem-racct   = '999996'. "Cuenta de Mayor GL
+  p_w_outitem-racct   = gs_zfi73-hkont_saldo_inic. "Cuenta de Mayor GL
+*** JULIOF3 03/08/2021 ROLLOUT IT-PT *******END*****
+  p_w_outitem-thirp   = ''. "Third Party
+  IF p_es_contrapartida IS INITIAL.
+    p_w_outitem-valdate = p_i_zzmapxt-docdate . "Fecha Valor
+    p_w_outitem-zzc09   = p_i_zzmapxt-zzc09. "Código Concepto
+    p_w_outitem-racct   = p_i_zzmapxt-racct. "Cuenta de Mayor GL
+    p_w_outitem-vbund   = p_i_zzmapxt-vbund. "Sociedad GL <--Ajuste petición Vicente
+    p_w_outitem-negap   = p_i_zzmapxt-negap.
+    p_w_outitem-rzzc08  = p_i_zzmapxt-rzzc08.
+    READ TABLE it_skb1 WITH KEY saknr = p_i_zzmapxt-racct INTO wa_skb1 BINARY SEARCH.
+    IF sy-subrc EQ 0.
+      IF wa_skb1-mitkz EQ 'D' OR wa_skb1-mitkz EQ 'K'.
+        IF p_w_outitem-vbund IS INITIAL.
+          CASE wa_skb1-mitkz.
+            WHEN 'D'.
+              p_w_outitem-thirp = lv_kunnr_gen.
+            WHEN 'K'.
+              p_w_outitem-thirp = lv_lifnr_gen.
+          ENDCASE.
+        ELSE.
+          p_w_outitem-thirp = p_w_outitem-vbund.
+        ENDIF.
+      ENDIF.
+    ENDIF.
+
+  ENDIF.
+
+  "p_w_outitem-TranT   = . "Tipo de Transacción
+  p_w_outitem-rbusa   = p_i_zzmapxt-rbusa. "División
+  IF p_es_contrapartida IS INITIAL.
+    p_w_outitem-rcntr   = p_i_zzmapxt-rcntr. "Centro de Coste
+    p_w_outitem-rzzc07  = p_i_zzmapxt-rzzc07. "Clave Productor
+    p_w_outitem-rzzc01  = p_i_zzmapxt-rzzc01. "Línea de Negocio (Cobertura actual en ECC)
+    p_w_outitem-rzzc02  = p_i_zzmapxt-rzzc02. "Línea de Negocio (Modalidad actual en ECC)
+    p_w_outitem-rzzc03  = p_i_zzmapxt-rzzc03. "Nueva Producción Cartera
+    p_w_outitem-anln1   = p_i_zzmapxt-anln1. "Activo Fijo
+    "p_w_outitem-OtheA   = . "Otras asignaciones
+    p_w_outitem-rzzc13  = p_i_zzmapxt-rzzc13. "Código de Empleado
+    p_w_outitem-rzzc06  = p_i_zzmapxt-rzzc06. "Código de Servicio
+    p_w_outitem-zzc04   = p_i_zzmapxt-zzc04. "Cartera de Inversión
+    p_w_outitem-zz0001   = p_i_zzmapxt-zz0001. "Cartera de Inversión
+*>TINGUAR 15/11/2021 Tabla de conversión cobertura
+    IF gt_conv_cob[] IS NOT INITIAL.
+      IF p_w_outitem-rzzc01 = lc_99999 OR p_w_outitem-rzzc01 IS INITIAL.
+        IF p_w_outitem-zzc04  IS NOT INITIAL.
+          "Buscamos cobertura
+          READ TABLE gt_conv_cob INTO wa_conv_cob WITH KEY bukrs = p_w_outitem-rbukrs zzc04 = p_w_outitem-zzc04.
+          IF sy-subrc = 0.
+            p_w_outitem-rzzc01 = wa_conv_cob-zzc01.
+          ENDIF.
+        ENDIF.
+      ENDIF.
+      IF p_w_outitem-zzc04 IS INITIAL AND p_w_outitem-rzzc01 IS NOT INITIAL.
+        "Buscamos cartera
+        READ TABLE gt_conv_cob INTO wa_conv_cob WITH KEY bukrs = p_w_outitem-rbukrs zzc01 = p_w_outitem-rzzc01.
+        IF sy-subrc = 0.
+          p_w_outitem-zzc04 = wa_conv_cob-zzc04.
+        ENDIF.
+      ENDIF.
+    ENDIF.
+*<TINGUAR 15/11/2021 Tabla de conversión cobertura
+  ELSE.
+
+  ENDIF.
+  p_w_outitem-assia   = text-015. "Asignación
+  "p_w_outitem-NegaP   = . "Contabilización negativa
+
+  IF p_es_contrapartida IS INITIAL.
+    MOVE p_i_zzmapxt-shkzg TO p_w_outitem-debitcr.
+*    IF p_i_zzmapxt-hslxx >= 0.
+**      p_w_outitem-debitcr = 'S' . "Indicador Debe / Haber
+*      p_w_outitem-debitcr = 'D' . "Indicador Debe / Haber
+*    ELSE.
+*      p_w_outitem-debitcr = 'H' . "Indicador Debe / Haber
+*    ENDIF.
+  ELSE.
+
+*    IF p_i_zzmapxt-hslxx >= 0.
+*      p_w_outitem-debitcr = 'H' . "Indicador Debe / Haber
+*    ELSE.
+**      p_w_outitem-debitcr = 'S' . "Indicador Debe / Haber
+*      p_w_outitem-debitcr = 'S' . "Indicador Debe / Haber
+*    ENDIF.
+  ENDIF.
+  IF p_es_contrapartida EQ abap_false.
+
+*  p_w_outitem-hslxx   = abs( p_i_zzmapxt-hslxx ). "Importe en moneda documento   <----LGHS DEL
+    lv_importe    = abs( p_i_zzmapxt-tslxx ). "Importe en moneda documento   <----LGHS ADD
+    p_w_outitem-tslxx = lv_importe .           "Importe en moneda documento   <----LGHS ADD
+    REPLACE ALL OCCURRENCES OF ',' IN p_w_outitem-tslxx WITH ''.
+    REPLACE ALL OCCURRENCES OF '.' IN p_w_outitem-tslxx WITH ''.
+    WRITE  p_w_outitem-tslxx TO  p_w_outitem-tslxx RIGHT-JUSTIFIED.
+    OVERLAY p_w_outitem-tslxx  WITH c_ceros.
+
+*  p_w_outitem-hslxx2   = abs( p_i_zzmapxt-hslxx ). "Importe en moneda local      <----LGHS DEL
+    lv_importe  = abs( p_i_zzmapxt-hslxx ).   "Importe en moneda local      <----LGHS ADD
+    p_w_outitem-hslxx2  =   lv_importe .          "Importe en moneda local      <----LGHS ADD
+    REPLACE ALL OCCURRENCES OF ',' IN p_w_outitem-hslxx2 WITH ''.
+    REPLACE ALL OCCURRENCES OF '.' IN p_w_outitem-hslxx2 WITH ''.
+    WRITE  p_w_outitem-hslxx2 TO  p_w_outitem-hslxx2 RIGHT-JUSTIFIED.
+    OVERLAY p_w_outitem-hslxx2 WITH c_ceros.
+
+  ELSE.
+    IF l_hslxx2_99 LT 0.
+      p_w_outitem-debitcr = 'H' . "Indicador Debe / Haber
+      ADD l_hslxx2_99 TO l_hslxxh.
+    ELSE.
+      ADD l_hslxx2_99 TO l_hslxxs.
+      p_w_outitem-debitcr = 'D' . "Indicador Debe / Haber
+    ENDIF.
+*  p_w_outitem-hslxx   = abs( p_i_zzmapxt-hslxx ). "Importe en moneda documento   <----LGHS DEL
+    lv_importe    = abs( l_hslxx2_99 ). "Importe en moneda documento   <----LGHS ADD
+    p_w_outitem-tslxx    = lv_importe . "Importe en moneda documento   <----LGHS ADD
+    REPLACE ALL OCCURRENCES OF ',' IN p_w_outitem-tslxx WITH ''.
+    REPLACE ALL OCCURRENCES OF '.' IN p_w_outitem-tslxx WITH ''.
+    WRITE  p_w_outitem-tslxx TO  p_w_outitem-tslxx RIGHT-JUSTIFIED.
+    OVERLAY p_w_outitem-tslxx  WITH c_ceros.
+
+*  p_w_outitem-hslxx2   = abs( p_i_zzmapxt-hslxx ). "Importe en moneda local      <----LGHS DEL  "Importe en moneda local      <----LGHS ADD
+    lv_importe  = abs( l_hslxx_99 ).          "Importe en moneda local      <----LGHS ADD
+    p_w_outitem-hslxx2 =  lv_importe.
+    REPLACE ALL OCCURRENCES OF ',' IN p_w_outitem-hslxx2 WITH ''.
+    REPLACE ALL OCCURRENCES OF '.' IN p_w_outitem-hslxx2 WITH ''.
+    WRITE  p_w_outitem-hslxx2 TO  p_w_outitem-hslxx2 RIGHT-JUSTIFIED.
+    OVERLAY p_w_outitem-hslxx2 WITH c_ceros.
+  ENDIF.
+
+  CONCATENATE p_docdate+6(2)
+              p_docdate+4(2)
+              p_docdate(4)
+         INTO lv_docdate SEPARATED BY '.'.
+  CONCATENATE 'SALDO MENSUAL' lv_docdate
+         INTO p_w_outitem-concc "Texto posición de documento
+    SEPARATED BY space.
+
+  p_w_outitem-rzzc11  = p_i_zzmapxt-rzzc11. "Canal
+  IF p_es_contrapartida EQ abap_true.
+    CLEAR: p_w_outitem-rcntr, "Centro de Coste
+    p_w_outitem-rzzc07, "Clave Productor
+    p_w_outitem-rzzc01, "Línea de Negocio (Cobertura actual en ECC)
+    p_w_outitem-rzzc02, "Línea de Negocio (Modalidad actual en ECC)
+    p_w_outitem-rzzc03, "Nueva Producción Cartera
+    p_w_outitem-anln1, "Activo Fijo
+    "p_w_outitem-OtheA   = . "Otras asignaciones
+    p_w_outitem-rzzc13, "Código de Empleado
+    p_w_outitem-rzzc06, "Código de Servicio
+    p_w_outitem-zzc04, "Cartera de Inversión
+*    p_w_outitem-rbusa,
+     p_w_outitem-zzc09,
+     p_w_outitem-rzzc11,
+     p_w_outitem-vbund,
+     p_w_outitem-negap,
+     p_w_outitem-rzzc08,
+     p_w_outitem-zz0001.
+
+*Ini RDJOSE2 19.12.2024 ajuste por diferencia en signo en cta puente
+    IF l_hslxx2_99  >= 0  AND l_hslxx_99  >= 0.
+*      p_i_show-shkzg = 'S'.
+      p_w_outitem-debitcr = 'D'.
+    ELSE.
+      p_w_outitem-debitcr = 'H'.
+    ENDIF.
+
+*ini ALF 25.10.2024 ajuste por diferencia en signo
+    REFRESH i_outitem.
+    IF p_w_outitem-debitcr = 'H' AND ( ( l_hslxx2_99  >= 0 AND l_hslxx_99  < 0 ) OR ( l_hslxx2_99  < 0 AND l_hslxx_99  >= 0 ) ).
+      ls_ref = p_w_outitem.
+      IF l_hslxx_99  < 0.
+        ls_ref-tslxx = c_ceros.
+        APPEND ls_ref TO i_outitem.
+        ls_ref = p_w_outitem.
+        ls_ref-hslxx2 = c_ceros.
+        ls_ref-debitcr = 'D'.
+        APPEND ls_ref TO i_outitem.
+      ELSE. "p_i_show-tslxx  < 0
+        ls_ref-hslxx2  = c_ceros.
+        APPEND ls_ref TO i_outitem.
+        ls_ref = p_w_outitem.
+        ls_ref-tslxx = c_ceros.
+        ls_ref-debitcr = 'D'.
+        APPEND ls_ref TO i_outitem.
+      ENDIF.
+    ELSE.
+***      IF p_w_outitem-tslxx <> 0 OR p_w_outitem-hslxx <> 0.
+***        APPEND p_i_show.
+***      ENDIF.
+    ENDIF.
+*fin ALF 25.10.2024 ajuste por diferencia en signo
+*fin RDJOSE2 19.12.2024 ajuste por diferencia en signo en cta puente
+
+  ENDIF.
+
+  "p_w_outitem-TaxC    = . "Código Impuesto
+  "p_w_outitem-expi    = . "Cargos por tipo de cambio
+  "p_w_outitem-issu    = . "Cargos por tipo de cambio de la fecha de emisión
+  "p_w_outitem-prev    = . "Número de registro maestro previo
+  "p_w_outitem-partner = . "Tipo de Banco Interlocutor
+  "p_w_outitem-CustO   = . "Pedido de Compra
+  "p_w_outitem-asset   = . "Fecha valor Activo Fijo
+  "p_w_outitem-PaymM   = . "Método de Pago
+  "p_w_outitem-HousB   = . "Banco Propio
+  "p_w_outitem-PaymB   = . "Bloqueo de Pago
+  "p_w_outitem-Tax T   = . "Tipo de Impuesto
+  "p_w_outitem-BrokB   = . "Broker
+  "p_w_outitem-ReasR   = . "Reasegurador
+  "p_w_outitem-SegmS   = . "Segmento
+  "p_w_outitem-Nro12   = . "Contrato de Reaseguro
+  "p_w_outitem-PaisP   = . "País
+
+ENDFORM.                    " F_CREA_ITEM
+*&---------------------------------------------------------------------*
+*&      Form  F_CREA_PIE
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*      -->P_P_I_ZZMAPXT  text
+*      <--P_W_OUTFOOT  text
+*----------------------------------------------------------------------*
+FORM f_crea_pie     USING    p_i_zzmapxt    STRUCTURE w_show_aux
+                             p_hslxxs
+                             p_hslxxh
+                             p_docdate
+                    CHANGING p_w_outfoot    STRUCTURE w_outfoot.
+
+  DATA wa_monedas TYPE ty_monedas.  "MVSALV2
+
+  p_w_outfoot-rectyp  = '33'. "Tipo de Registro
+  p_w_outfoot-rbukrs  = p_i_zzmapxt-rbukrs. "Código de la Sociedad Financiera
+  p_w_outfoot-infnum  = p_infnum. "Número de Interface
+  p_w_outfoot-sernum  = '9'. "Número de serie
+  p_w_outfoot-ofcc    = lv_offcod. "Of Control
+  p_w_outfoot-postd   = p_docdate. "Fecha de contabilización
+
+
+** MVSALV2 - Recuperar moneda - INICIO
+*  p_w_outfoot-curr    = 'EUR'. "Moneda del saldo cuenta de mayor
+*  READ TABLE it_monedas INTO wa_monedas
+*      WITH KEY bukrs = p_i_zzmapxt-rbukrs.
+*  IF sy-subrc EQ 0.
+*    p_w_outfoot-curr = wa_monedas-waers.
+*  ENDIF.
+  p_w_outfoot-curr = p_i_zzmapxt-rtcur.
+** MVSALV2 - FIN
+
+*  p_w_outfoot-totald  = abs( p_hslxxs ). "Importe Total Documento: DEBE
+  p_hslxxs  = abs( p_hslxxs ). "Importe Total Documento: DEBE
+  p_w_outfoot-totald  =  p_hslxxs. "Importe Total Documento: DEBE
+  REPLACE ALL OCCURRENCES OF ',' IN p_w_outfoot-totald WITH ''.
+  REPLACE ALL OCCURRENCES OF '.' IN p_w_outfoot-totald WITH ''.
+  WRITE p_w_outfoot-totald TO  p_w_outfoot-totald RIGHT-JUSTIFIED.
+  OVERLAY p_w_outfoot-totald WITH c_ceros.
+
+*  p_w_outfoot-totalcr = abs( p_hslxxh ). "Importe Total Documento: HABER
+  p_hslxxh = abs( p_hslxxh ). "Importe Total Documento: HABER
+  p_w_outfoot-totalcr = p_hslxxh. "Importe Total Documento: HABER
+  REPLACE ALL OCCURRENCES OF ',' IN p_w_outfoot-totalcr WITH ''.
+  REPLACE ALL OCCURRENCES OF '.' IN p_w_outfoot-totalcr WITH ''.
+  WRITE  p_w_outfoot-totalcr TO p_w_outfoot-totalcr RIGHT-JUSTIFIED.
+  OVERLAY p_w_outfoot-totalcr WITH c_ceros.
+
+ENDFORM.                    " F_CREA_PIE
+*&---------------------------------------------------------------------*
+*&      Form  F_OBTIENE_IMPORTE_FINAL
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*      -->P_P_I_ZZMAPXT  text
+*      -->P_L_LASTMONTH  text
+*      <--P_P_I_SHOW_HSLXX  text
+*----------------------------------------------------------------------*
+FORM f_obtiene_importe_final  USING    p_i_zzmapxt STRUCTURE wa_zzmap2t
+                                       p_lastmonth
+                              CHANGING p_hslxx
+                                       p_tslxx.
+  FIELD-SYMBOLS: <fs_campo> TYPE any.
+  DATA: l_nombre_campo(40),
+        l_month(2) TYPE n.
+  CLEAR p_hslxx.
+
+  IF p_lastmonth  > 0.
+    DO 16 TIMES.
+      l_month = l_month + 1.
+      CONCATENATE 'HSL' l_month INTO l_nombre_campo.
+      ASSIGN COMPONENT l_nombre_campo OF STRUCTURE p_i_zzmapxt TO <fs_campo>.
+      IF sy-subrc EQ 0.
+        p_hslxx = p_hslxx + <fs_campo>.
+      ENDIF.
+    ENDDO.
+  ENDIF.
+  IF p_montr = abap_true.
+    CLEAR l_month.
+    IF p_lastmonth  > 0.
+      DO 16 TIMES.
+        l_month = l_month + 1.
+        CONCATENATE 'TSL' l_month INTO l_nombre_campo.
+        ASSIGN COMPONENT l_nombre_campo OF STRUCTURE p_i_zzmapxt TO <fs_campo>.
+        IF sy-subrc EQ 0.
+          p_tslxx = p_tslxx + <fs_campo>.
+        ELSE.
+          p_tslxx = p_hslxx.
+        ENDIF.
+      ENDDO.
+    ENDIF.
+  ELSE.
+    p_tslxx = p_hslxx.
+  ENDIF.
+** CRG INI 31102025 Modificación moneda KWD
+  IF p_i_zzmapxt-rtcur = 'KWD'.
+    p_tslxx = p_tslxx / 10.
+  ENDIF.
+** CRG FIN 31102025
+
+ENDFORM.                    " F_OBTIENE_IMPORTE_FINAL
+*&---------------------------------------------------------------------*
+*&      Form  F_OBTIENE_IMPORTE_FINAL
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*      -->P_P_I_ZZMAPXT  text
+*      -->P_L_LASTMONTH  text
+*      <--P_P_I_SHOW_HSLXX  text
+*----------------------------------------------------------------------*
+FORM f_obtiene_importe_final_map1 USING p_i_zzmapxt STRUCTURE wa_zzmap1t
+                                        p_lastmonth
+                               CHANGING p_hslxx
+                                        p_tslxx.
+  FIELD-SYMBOLS: <fs_campo> TYPE any.
+  DATA: l_nombre_campo(40),
+        l_month(2) TYPE n.
+  CLEAR p_hslxx.
+
+  IF p_lastmonth  > 0.
+    DO 16 TIMES.
+      l_month = l_month + 1.
+      CONCATENATE 'HSL' l_month INTO l_nombre_campo.
+      ASSIGN COMPONENT l_nombre_campo OF STRUCTURE p_i_zzmapxt TO <fs_campo>.
+      IF sy-subrc EQ 0.
+        p_hslxx = p_hslxx + <fs_campo>.
+        p_tslxx = p_hslxx.
+      ENDIF.
+    ENDDO.
+  ENDIF.
+** CRG INI 31102025 Modificación moneda KWD
+  IF p_i_zzmapxt-rtcur = 'KWD'.
+    p_tslxx = p_tslxx / 10.
+  ENDIF.
+** CRG FIN 31102025
+
+ENDFORM.                    " F_OBTIENE_IMPORTE_FINAL
+*&---------------------------------------------------------------------*
+*&      Form  F_OBTENER_ULTIMO_DIA_MES
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*      <--P_L_DOCDATE  text
+*      <--P_L_LASTMONTH  text
+*----------------------------------------------------------------------*
+FORM f_obtener_ultimo_dia_mes  CHANGING p_docdate
+                                        p_lastmonth.
+  DATA: l_month(2) TYPE n,
+        lv_year TYPE gjahr.
+
+
+  IF p_saldo EQ abap_true.
+    lv_year = p_ryear - 1." DEVK982456 AMALON S 7000000356: Programa Migración para USA
+    CONCATENATE lv_year '1231' INTO p_docdate.
+    p_lastmonth = 12.
+  ELSE.
+    p_lastmonth = lv_rpmax.
+    IF p_lastmonth >= 12.
+      p_lastmonth = 12.
+    ENDIF.
+    l_month = p_lastmonth.
+    CONCATENATE p_ryear l_month '01' INTO p_docdate.
+    CALL FUNCTION 'FKK_LAST_DAY_OF_MONTH'
+      EXPORTING
+        day_in            = p_docdate
+      IMPORTING
+        last_day_of_month = p_docdate
+      EXCEPTIONS
+        day_in_no_date    = 1
+        OTHERS            = 2.
+  ENDIF.
+ENDFORM.                    " F_OBTENER_ULTIMO_DIA_MES
+
+*&---------------------------------------------------------------------*
+*&      Form  f_agrega_linea
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*      -->P_I_FINAL_OUT  text
+*      -->P_OUT          text
+*----------------------------------------------------------------------*
+FORM f_agrega_linea  TABLES   p_i_final_out STRUCTURE w_final_out
+                    USING    p_out.
+  DATA: l_termina,
+        l_valor(100),
+        l_tabix TYPE sytabix.
+  CONSTANTS: c_separ TYPE c LENGTH 1 VALUE ';'.
+  FIELD-SYMBOLS: <fs_value>.
+  IF p_csv = abap_true.
+    WHILE l_termina IS INITIAL.
+      l_tabix = l_tabix + 1.
+      ASSIGN COMPONENT l_tabix OF STRUCTURE p_out TO <fs_value>.
+      IF sy-subrc EQ 0.
+        l_valor = <fs_value>.
+*        CONDENSE l_valor NO-GAPS.
+        IF l_tabix = 1.
+          p_i_final_out-linea = l_valor.
+        ELSE.
+          CONCATENATE p_i_final_out-linea  c_separ l_valor INTO p_i_final_out-linea.
+        ENDIF.
+      ELSE.
+        l_termina = c_si.
+      ENDIF.
+    ENDWHILE.
+*
+  ELSE.
+    p_i_final_out = p_out.
+  ENDIF.
+  IF p_i_final_out IS NOT INITIAL .
+    APPEND p_i_final_out.
+  ENDIF.
+ENDFORM.                    " F_AGREGA_LINA
+*&---------------------------------------------------------------------*
+*&      Form  F_RANGOS
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*      -->P_LR_RLDNR  text
+*      -->P_LR_RRCTY  text
+*      -->P_LR_RVERS  text
+*----------------------------------------------------------------------*
+FORM f_rangos .
+
+*>TINGUAR 23/09/2021 nuevas cuentas res
+  DATA: lt_ctas_mig TYPE STANDARD TABLE OF zmfit_ctas_mig,
+        lw_ctas_mig TYPE zmfit_ctas_mig.
+*<TINGUAR 23/09/2021 nuevas cuentas res
+
+  r_rldnr-sign = 'I'.
+  r_rldnr-option = 'EQ'.
+  r_rldnr-low = 'Z1'.
+  APPEND r_rldnr.
+  r_rldnr-low = 'Z2'.
+  APPEND r_rldnr.
+
+*  r_rrcty-sign = 'I'.
+*  r_rrcty-option = 'EQ'.
+*  r_rrcty-low = '0'.
+*  APPEND r_rrcty.
+*  r_rrcty-low = '2'.
+*  APPEND r_rrcty.
+
+  r_rvers-sign = 'I'.
+  r_rvers-option = 'EQ'.
+  r_rvers-low = '001'.
+  APPEND r_rvers.
+
+  REFRESH r_saknr_8_9.
+  r_saknr_8_9-sign = 'I'.
+  r_saknr_8_9-option = 'BT'.
+  r_saknr_8_9-low = '0000800000'.
+  r_saknr_8_9-high = '0000999999'.
+  APPEND r_saknr_8_9.
+  CLEAR r_saknr_8_9.
+
+*>TINGUAR 23/09/2021 nuevas cuentas res
+  IF s_bukrs[] IS NOT INITIAL.
+    SELECT *
+      INTO TABLE lt_ctas_mig
+      FROM zmfit_ctas_mig
+      WHERE bukrs IN s_bukrs.
+    IF sy-subrc = 0.
+      REFRESH r_saknr_res.
+      LOOP AT lt_ctas_mig INTO lw_ctas_mig.
+        r_saknr_res-sign = 'I'.
+        r_saknr_res-option = 'BT'.
+        r_saknr_res-low = lw_ctas_mig-hkont_from.
+        r_saknr_res-high = lw_ctas_mig-hkont_to.
+        APPEND r_saknr_res.
+        CLEAR r_saknr_res.
+      ENDLOOP.
+    ENDIF.
+  ENDIF.
+*<TINGUAR 23/09/2021 nuevas cuentas res
+*>TINGUAR 15/11/2021 Tabla de conversión cobertura
+  SELECT * INTO TABLE gt_conv_cob FROM zmfit_conv_cob WHERE bukrs IN s_bukrs.
+*<TINGUAR 15/11/2021 Tabla de conversión cobertura
+
+ENDFORM.                    " F_RANGOS
+*&---------------------------------------------------------------------*
+*&      Form  F_OBTIENE_IMPORTE_DELTA
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*      -->P_W_ZZMAP2T  text
+*      -->P_L_LASTMONTH  text
+*      <--P_P_I_SHOW_HSLXX  text
+*----------------------------------------------------------------------*
+FORM f_obtiene_importe_delta  USING    p_i_zzmapxt STRUCTURE wa_zzmap2t
+                                       p_lastmonth
+                              CHANGING p_hslxx
+                                       p_tslxx.
+
+  FIELD-SYMBOLS: <fs_campo> TYPE any.
+  DATA: l_nombre_campo(40),
+        l_month(2)     TYPE n.
+  CLEAR p_hslxx.
+
+  IF p_saldo = abap_false.
+    CLEAR l_month.
+    ADD lv_rpmax TO l_month.
+    CONCATENATE 'HSL' l_month INTO l_nombre_campo.
+    ASSIGN COMPONENT l_nombre_campo OF STRUCTURE p_i_zzmapxt TO <fs_campo>.
+    IF sy-subrc EQ 0.
+      p_hslxx = p_hslxx + <fs_campo>.
+    ENDIF.
+  ELSE.
+    l_nombre_campo = c_hslvt.
+    ASSIGN COMPONENT l_nombre_campo OF STRUCTURE p_i_zzmapxt TO <fs_campo>.
+    IF sy-subrc EQ 0.
+      p_hslxx = p_hslxx + <fs_campo>.
+    ENDIF.
+  ENDIF.
+  IF p_montr = abap_true.
+    IF p_saldo = abap_false.
+      CLEAR l_month.
+      ADD lv_rpmax TO l_month.
+      CONCATENATE 'TSL' l_month INTO l_nombre_campo.
+      ASSIGN COMPONENT l_nombre_campo OF STRUCTURE p_i_zzmapxt TO <fs_campo>.
+      IF sy-subrc EQ 0.
+        p_tslxx = p_tslxx + <fs_campo>.
+      ELSE.
+        p_tslxx = p_hslxx.
+      ENDIF.
+
+    ELSE.
+      l_nombre_campo = c_tslvt.
+      ASSIGN COMPONENT l_nombre_campo OF STRUCTURE p_i_zzmapxt TO <fs_campo>.
+      IF sy-subrc EQ 0.
+        p_tslxx = p_tslxx + <fs_campo>.
+      ELSE.
+        p_tslxx = p_hslxx.
+      ENDIF.
+    ENDIF.
+  ELSE.
+    p_tslxx = p_hslxx.
+  ENDIF.
+
+** CRG INI 31102025 Modificación moneda KWD
+  IF p_i_zzmapxt-rtcur = 'KWD'.
+    p_tslxx = p_tslxx / 10.
+  ENDIF.
+** CRG FIN 31102025
+
+ENDFORM.                    " F_OBTIENE_IMPORTE_DELTA
+*&---------------------------------------------------------------------*
+*&      Form  F_OBTIENE_IMPORTE_DELTA
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*      -->P_W_ZZMAP2T  text
+*      -->P_L_LASTMONTH  text
+*      <--P_P_I_SHOW_HSLXX  text
+*----------------------------------------------------------------------*
+FORM f_obtiene_importe_delta_map1  USING p_i_zzmapxt STRUCTURE wa_zzmap1t
+                                         p_lastmonth
+                                CHANGING p_hslxx
+                                         p_tslxx.
+
+  FIELD-SYMBOLS: <fs_campo> TYPE any.
+  DATA: l_nombre_campo(40),
+        l_month(2)     TYPE n.
+  CLEAR p_hslxx.
+
+  IF p_saldo = abap_false.
+*    IF p_lastmonth => 12.
+*      l_month = 11.
+*      DO 5 TIMES.
+*        l_month = l_month + 1.
+*        CONCATENATE 'HSL' l_month INTO l_nombre_campo.
+*        ASSIGN COMPONENT l_nombre_campo OF STRUCTURE p_i_zzmapxt TO <fs_campo>.
+*        IF sy-subrc EQ 0.
+*          p_hslxx = p_hslxx + <fs_campo>.
+*        ENDIF.
+*      ENDDO.
+*      l_month = 12.
+*    ELSE.
+    CLEAR l_month.
+    ADD lv_rpmax TO l_month.
+    CONCATENATE 'HSL' l_month INTO l_nombre_campo.
+    ASSIGN COMPONENT l_nombre_campo OF STRUCTURE p_i_zzmapxt TO <fs_campo>.
+    IF sy-subrc EQ 0.
+      p_hslxx = p_hslxx + <fs_campo>.
+      p_tslxx = p_hslxx.
+    ENDIF.
+*    ENDIF.
+  ELSE.
+    l_nombre_campo = c_hslvt.
+    ASSIGN COMPONENT l_nombre_campo OF STRUCTURE p_i_zzmapxt TO <fs_campo>.
+    IF sy-subrc EQ 0.
+      p_hslxx = p_hslxx + <fs_campo>.
+      p_tslxx = p_hslxx.
+    ENDIF.
+  ENDIF.
+
+*  IF l_month > 1.
+*    l_month = l_month - 1.
+*    CONCATENATE 'HSL' l_month INTO l_nombre_campo.
+*    ASSIGN COMPONENT l_nombre_campo OF STRUCTURE p_i_zzmapxt TO <fs_campo>.
+*    IF sy-subrc EQ 0.
+*      p_hslxx = p_hslxx - <fs_campo>.
+*    ENDIF.
+*  ENDIF.
+** CRG INI 31102025 Modificación moneda KWD
+  IF p_i_zzmapxt-rtcur = 'KWD'.
+    p_tslxx = p_tslxx / 10.
+  ENDIF.
+** CRG FIN 31102025
+ENDFORM.                    " F_OBTIENE_IMPORTE_DELTA
+*&---------------------------------------------------------------------*
+*&      Form  F_LLENA_SHOW_MAP1
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*  -->  p1        text
+*  <--  p2        text
+*----------------------------------------------------------------------*
+FORM f_llena_show_map1 TABLES p_i_show STRUCTURE w_show_aux
+                         USING lv_combi.
+  DATA: lv_flag TYPE c.
+  DATA ls_ref TYPE zmfir_saldos_proce.
+
+  LOOP AT it_zzmap1t INTO wa_zzmap1t.
+    IF wa_zzmap1t-rbukrs = '0028'.
+      IF wa_zzmap1t-rzzc11 IS NOT INITIAL.
+        READ TABLE it_zzc11 INTO wa_zzc11 WITH KEY zzc11 = wa_zzmap1t-rzzc11.
+        IF sy-subrc EQ 0.
+          MOVE wa_zzc11-zzc11_s4h TO wa_zzmap1t-rzzc11.
+        ENDIF.
+      ENDIF.
+
+      IF wa_zzmap1t-rcntr IS NOT INITIAL.
+        READ TABLE it_cecos INTO wa_cecos WITH KEY kostl = wa_zzmap1t-rcntr.
+        IF sy-subrc EQ 0.
+          wa_zzmap1t-rcntr = wa_cecos-kostl_s4.
+        ENDIF.
+      ENDIF.
+    ENDIF.
+
+    MOVE-CORRESPONDING  wa_zzmap1t TO p_i_show.
+
+    READ TABLE it_monedas INTO wa_monedas
+    WITH KEY bukrs = wa_zzmap1t-rbukrs.
+    IF sy-subrc EQ 0.
+      p_i_show-rtcur = wa_monedas-waers.
+    ENDIF.
+    "Cartera de inversión
+    IF NOT wa_zzmap1t-aufnr IS INITIAL.
+      READ TABLE it_cartera INTO wa_cartera WITH KEY aufnr = wa_zzmap1t-aufnr BINARY SEARCH.
+      IF sy-subrc EQ 0.
+        MOVE wa_cartera-zzc04 TO p_i_show-zzc04.
+      ENDIF.
+    ENDIF.
+
+    "Conversión Sociedad GL
+    IF wa_zzmap1t-vbund IS NOT INITIAL.
+      READ TABLE it_vbund INTO wa_vbund WITH KEY vbund = wa_zzmap1t-vbund.
+      IF sy-subrc EQ 0.
+        p_i_show-vbund = wa_vbund-vbund_s4.
+      ENDIF.
+    ENDIF.
+
+    READ TABLE it_hkont INTO wa_hkont WITH KEY hkont = wa_zzmap1t-racct BINARY SEARCH.
+    IF sy-subrc EQ 0.
+      MOVE wa_hkont-hkont_s4h TO p_i_show-racct.
+    ENDIF.
+
+    LOOP AT gt_zz0001 INTO gs_zz0001 WHERE bukrs = wa_zzmap1t-rbukrs
+                                       AND ( zzc01 = wa_zzmap1t-rzzc01 OR zzc01 = '*')
+                                       AND ( zzc02 = wa_zzmap1t-rzzc02 OR zzc02 = '*').
+      p_i_show-zz0001 = gs_zz0001-zz0001.
+      EXIT.
+    ENDLOOP.
+
+    p_i_show-docdate = l_docdate.
+    IF p_total = c_si OR
+***EY ***AJUSTES ROLL-OUT IT/PT***************START
+      ( p_comb2 = c_si AND lv_combi = space ).
+***EY ***AJUSTES ROLL-OUT IT/PT***************END
+      PERFORM f_obtiene_importe_final_map1  USING wa_zzmap1t
+                                                  l_lastmonth
+                                        CHANGING  p_i_show-hslxx
+                                                  p_i_show-tslxx.
+    ENDIF.
+    IF p_delta = c_si OR
+***EY ***AJUSTES ROLL-OUT IT/PT***************START
+      ( p_combi = c_si AND lv_combi = space ).
+***EY ***AJUSTES ROLL-OUT IT/PT***************END
+      PERFORM f_obtiene_importe_delta_map1 USING  wa_zzmap1t
+                                                  l_lastmonth
+                                        CHANGING  p_i_show-hslxx
+                                                  p_i_show-tslxx.
+    ENDIF.
+***EY ***AJUSTES ROLL-OUT IT/PT***************START
+    IF lv_combi = c_si.
+      PERFORM f_obtiene_importe_combi_map1 USING  wa_zzmap1t
+                                                  l_lastmonth
+                                        CHANGING  p_i_show-hslxx
+                                                  p_i_show-tslxx.
+    ENDIF.
+***EY ***AJUSTES ROLL-OUT IT/PT***************END
+    IF p_i_show-tslxx >= 0 AND p_i_show-hslxx >= 0.
+*      p_i_show-shkzg = 'S'.
+      p_i_show-shkzg = 'D'.
+    ELSE.
+      p_i_show-shkzg = 'H'.
+    ENDIF.
+
+** CRG 28032025 Se eliminan las línea con los dos importes a 0. Se elimina el "0" ya que si un importe es 0 no hay q tratarlo
+    IF p_i_show-shkzg = 'H' AND ( ( p_i_show-tslxx  > 0 AND p_i_show-hslxx  < 0 ) OR ( p_i_show-tslxx  < 0 AND p_i_show-hslxx  > 0 ) ).
+      ls_ref = p_i_show.
+      IF p_i_show-hslxx  < 0.
+        CLEAR ls_ref-tslxx.
+        APPEND ls_ref TO p_i_show.
+        ls_ref = p_i_show.
+        CLEAR ls_ref-hslxx.
+        ls_ref-shkzg = 'D'.
+        APPEND ls_ref TO p_i_show.
+      ELSE. "p_i_show-tslxx  < 0
+        CLEAR ls_ref-hslxx.
+        APPEND ls_ref TO p_i_show.
+        ls_ref = p_i_show.
+        CLEAR ls_ref-tslxx.
+        ls_ref-shkzg = 'D'.
+        APPEND ls_ref TO p_i_show.
+      ENDIF.
+    ELSE.
+      IF p_i_show-hslxx <> 0 OR p_i_show-tslxx <> 0.
+        APPEND p_i_show.
+      ENDIF.
+    ENDIF.
+
+    CLEAR p_i_show.
+  ENDLOOP.
+
+ENDFORM.                    " F_LLENA_SHOW_MAP1
+*&---------------------------------------------------------------------*
+*&      Form  F_LLENA_SHOW_MAP2
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*  -->  p1        text
+*  <--  p2        text
+*----------------------------------------------------------------------*
+FORM f_llena_show_map2 TABLES p_i_show STRUCTURE w_show_aux
+                         USING lv_combi.
+  DATA ls_ref TYPE zmfir_saldos_proce.
+
+  LOOP AT it_zzmap2t INTO wa_zzmap2t.
+    IF wa_zzmap2t-rzzc13 IS NOT INITIAL.
+      CONCATENATE c_4ceros s_bukrs-low INTO wa_zzmap2t-rzzc13.
+    ENDIF.
+
+    IF wa_zzmap2t-rbukrs = '0028'.
+      IF wa_zzmap2t-rzzc11 IS NOT INITIAL.
+        READ TABLE it_zzc11 INTO wa_zzc11 WITH KEY zzc11 = wa_zzmap2t-rzzc11.
+        IF sy-subrc EQ 0.
+          MOVE wa_zzc11-zzc11_s4h TO wa_zzmap2t-rzzc11.
+        ENDIF.
+      ENDIF.
+
+      IF wa_zzmap2t-rcntr IS NOT INITIAL.
+        READ TABLE it_cecos INTO wa_cecos WITH KEY kostl = wa_zzmap2t-rcntr.
+        IF sy-subrc EQ 0.
+          wa_zzmap2t-rcntr = wa_cecos-kostl_s4.
+        ENDIF.
+      ENDIF.
+    ENDIF.
+
+    MOVE-CORRESPONDING wa_zzmap2t TO p_i_show.
+
+    IF p_montr <> abap_true.
+      READ TABLE it_monedas INTO wa_monedas
+        WITH KEY bukrs = wa_zzmap2t-rbukrs.
+      IF sy-subrc EQ 0.
+        p_i_show-rtcur = wa_monedas-waers.
+      ENDIF.
+    ENDIF.
+
+
+    "Conversión Sociedad GL
+    IF wa_zzmap2t-vbund IS NOT INITIAL.
+      READ TABLE it_vbund INTO wa_vbund WITH KEY vbund = wa_zzmap2t-vbund.
+      IF sy-subrc EQ 0.
+        p_i_show-vbund = wa_vbund-vbund_s4.
+      ENDIF.
+    ENDIF.
+
+    READ TABLE it_hkont INTO wa_hkont WITH KEY hkont = wa_zzmap2t-racct BINARY SEARCH.
+    IF sy-subrc EQ 0.
+      MOVE wa_hkont-hkont_s4h TO p_i_show-racct.
+    ENDIF.
+
+
+    p_i_show-docdate = l_docdate.
+    IF p_total = c_si OR
+***EY ***AJUSTES ROLL-OUT IT/PT***************START
+      ( p_comb2 = c_si AND lv_combi = space ).
+***EY ***AJUSTES ROLL-OUT IT/PT***************END
+      PERFORM f_obtiene_importe_final   USING     wa_zzmap2t
+                                                  l_lastmonth
+                                        CHANGING  p_i_show-hslxx
+                                                  p_i_show-tslxx.
+    ENDIF.
+    IF p_delta = c_si OR
+***EY ***AJUSTES ROLL-OUT IT/PT***************START
+      ( p_combi = c_si AND lv_combi = space ).
+***EY ***AJUSTES ROLL-OUT IT/PT***************END
+      PERFORM f_obtiene_importe_delta   USING     wa_zzmap2t
+                                                  l_lastmonth
+                                        CHANGING  p_i_show-hslxx
+                                                  p_i_show-tslxx.
+    ENDIF.
+    IF lv_combi = c_si.
+      PERFORM f_obtiene_importe_combi   USING     wa_zzmap2t
+                                                  l_lastmonth
+                                        CHANGING  p_i_show-hslxx
+                                                  p_i_show-tslxx.
+    ENDIF.
+
+    IF p_montr = abap_false.
+      IF wa_zzmap2t-drcrk EQ 'H'.
+        IF p_i_show-hslxx >= 0.
+          p_i_show-negap = 'X'.
+        ENDIF.
+        p_i_show-shkzg = 'H'.
+      ELSEIF wa_zzmap2t-drcrk EQ 'S'.
+        IF p_i_show-hslxx < 0.
+          p_i_show-negap = 'X'.
+        ENDIF.
+        p_i_show-shkzg = 'D'.
+      ENDIF.
+    ELSE.
+      IF wa_zzmap2t-drcrk EQ 'H'.
+        IF p_i_show-tslxx >= 0.
+          p_i_show-negap = 'X'.
+        ENDIF.
+        p_i_show-shkzg = 'H'.
+      ELSEIF wa_zzmap2t-drcrk EQ 'S'.
+        IF p_i_show-tslxx < 0.
+          p_i_show-negap = 'X'.
+        ENDIF.
+        p_i_show-shkzg = 'D'.
+      ENDIF.
+    ENDIF.
+
+*    IF p_i_show-hslxx  >= 0.
+*      IF wa_zzmap2t-drcrk EQ 'H'.
+*        p_i_show-negap = 'X'.
+*      ENDIF.
+**      p_i_show-shkzg = 'S'.
+*      p_i_show-shkzg = 'D'.
+*    ELSE.
+*      IF wa_zzmap2t-drcrk EQ 'S'.
+*        p_i_show-negap = 'X'.
+*      ENDIF.
+*      p_i_show-shkzg = 'H'.
+*    ENDIF.
+** CRG 28032025 Se eliminan las línea con los dos importes a 0.
+** CRG 28032025 Se eliminan las línea con los dos importes a 0. Se elimina el "0" ya que si un importe es 0 no hay q tratarlo
+    IF p_i_show-shkzg = 'H' AND ( ( p_i_show-tslxx  > 0 AND p_i_show-hslxx  < 0 ) OR ( p_i_show-tslxx  < 0 AND p_i_show-hslxx  > 0 ) ).
+      ls_ref = p_i_show.
+      IF p_i_show-hslxx  < 0.
+        CLEAR ls_ref-tslxx.
+        APPEND ls_ref TO p_i_show.
+        ls_ref = p_i_show.
+        CLEAR ls_ref-hslxx.
+        ls_ref-shkzg = 'D'.
+        APPEND ls_ref TO p_i_show.
+      ELSE. "p_i_show-tslxx  < 0
+        CLEAR ls_ref-hslxx.
+        APPEND ls_ref TO p_i_show.
+        ls_ref = p_i_show.
+        CLEAR ls_ref-tslxx.
+        ls_ref-shkzg = 'D'.
+        APPEND ls_ref TO p_i_show.
+      ENDIF.
+    ELSE.
+      IF p_i_show-hslxx <> 0 OR p_i_show-tslxx <> 0.
+        APPEND p_i_show.
+      ENDIF.
+    ENDIF.
+
+    CLEAR p_i_show.
+  ENDLOOP.
+ENDFORM.                    " F_LLENA_SHOW_MAP2
+*&---------------------------------------------------------------------*
+*&      Form  F_DETERMIINA_CUENTAS
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*  -->  p1        text
+*  <--  p2        text
+*----------------------------------------------------------------------*
+FORM f_determiina_cuentas .
+
+ENDFORM.                    " F_DETERMIINA_CUENTAS
+*&---------------------------------------------------------------------*
+*&      Form  F_OCULTARCAMPOS
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*  -->  p1        text
+*  <--  p2        text
+*----------------------------------------------------------------------*
+FORM f_ocultarcampos .
+
+  CONSTANTS: c_active    TYPE c VALUE '1',
+             c_inactive  TYPE c VALUE '0',
+             c_group_b3  TYPE char2 VALUE 'B3'.
+
+  LOOP AT SCREEN.
+    IF p_cam EQ abap_true.
+      IF screen-group1 = c_group_b3.
+        screen-active = c_active.
+      ENDIF.
+    ELSE.
+      IF screen-group1 = c_group_b3.
+        screen-active = c_inactive.
+      ENDIF.
+    ENDIF.
+
+    MODIFY SCREEN.
+  ENDLOOP.
+
+
+ENDFORM.                    " F_OCULTARCAMPOS
+*&---------------------------------------------------------------------*
+*&      Form  F_RFC_CAM
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*      -->P_I_FINAL_OUT  text
+*      -->P_LV_FILENAME  text
+*----------------------------------------------------------------------*
+FORM f_rfc_cam  TABLES p_i_final_out
+                USING p_lv_filename.
+  DATA: v_filename TYPE localfile,
+        t_table TYPE swfistring,
+        w_i_final_out LIKE LINE OF i_final_out,
+        w_table LIKE LINE OF t_table.
+
+  DATA: t_output TYPE STANDARD TABLE OF zmfi_output,
+        w_output LIKE LINE OF t_output.
+  DATA: wa_log_saldos TYPE zmfit_saldos_log.
+
+  LOOP AT p_i_final_out INTO w_i_final_out.
+    w_table = w_i_final_out.
+    APPEND w_table TO t_table.
+  ENDLOOP.
+
+  MOVE p_lv_filename TO v_filename.
+
+  CALL FUNCTION 'ZMFIMF_CAM' DESTINATION p_rfc
+    EXPORTING
+      i_filename = v_filename
+      i_table    = t_table
+    TABLES
+      t_output   = t_output.
+
+  LOOP AT t_output INTO w_output.
+    MOVE-CORRESPONDING: w_output TO wa_log_saldos.
+    MOVE: s_bukrs-low  TO wa_log_saldos-bukrs,
+          lv_blart     TO wa_log_saldos-blart,
+          v_filename   TO wa_log_saldos-filename,
+          p_filna      TO wa_log_saldos-path,
+          sy-datum     TO wa_log_saldos-datum,
+          sy-uzeit     TO wa_log_saldos-uzeit,
+          sy-uname     TO wa_log_saldos-uname.
+
+    MODIFY zmfit_saldos_log FROM wa_log_saldos.
+
+  ENDLOOP.
+  IF sy-subrc EQ 0.
+    COMMIT WORK AND WAIT.
+  ENDIF.
+
+  PERFORM f_delay.
+ENDFORM.                    " F_RFC_CAM
+*&---------------------------------------------------------------------*
+*&      Form  F_DELAY
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*  -->  p1        text
+*  <--  p2        text
+*----------------------------------------------------------------------*
+FORM f_delay .
+  IF p_dlay IS NOT INITIAL.
+    WAIT UP TO p_dlay SECONDS.
+  ENDIF.
+ENDFORM.                    " F_DELAY
+
+***EY ***AJUSTES ROLL-OUT IT/PT***************START
+*&---------------------------------------------------------------------*
+*&      Form  F_OBTIENE_IMPORTE_COMBI
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*      -->P_W_ZZMAP2T  text
+*      -->P_L_LASTMONTH  text
+*      <--P_P_I_SHOW_HSLXX  text
+*----------------------------------------------------------------------*
+FORM f_obtiene_importe_combi_map1  USING p_i_zzmapxt STRUCTURE wa_zzmap1t
+                                         p_lastmonth
+                                CHANGING p_hslxx
+                                         p_tslxx.
+
+  FIELD-SYMBOLS: <fs_campo> TYPE any.
+  DATA: l_nombre_campo(40),
+        l_month(2)     TYPE n.
+  CLEAR p_hslxx.
+
+
+  l_nombre_campo = c_hslvt.
+  ASSIGN COMPONENT l_nombre_campo OF STRUCTURE p_i_zzmapxt TO <fs_campo>.
+  IF sy-subrc EQ 0.
+    p_hslxx = p_hslxx + <fs_campo>.
+    p_tslxx = p_hslxx.
+  ENDIF.
+** CRG INI 31102025 Modificación moneda KWD
+  IF p_i_zzmapxt-rtcur = 'KWD'.
+    p_tslxx = p_tslxx / 10.
+  ENDIF.
+** CRG FIN 31102025
+
+ENDFORM.                    " F_OBTIENE_IMPORTE_DELTA
+
+*&---------------------------------------------------------------------*
+*&      Form  F_OBTIENE_IMPORTE_DELTA
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*      -->P_W_ZZMAP2T  text
+*      -->P_L_LASTMONTH  text
+*      <--P_P_I_SHOW_HSLXX  text
+*----------------------------------------------------------------------*
+FORM f_obtiene_importe_combi  USING    p_i_zzmapxt STRUCTURE wa_zzmap2t
+                                       p_lastmonth
+                              CHANGING p_hslxx
+                                       p_tslxx.
+
+  FIELD-SYMBOLS: <fs_campo> TYPE any.
+  DATA: l_nombre_campo(40),
+        l_month(2)     TYPE n.
+  CLEAR p_hslxx.
+
+
+  l_nombre_campo = c_hslvt.
+  ASSIGN COMPONENT l_nombre_campo OF STRUCTURE p_i_zzmapxt TO <fs_campo>.
+  IF sy-subrc EQ 0.
+    p_hslxx = p_hslxx + <fs_campo>.
+  ENDIF.
+
+  IF p_montr = abap_true.
+    l_nombre_campo = c_tslvt.
+    ASSIGN COMPONENT l_nombre_campo OF STRUCTURE p_i_zzmapxt TO <fs_campo>.
+    IF sy-subrc EQ 0.
+      p_tslxx = p_tslxx + <fs_campo>.
+    ELSE.
+      p_tslxx = p_hslxx.
+    ENDIF.
+  ELSE.
+    p_tslxx = p_hslxx.
+  ENDIF.
+** CRG INI 31102025 Modificación moneda KWD
+  IF p_i_zzmapxt-rtcur = 'KWD'.
+    p_tslxx = p_tslxx / 10.
+  ENDIF.
+** CRG FIN 31102025
+ENDFORM.                    " F_OBTIENE_IMPORTE_DELTA
+
+*&---------------------------------------------------------------------*
+*&      Form  F_SALDO_CERO
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*  -->  p1        text
+*  <--  p2        text
+*----------------------------------------------------------------------*
+FORM f_saldo_cero  TABLES p_show STRUCTURE w_show_aux.
+
+* tabla para eliminar registro con saldo 0
+  TYPES: BEGIN OF ty_aux,
+    rbukrs  TYPE  bukrs,
+    ryear TYPE  gjahr,
+    rbusa TYPE  gsber,
+    rtcur TYPE rtcur,
+    racct TYPE  racct,
+    negap TYPE  xnegp,
+    rzzc01 TYPE  zzc01,
+    rzzc02  TYPE  zzc02,
+    rzzc03 TYPE  zzc03,
+    zzc04  TYPE  zzc04,
+    rzzc08  TYPE  zzc08,
+    rzzc11 TYPE  zzc11,
+    docdate TYPE  rl_docdate,
+    shkzg TYPE  shkzg,
+    rzzc12  TYPE  zzc12,
+    rcntr TYPE  kostl,
+    vbund TYPE  vbund,
+    hslxx TYPE  hslxx9,
+    tslxx TYPE tslxx9,
+    rzzc06  TYPE  zzc06,
+    rzzc07  TYPE  zzc07,
+    rzzc13  TYPE  zzc13,
+    zzc09 TYPE  zzc09,
+    anln1 TYPE  anln1,
+    zz0001  TYPE  zz0001,
+   END OF ty_aux.
+
+  DATA: lt_tab TYPE TABLE OF ty_aux,
+        ls_tab TYPE ty_aux,
+        lv_sum TYPE hslxx9,
+        lv_sum2 TYPE tslxx9.
+  FIELD-SYMBOLS <fs_tab> TYPE ty_aux.
+
+  FREE lt_tab.
+  LOOP AT p_show.
+    CLEAR ls_tab.
+    MOVE-CORRESPONDING p_show TO ls_tab.
+    APPEND ls_tab TO lt_tab.
+  ENDLOOP.
+
+  SORT lt_tab BY rbukrs ryear rbusa rtcur racct negap rzzc01 rzzc02 rzzc03 zzc04 rzzc08 rzzc11.
+
+  LOOP AT lt_tab ASSIGNING <fs_tab>.
+    AT NEW rzzc11.
+      CLEAR: lv_sum, lv_sum2.
+    ENDAT.
+    lv_sum = lv_sum + <fs_tab>-hslxx.
+    lv_sum2 = lv_sum2 + <fs_tab>-tslxx.
+
+    AT END OF rzzc11.
+      IF lv_sum = 0 AND lv_sum2 = 0.
+        DELETE lt_tab WHERE rbukrs = <fs_tab>-rbukrs
+                        AND ryear  = <fs_tab>-ryear
+                        AND rbusa  = <fs_tab>-rbusa
+                        AND rtcur  = <fs_tab>-rtcur
+                        AND racct  = <fs_tab>-racct
+                        AND negap  = <fs_tab>-negap
+                        AND rzzc01 = <fs_tab>-rzzc01
+                        AND rzzc02 = <fs_tab>-rzzc02
+                        AND rzzc03 = <fs_tab>-rzzc03
+                        AND zzc04  = <fs_tab>-zzc04
+                        AND rzzc08 = <fs_tab>-rzzc08
+                        AND rzzc11 = <fs_tab>-rzzc11.
+      ENDIF.
+    ENDAT.
+  ENDLOOP.
+
+  FREE: p_show.
+
+  LOOP AT lt_tab ASSIGNING <fs_tab>.
+    MOVE-CORRESPONDING <fs_tab> TO p_show.
+    APPEND p_show.
+  ENDLOOP.
+
+ENDFORM.                    " F_SALDO_CERO
+***EY ***AJUSTES ROLL-OUT IT/PT***************END
+*&---------------------------------------------------------------------*
+*&      Form  F_LLENA_SHOW_MAP4
+*&---------------------------------------------------------------------*
+*   Clonada de F_LLENA_SHOW_MAP1
+*----------------------------------------------------------------------*
+FORM f_llena_show_map4 TABLES p_i_show STRUCTURE w_show_aux
+                         USING lv_combi.
+  DATA: lv_flag TYPE c.
+  DATA ls_ref TYPE zmfir_saldos_proce.
+
+* Se recorren los datos leidos - Esto solo aplica para sociedad 0496 y solo
+* estará rellena en ese caso
+  LOOP AT it_zzmap4t INTO wa_zzmap4t.
+
+    MOVE-CORRESPONDING  wa_zzmap4t TO p_i_show.
+
+    IF p_montr <> abap_true.
+      READ TABLE it_monedas INTO wa_monedas
+        WITH KEY bukrs = wa_zzmap4t-rbukrs.
+      IF sy-subrc EQ 0.
+        p_i_show-rtcur = wa_monedas-waers.
+      ENDIF.
+    ENDIF.
+* Inicio Amalon DEVK982915  7000000540: Traspaso Saldos - ECC
+    "Conversión CECOs
+    IF wa_zzmap4t-rcntr IS NOT INITIAL.
+      READ TABLE it_cecos INTO wa_cecos WITH KEY kostl = wa_zzmap4t-rcntr.
+      IF sy-subrc EQ 0.
+        p_i_show-rcntr = wa_cecos-kostl_s4.
+      ENDIF.
+    ENDIF.
+* Fin Amalon DEVK982915	7000000540: Traspaso Saldos - ECC
+    "Cartera de inversión
+    IF NOT wa_zzmap4t-aufnr IS INITIAL.
+      READ TABLE it_cartera INTO wa_cartera WITH KEY aufnr = wa_zzmap4t-aufnr BINARY SEARCH.
+      IF sy-subrc EQ 0.
+        MOVE wa_cartera-zzc04 TO p_i_show-zzc04.
+      ENDIF.
+    ENDIF.
+
+    "Conversión Sociedad GL
+    IF wa_zzmap4t-vbund IS NOT INITIAL.
+      READ TABLE it_vbund INTO wa_vbund WITH KEY vbund = wa_zzmap4t-vbund.
+      IF sy-subrc EQ 0.
+        p_i_show-vbund = wa_vbund-vbund_s4.
+      ENDIF.
+    ENDIF.
+
+    READ TABLE it_hkont INTO wa_hkont WITH KEY hkont = wa_zzmap4t-racct BINARY SEARCH.
+    IF sy-subrc EQ 0.
+      MOVE wa_hkont-hkont_s4h TO p_i_show-racct.
+    ENDIF.
+
+    LOOP AT gt_zz0001 INTO gs_zz0001 WHERE bukrs = wa_zzmap4t-rbukrs
+                                       AND ( zzc01 = wa_zzmap4t-rzzc01 OR zzc01 = '*')
+                                       AND ( zzc02 = wa_zzmap4t-rzzc02 OR zzc02 = '*').
+      p_i_show-zz0001 = gs_zz0001-zz0001.
+      EXIT.
+    ENDLOOP.
+
+    p_i_show-docdate = l_docdate.
+    IF p_total = c_si OR
+***EY ***AJUSTES ROLL-OUT IT/PT***************START
+      ( p_comb2 = c_si AND lv_combi = space ).
+***EY ***AJUSTES ROLL-OUT IT/PT***************END
+      PERFORM f_obtiene_importe_final_map4  USING wa_zzmap4t
+                                                  l_lastmonth
+                                        CHANGING  p_i_show-hslxx
+                                                  p_i_show-tslxx.
+    ENDIF.
+    IF p_delta = c_si OR
+***EY ***AJUSTES ROLL-OUT IT/PT***************START
+      ( p_combi = c_si AND lv_combi = space ).
+***EY ***AJUSTES ROLL-OUT IT/PT***************END
+      PERFORM f_obtiene_importe_delta_map4 USING  wa_zzmap4t
+                                                  l_lastmonth
+                                        CHANGING  p_i_show-hslxx
+                                                  p_i_show-tslxx.
+    ENDIF.
+***EY ***AJUSTES ROLL-OUT IT/PT***************START
+    IF lv_combi = c_si.
+      PERFORM f_obtiene_importe_combi_map4 USING  wa_zzmap4t
+                                                  l_lastmonth
+                                        CHANGING  p_i_show-hslxx
+                                                  p_i_show-tslxx.
+    ENDIF.
+***EY ***AJUSTES ROLL-OUT IT/PT***************END
+    IF p_i_show-tslxx  >= 0  AND p_i_show-hslxx  >= 0.
+*      p_i_show-shkzg = 'S'.
+      p_i_show-shkzg = 'D'.
+    ELSE.
+      p_i_show-shkzg = 'H'.
+    ENDIF.
+
+*ini ALF 25.10.2024 ajuste por diferencia en signo
+** CRG 28032025 Se eliminan las línea con los dos importes a 0. Se elimina el "0" ya que si un importe es 0 no hay q tratarlo
+*    IF p_i_show-shkzg = 'H' AND ( ( p_i_show-tslxx  >= 0 AND p_i_show-hslxx  < 0 ) OR ( p_i_show-tslxx  < 0 AND p_i_show-hslxx  >= 0 ) ).
+    IF p_i_show-shkzg = 'H' AND ( ( p_i_show-tslxx  > 0 AND p_i_show-hslxx  < 0 ) OR ( p_i_show-tslxx  < 0 AND p_i_show-hslxx  > 0 ) ).
+      ls_ref = p_i_show.
+      IF p_i_show-hslxx  < 0.
+        CLEAR ls_ref-tslxx.
+        APPEND ls_ref TO p_i_show.
+        ls_ref = p_i_show.
+        CLEAR ls_ref-hslxx.
+        ls_ref-shkzg = 'D'.
+        APPEND ls_ref TO p_i_show.
+      ELSE. "p_i_show-tslxx  < 0
+        CLEAR ls_ref-hslxx.
+        APPEND ls_ref TO p_i_show.
+        ls_ref = p_i_show.
+        CLEAR ls_ref-tslxx.
+        ls_ref-shkzg = 'D'.
+        APPEND ls_ref TO p_i_show.
+      ENDIF.
+    ELSE.
+      IF p_i_show-tslxx <> 0 OR p_i_show-hslxx <> 0.
+        APPEND p_i_show.
+      ENDIF.
+
+    ENDIF.
+*fin ALF 25.10.2024 ajuste por diferencia en signo
+
+
+    CLEAR p_i_show.
+  ENDLOOP.
+
+ENDFORM.                    " F_LLENA_SHOW_MAP4
+
+*&---------------------------------------------------------------------*
+*&      Form  F_OBTIENE_IMPORTE_FINAL_MAP4
+*&---------------------------------------------------------------------*
+*      Clonada de la F_OBTIENE_IMPORTE_FINAL_MAP1 cambiando el tipo
+*----------------------------------------------------------------------*
+FORM f_obtiene_importe_final_map4 USING p_i_zzmapxt STRUCTURE wa_zzmap4t
+                                        p_lastmonth
+                               CHANGING p_hslxx
+                                        p_tslxx.
+  FIELD-SYMBOLS: <fs_campo> TYPE any.
+  DATA: l_nombre_campo(40),
+        l_month(2) TYPE n.
+  CLEAR p_hslxx.
+
+  IF p_lastmonth  > 0.
+    DO 16 TIMES.
+      l_month = l_month + 1.
+      CONCATENATE 'HSL' l_month INTO l_nombre_campo.
+      ASSIGN COMPONENT l_nombre_campo OF STRUCTURE p_i_zzmapxt TO <fs_campo>.
+      IF sy-subrc EQ 0.
+        p_hslxx = p_hslxx + <fs_campo>.
+      ENDIF.
+    ENDDO.
+  ENDIF.
+  IF p_montr = abap_true.
+    CLEAR l_month.
+    IF p_lastmonth  > 0.
+      DO 16 TIMES.
+        l_month = l_month + 1.
+        CONCATENATE 'TSL' l_month INTO l_nombre_campo.
+        ASSIGN COMPONENT l_nombre_campo OF STRUCTURE p_i_zzmapxt TO <fs_campo>.
+        IF sy-subrc EQ 0.
+          p_tslxx = p_tslxx + <fs_campo>.
+        ELSE.
+          p_tslxx = p_hslxx.
+        ENDIF.
+      ENDDO.
+    ENDIF.
+  ELSE.
+    p_tslxx = p_hslxx.
+  ENDIF.
+** CRG INI 31102025 Modificación moneda KWD
+  IF p_i_zzmapxt-rtcur = 'KWD'.
+    p_tslxx = p_tslxx / 10.
+  ENDIF.
+** CRG FIN 31102025
+ENDFORM.                    " F_OBTIENE_IMPORTE_FINAL_MAP4
+
+*&---------------------------------------------------------------------*
+*&      Form  F_OBTIENE_IMPORTE_DELTA
+*&---------------------------------------------------------------------*
+* Clonada de F_OBTIENE_IMPORTE_DELTA_MAP1 cambiando el tipo
+*----------------------------------------------------------------------*
+FORM f_obtiene_importe_delta_map4  USING p_i_zzmapxt STRUCTURE wa_zzmap4t
+                                         p_lastmonth
+                                CHANGING p_hslxx
+                                         p_tslxx.
+
+  FIELD-SYMBOLS: <fs_campo> TYPE any.
+  DATA: l_nombre_campo(40),
+        l_month(2)     TYPE n.
+  CLEAR p_hslxx.
+
+  IF p_saldo = abap_false.
+    CLEAR l_month.
+    ADD lv_rpmax TO l_month.
+    CONCATENATE 'HSL' l_month INTO l_nombre_campo.
+    ASSIGN COMPONENT l_nombre_campo OF STRUCTURE p_i_zzmapxt TO <fs_campo>.
+    IF sy-subrc EQ 0.
+      p_hslxx = p_hslxx + <fs_campo>.
+    ENDIF.
+
+  ELSE.
+    l_nombre_campo = c_hslvt.
+    ASSIGN COMPONENT l_nombre_campo OF STRUCTURE p_i_zzmapxt TO <fs_campo>.
+    IF sy-subrc EQ 0.
+      p_hslxx = p_hslxx + <fs_campo>.
+    ENDIF.
+  ENDIF.
+  IF p_montr = abap_true.
+    IF p_saldo = abap_false.
+      CLEAR l_month.
+      ADD lv_rpmax TO l_month.
+      CONCATENATE 'TSL' l_month INTO l_nombre_campo.
+      ASSIGN COMPONENT l_nombre_campo OF STRUCTURE p_i_zzmapxt TO <fs_campo>.
+      IF sy-subrc EQ 0.
+        p_tslxx = p_tslxx + <fs_campo>.
+      ELSE.
+        p_tslxx = p_hslxx.
+      ENDIF.
+
+    ELSE.
+      l_nombre_campo = c_tslvt.
+      ASSIGN COMPONENT l_nombre_campo OF STRUCTURE p_i_zzmapxt TO <fs_campo>.
+      IF sy-subrc EQ 0.
+        p_tslxx = p_tslxx + <fs_campo>.
+      ELSE.
+        p_tslxx = p_hslxx.
+      ENDIF.
+    ENDIF.
+  ELSE.
+    p_tslxx = p_hslxx.
+  ENDIF.
+** CRG INI 31102025 Modificación moneda KWD
+  IF p_i_zzmapxt-rtcur = 'KWD'.
+    p_tslxx = p_tslxx / 10.
+  ENDIF.
+** CRG FIN 31102025
+ENDFORM.                    " F_OBTIENE_IMPORTE_DELTA_MAP4
+
+*&---------------------------------------------------------------------*
+*&      Form  F_OBTIENE_IMPORTE_COMBI_MAP4
+*&---------------------------------------------------------------------*
+* Clonada de F_OBTIENE_IMPORTE_COMBI_MAP1 cambiando el tipo
+*----------------------------------------------------------------------*
+FORM f_obtiene_importe_combi_map4  USING p_i_zzmapxt STRUCTURE wa_zzmap4t
+                                         p_lastmonth
+                                CHANGING p_hslxx
+                                         p_tslxx.
+
+  FIELD-SYMBOLS: <fs_campo> TYPE any.
+  DATA: l_nombre_campo(40),
+        l_month(2)     TYPE n.
+  CLEAR p_hslxx.
+
+
+  l_nombre_campo = c_hslvt.
+  ASSIGN COMPONENT l_nombre_campo OF STRUCTURE p_i_zzmapxt TO <fs_campo>.
+  IF sy-subrc EQ 0.
+    p_hslxx = p_hslxx + <fs_campo>.
+  ENDIF.
+
+  IF p_montr = abap_true.
+    l_nombre_campo = c_tslvt.
+    ASSIGN COMPONENT l_nombre_campo OF STRUCTURE p_i_zzmapxt TO <fs_campo>.
+    IF sy-subrc EQ 0.
+      p_tslxx = p_tslxx + <fs_campo>.
+    ELSE.
+      p_tslxx = p_hslxx.
+    ENDIF.
+  ELSE.
+    p_tslxx = p_hslxx.
+  ENDIF.
+** CRG INI 31102025 Modificación moneda KWD
+  IF p_i_zzmapxt-rtcur = 'KWD'.
+    p_tslxx = p_tslxx / 10.
+  ENDIF.
+** CRG FIN 31102025
+ENDFORM.                    " F_OBTIENE_IMPORTE_COMBI_MAP4
+
+
+*&---------------------------------------------------------------------*
+*&      Form  F_LEER_LEDGER_Z4
+*&---------------------------------------------------------------------*
+* Rutina para extracción de datos de Ledger Z4
+*----------------------------------------------------------------------*
+FORM f_leer_ledger_z4.
+
+  CONSTANTS: lc_z4 TYPE rldnr VALUE 'Z4'.
+
+  IF it_cta_res IS NOT INITIAL.
+    SELECT * INTO TABLE it_zzmap4t
+      FROM zzmap4t
+      FOR ALL ENTRIES IN it_cta_res
+      WHERE zzmap4t~rbukrs IN s_bukrs
+      AND zzmap4t~racct  = it_cta_res-saknr
+      AND zzmap4t~rldnr  EQ lc_z4
+      AND zzmap4t~rrcty  IN s_rrcty "r_rrcty
+      AND zzmap4t~rvers  IN r_rvers
+      AND zzmap4t~ryear  = p_ryear
+      AND zzmap4t~rtcur  IN p_rtcur
+      AND zzmap4t~rzzs01 IN s_rzzs01.
+  ENDIF.
+  IF it_cta_bal IS NOT INITIAL.
+    SELECT *
+        FROM zzmap4t
+        APPENDING TABLE  it_zzmap4t
+         FOR ALL ENTRIES IN it_cta_bal
+       WHERE rbukrs IN s_bukrs
+         AND racct  = it_cta_bal-saknr
+         AND rldnr  EQ lc_z4
+         AND rrcty  IN s_rrcty
+         AND rvers  IN r_rvers
+         AND rtcur  IN p_rtcur
+         AND ryear  = p_ryear.
+    IF sy-subrc EQ 0.
+
+    ENDIF.
+  ENDIF.
+
+
+ENDFORM.                    "F_LEER_LEDGER_Z4
+
+*&---------------------------------------------------------------------*
+*&      Form  F_LEER_LEDGER_Z1
+*&---------------------------------------------------------------------*
+* Rutina para extracción de datos de Ledger Z1
+*----------------------------------------------------------------------*
+FORM f_leer_ledger_z1.
+
+  CONSTANTS: lc_z1 TYPE rldnr VALUE 'Z1'.
+
+  IF it_cta_res IS NOT INITIAL.
+    SELECT * INTO TABLE it_zzmap1t
+      FROM zzmap1t
+      FOR ALL ENTRIES IN it_cta_res
+      WHERE zzmap1t~rbukrs IN s_bukrs
+      AND zzmap1t~racct  = it_cta_res-saknr
+      AND zzmap1t~rldnr  EQ lc_z1
+      AND zzmap1t~rrcty  IN s_rrcty "r_rrcty
+      AND zzmap1t~rvers  IN r_rvers
+      AND zzmap1t~ryear  = p_ryear
+      AND zzmap1t~rtcur  IN p_rtcur
+      AND zzmap1t~rzzs01 IN s_rzzs01.
+  ENDIF.
+  IF it_cta_bal IS NOT INITIAL.
+    SELECT *
+        FROM zzmap1t
+        APPENDING TABLE  it_zzmap1t
+         FOR ALL ENTRIES IN it_cta_bal
+       WHERE rbukrs IN s_bukrs
+         AND racct  = it_cta_bal-saknr
+         AND rldnr  EQ lc_z1
+         AND rrcty  IN s_rrcty
+         AND rvers  IN r_rvers
+         AND rtcur  IN p_rtcur
+         AND ryear  = p_ryear.
+    IF sy-subrc EQ 0.
+
+    ENDIF.
+  ENDIF.
+
+
+ENDFORM.                    "F_LEER_LEDGER_Z1
+*&---------------------------------------------------------------------*
+*&      Form  F_CHECK_LONG
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*      -->P_P_I_SHOW_AUX  text
+*----------------------------------------------------------------------*
+FORM f_check_long  TABLES   p_i_show_aux STRUCTURE w_show_aux.
+  DATA: lv_tabix TYPE sy-tabix,
+        lv_hsl_txt TYPE string,
+        lv_tsl_txt TYPE string,
+        lv_len TYPE i,
+        lv_flag_err TYPE c,
+        lv_flag_exit TYPE c,
+        lv_exit TYPE c,
+        lt_show_aux LIKE p_i_show_aux[],
+        lt_del_tabix TYPE STANDARD TABLE OF sy-tabix,
+        lv_hslxx LIKE w_show_aux-hslxx,
+        lv_tslxx LIKE w_show_aux-tslxx,
+        lv_index TYPE sy-index.
+  WHILE lv_flag_exit = space.
+    CLEAR: lt_del_tabix[], lt_show_aux[].
+    lv_exit = abap_true.
+    LOOP AT p_i_show_aux INTO w_show_aux.
+      lv_tabix = sy-tabix.
+      CLEAR lv_flag_err.
+      lv_hsl_txt = w_show_aux-hslxx.
+      lv_tsl_txt = w_show_aux-tslxx.
+      REPLACE ALL OCCURRENCES OF '.' IN lv_hsl_txt WITH '' IN CHARACTER MODE.
+      REPLACE ALL OCCURRENCES OF '.' IN lv_tsl_txt WITH '' IN CHARACTER MODE.
+      REPLACE ALL OCCURRENCES OF '-' IN lv_hsl_txt WITH '' IN CHARACTER MODE.
+      REPLACE ALL OCCURRENCES OF '-' IN lv_tsl_txt WITH '' IN CHARACTER MODE.
+      CONDENSE: lv_hsl_txt NO-GAPS,
+                lv_tsl_txt NO-GAPS.
+      lv_len = strlen( lv_hsl_txt ).
+      IF lv_len > 13.
+        lv_flag_err = abap_true.
+      ENDIF.
+      lv_len = strlen( lv_tsl_txt ).
+      IF lv_len > 13.
+        lv_flag_err = abap_true.
+      ENDIF.
+      IF lv_flag_err = abap_true.
+        lv_hslxx = w_show_aux-hslxx.
+        lv_tslxx = w_show_aux-tslxx.
+        w_show_aux-hslxx = w_show_aux-hslxx / 10.
+        w_show_aux-tslxx = w_show_aux-tslxx / 10.
+        DO 10 TIMES.
+          lv_index = sy-index.
+          lv_hslxx = lv_hslxx - w_show_aux-hslxx.
+          lv_tslxx = lv_tslxx - w_show_aux-tslxx.
+          IF lv_index = 10.
+            w_show_aux-hslxx = w_show_aux-hslxx + lv_hslxx.
+            w_show_aux-tslxx = w_show_aux-tslxx + lv_tslxx.
+          ENDIF.
+          APPEND w_show_aux TO lt_show_aux.
+        ENDDO.
+        APPEND lv_tabix TO lt_del_tabix.
+        lv_exit = space.
+      ENDIF.
+    ENDLOOP.
+    IF lv_exit = abap_true.
+      lv_flag_exit = abap_true.
+    ELSE.
+      SORT lt_del_tabix DESCENDING.
+      LOOP AT lt_del_tabix INTO lv_tabix.
+        DELETE p_i_show_aux INDEX lv_tabix.
+      ENDLOOP.
+      APPEND LINES OF lt_show_aux TO p_i_show_aux.
+    ENDIF.
+  ENDWHILE.
+
+ENDFORM.                    " F_CHECK_LONG
+*&---------------------------------------------------------------------*
+*&      Form  F_CHECK_LONG_PTE
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*      <--P_LV_TIMES  text
+*----------------------------------------------------------------------*
+FORM f_check_long_pte USING pl_hslxx_99
+                            pl_hslxx2_99
+       CHANGING p_flag_err.
+  DATA: lv_tabix TYPE sy-tabix,
+        lv_hsl_txt TYPE string,
+        lv_tsl_txt TYPE string,
+        lv_len TYPE i,
+        lv_len2 TYPE i.
+
+  lv_hsl_txt = pl_hslxx_99.
+  lv_tsl_txt = pl_hslxx2_99.
+  REPLACE ALL OCCURRENCES OF '.' IN lv_hsl_txt WITH '' IN CHARACTER MODE.
+  REPLACE ALL OCCURRENCES OF '.' IN lv_tsl_txt WITH '' IN CHARACTER MODE.
+  REPLACE ALL OCCURRENCES OF '-' IN lv_hsl_txt WITH '' IN CHARACTER MODE.
+  REPLACE ALL OCCURRENCES OF '-' IN lv_tsl_txt WITH '' IN CHARACTER MODE.
+  CONDENSE: lv_hsl_txt NO-GAPS,
+            lv_tsl_txt NO-GAPS.
+  lv_len = strlen( lv_hsl_txt ).
+  lv_len2 = strlen( lv_tsl_txt ).
+  IF lv_len > 13 OR lv_len2 > 13.
+    p_flag_err = abap_true.
+  ELSE.
+    p_flag_err = abap_false.
+  ENDIF.
+
+ENDFORM.                    " F_CHECK_LONG_PTE
+*&---------------------------------------------------------------------*
+*&      Form  F_CREA_ITEM_10
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*      -->P_P_I_FINAL_OUT  text
+*      -->P_P_I_SHOW_AUX  text
+*      -->P_C_SI  text
+*      -->P_P_I_SHOW_AUX_DOCDATE  text
+*      <--P_W_OUTITEM  text
+*----------------------------------------------------------------------*
+FORM f_crea_item_10  TABLES   p_i_final_out STRUCTURE w_final_out
+                     USING    p_i_show_aux
+                              p_c_si
+                              p_i_show_aux_docdate
+                     CHANGING p_w_outitem  STRUCTURE w_outitem.
+
+  DATA: lv_hslxx LIKE w_show_aux-hslxx,
+        lv_tslxx LIKE w_show_aux-tslxx,
+        lv_index TYPE sy-index,
+        lv_times TYPE i VALUE 1,
+        lv_hslxx_aux LIKE w_show_aux-hslxx,
+        lv_tslxx_aux LIKE w_show_aux-tslxx,
+        lv_flag TYPE c.
+  lv_hslxx = l_hslxx_99.
+  lv_tslxx = l_hslxx2_99.
+  lv_flag = abap_true.
+  WHILE lv_flag = abap_true.
+    lv_times = lv_times * 10.
+    lv_hslxx_aux = l_hslxx_99 / lv_times.
+    lv_tslxx_aux = l_hslxx2_99 / lv_times.
+    PERFORM f_check_long_pte USING lv_hslxx_aux
+                                   lv_hslxx_aux
+                          CHANGING lv_flag.
+
+  ENDWHILE.
+  l_hslxx_99 = l_hslxx_99 / lv_times.
+  l_hslxx2_99 = l_hslxx2_99 / lv_times.
+
+  DO lv_times TIMES.
+    lv_index = sy-index.
+    lv_hslxx = lv_hslxx - l_hslxx_99.
+    lv_tslxx = lv_tslxx - l_hslxx2_99.
+    IF lv_index = lv_times.
+      l_hslxx_99 = l_hslxx_99 + lv_hslxx.
+      l_hslxx2_99 = l_hslxx2_99 + lv_tslxx.
+    ENDIF.
+    PERFORM f_crea_item       USING  p_i_show_aux
+                                         p_c_si
+                                         p_i_show_aux_docdate
+                              CHANGING   p_w_outitem.
+    PERFORM f_agrega_linea    TABLES     p_i_final_out
+                                  USING      p_w_outitem.
+  ENDDO.
+
+ENDFORM.                    " F_CREA_ITEM_10
+*&---------------------------------------------------------------------*
+*&      Form  F_LEER_LEDGER_Z3
+*&---------------------------------------------------------------------*
+* Rutina para extracción de datos de Ledger Z3
+*----------------------------------------------------------------------*
+FORM f_leer_ledger_z3.
+
+  CONSTANTS: lc_z3 TYPE rldnr VALUE 'Z3'.
+
+  IF it_cta_res IS NOT INITIAL.
+    SELECT * INTO TABLE it_zzmap3t
+      FROM zzmap3t
+      FOR ALL ENTRIES IN it_cta_res
+      WHERE zzmap3t~rbukrs IN s_bukrs
+      AND zzmap3t~racct  = it_cta_res-saknr
+      AND zzmap3t~rldnr  EQ lc_z3
+      AND zzmap3t~rrcty  IN s_rrcty "r_rrcty
+      AND zzmap3t~rvers  IN r_rvers
+      AND zzmap3t~ryear  = p_ryear
+      AND zzmap3t~rtcur  IN p_rtcur
+      AND zzmap3t~rzzs01 IN s_rzzs01.
+  ENDIF.
+  IF it_cta_bal IS NOT INITIAL.
+    SELECT *
+        FROM zzmap3t
+        APPENDING TABLE  it_zzmap3t
+         FOR ALL ENTRIES IN it_cta_bal
+       WHERE rbukrs IN s_bukrs
+         AND racct  = it_cta_bal-saknr
+         AND rldnr  EQ lc_z3
+         AND rrcty  IN s_rrcty
+         AND rvers  IN r_rvers
+         AND rtcur  IN p_rtcur
+         AND ryear  = p_ryear.
+    IF sy-subrc EQ 0.
+
+    ENDIF.
+  ENDIF.
+
+
+ENDFORM.                    "F_LEER_LEDGER_Z3
+*&---------------------------------------------------------------------*
+*&      Form  F_LLENA_SHOW_MAP3
+*&---------------------------------------------------------------------*
+*   Clonada de F_LLENA_SHOW_MAP4
+*----------------------------------------------------------------------*
+FORM f_llena_show_map3 TABLES p_i_show STRUCTURE w_show_aux
+                         USING lv_combi.
+  DATA: lv_flag TYPE c.
+  DATA ls_ref TYPE zmfir_saldos_proce.
+
+* Se recorren los datos leidos
+  LOOP AT it_zzmap3t INTO wa_zzmap3t.
+
+    MOVE-CORRESPONDING  wa_zzmap3t TO p_i_show.
+
+    IF p_montr <> abap_true.
+      READ TABLE it_monedas INTO wa_monedas
+        WITH KEY bukrs = wa_zzmap3t-rbukrs.
+      IF sy-subrc EQ 0.
+        p_i_show-rtcur = wa_monedas-waers.
+      ENDIF.
+    ENDIF.
+* Inicio Amalon DEVK982915  7000000540: Traspaso Saldos - ECC
+    "Conversión CECOs
+    IF wa_zzmap3t-rcntr IS NOT INITIAL.
+      READ TABLE it_cecos INTO wa_cecos WITH KEY kostl = wa_zzmap3t-rcntr.
+      IF sy-subrc EQ 0.
+        p_i_show-rcntr = wa_cecos-kostl_s4.
+      ENDIF.
+    ENDIF.
+* Fin Amalon DEVK982915	7000000540: Traspaso Saldos - ECC
+    "Cartera de inversión
+    IF NOT wa_zzmap3t-aufnr IS INITIAL.
+      READ TABLE it_cartera INTO wa_cartera WITH KEY aufnr = wa_zzmap3t-aufnr BINARY SEARCH.
+      IF sy-subrc EQ 0.
+        MOVE wa_cartera-zzc04 TO p_i_show-zzc04.
+      ENDIF.
+    ENDIF.
+
+    "Conversión Sociedad GL
+    IF wa_zzmap3t-vbund IS NOT INITIAL.
+      READ TABLE it_vbund INTO wa_vbund WITH KEY vbund = wa_zzmap3t-vbund.
+      IF sy-subrc EQ 0.
+        p_i_show-vbund = wa_vbund-vbund_s4.
+      ENDIF.
+    ENDIF.
+
+    READ TABLE it_hkont INTO wa_hkont WITH KEY hkont = wa_zzmap3t-racct BINARY SEARCH.
+    IF sy-subrc EQ 0.
+      MOVE wa_hkont-hkont_s4h TO p_i_show-racct.
+    ENDIF.
+
+    LOOP AT gt_zz0001 INTO gs_zz0001 WHERE bukrs = wa_zzmap3t-rbukrs
+                                       AND ( zzc01 = wa_zzmap3t-rzzc01 OR zzc01 = '*')
+                                       AND ( zzc02 = wa_zzmap3t-rzzc02 OR zzc02 = '*').
+      p_i_show-zz0001 = gs_zz0001-zz0001.
+      EXIT.
+    ENDLOOP.
+
+    p_i_show-docdate = l_docdate.
+    IF p_total = c_si OR
+      ( p_comb2 = c_si AND lv_combi = space ).
+      PERFORM f_obtiene_importe_final_map3  USING wa_zzmap3t
+                                                  l_lastmonth
+                                        CHANGING  p_i_show-hslxx
+                                                  p_i_show-tslxx.
+    ENDIF.
+    IF p_delta = c_si OR
+      ( p_combi = c_si AND lv_combi = space ).
+      PERFORM f_obtiene_importe_delta_map3 USING  wa_zzmap3t
+                                                  l_lastmonth
+                                        CHANGING  p_i_show-hslxx
+                                                  p_i_show-tslxx.
+    ENDIF.
+    IF lv_combi = c_si.
+      PERFORM f_obtiene_importe_combi_map3 USING  wa_zzmap3t
+                                                  l_lastmonth
+                                        CHANGING  p_i_show-hslxx
+                                                  p_i_show-tslxx.
+    ENDIF.
+    IF p_i_show-tslxx  >= 0  AND p_i_show-hslxx  >= 0.
+*      p_i_show-shkzg = 'S'.
+      p_i_show-shkzg = 'D'.
+    ELSE.
+      p_i_show-shkzg = 'H'.
+    ENDIF.
+
+** CRG 28032025 Se eliminan las línea con los dos importes a 0. Se elimina el "0" ya que si un importe es 0 no hay q tratarlo
+    IF p_i_show-shkzg = 'H' AND ( ( p_i_show-tslxx  > 0 AND p_i_show-hslxx  < 0 ) OR ( p_i_show-tslxx  < 0 AND p_i_show-hslxx  > 0 ) ).
+      ls_ref = p_i_show.
+      IF p_i_show-hslxx  < 0.
+        CLEAR ls_ref-tslxx.
+        APPEND ls_ref TO p_i_show.
+        ls_ref = p_i_show.
+        CLEAR ls_ref-hslxx.
+        ls_ref-shkzg = 'D'.
+        APPEND ls_ref TO p_i_show.
+      ELSE. "p_i_show-tslxx  < 0
+        CLEAR ls_ref-hslxx.
+        APPEND ls_ref TO p_i_show.
+        ls_ref = p_i_show.
+        CLEAR ls_ref-tslxx.
+        ls_ref-shkzg = 'D'.
+        APPEND ls_ref TO p_i_show.
+      ENDIF.
+    ELSE.
+      IF p_i_show-tslxx <> 0 OR p_i_show-hslxx <> 0.
+        APPEND p_i_show.
+      ENDIF.
+    ENDIF.
+
+    CLEAR p_i_show.
+  ENDLOOP.
+
+ENDFORM.                    " F_LLENA_SHOW_MAP3
+*&---------------------------------------------------------------------*
+*&      Form  F_OBTIENE_IMPORTE_FINAL_MAP3
+*&---------------------------------------------------------------------*
+*      Clonada de la F_OBTIENE_IMPORTE_FINAL_MAP4 cambiando el tipo
+*----------------------------------------------------------------------*
+FORM f_obtiene_importe_final_map3 USING p_i_zzmapxt STRUCTURE wa_zzmap3t
+                                        p_lastmonth
+                               CHANGING p_hslxx
+                                        p_tslxx.
+  FIELD-SYMBOLS: <fs_campo> TYPE any.
+  DATA: l_nombre_campo(40),
+        l_month(2) TYPE n.
+  CLEAR p_hslxx.
+
+  IF p_lastmonth  > 0.
+    DO 16 TIMES.
+      l_month = l_month + 1.
+      CONCATENATE 'HSL' l_month INTO l_nombre_campo.
+      ASSIGN COMPONENT l_nombre_campo OF STRUCTURE p_i_zzmapxt TO <fs_campo>.
+      IF sy-subrc EQ 0.
+        p_hslxx = p_hslxx + <fs_campo>.
+      ENDIF.
+    ENDDO.
+  ENDIF.
+  IF p_montr = abap_true.
+    CLEAR l_month.
+    IF p_lastmonth  > 0.
+      DO 16 TIMES.
+        l_month = l_month + 1.
+        CONCATENATE 'TSL' l_month INTO l_nombre_campo.
+        ASSIGN COMPONENT l_nombre_campo OF STRUCTURE p_i_zzmapxt TO <fs_campo>.
+        IF sy-subrc EQ 0.
+          p_tslxx = p_tslxx + <fs_campo>.
+        ELSE.
+          p_tslxx = p_hslxx.
+        ENDIF.
+      ENDDO.
+    ENDIF.
+  ELSE.
+    p_tslxx = p_hslxx.
+  ENDIF.
+** CRG INI 31102025 Modificación moneda KWD
+  IF p_i_zzmapxt-rtcur = 'KWD'.
+    p_tslxx = p_tslxx / 10.
+  ENDIF.
+** CRG FIN 31102025
+ENDFORM.                    " F_OBTIENE_IMPORTE_FINAL_MAP3
+*&---------------------------------------------------------------------*
+*&      Form  F_OBTIENE_IMPORTE_DELTA_MAP3
+*&---------------------------------------------------------------------*
+* Clonada de F_OBTIENE_IMPORTE_DELTA_MAP4 cambiando el tipo
+*----------------------------------------------------------------------*
+FORM f_obtiene_importe_delta_map3  USING p_i_zzmapxt STRUCTURE wa_zzmap3t
+                                         p_lastmonth
+                                CHANGING p_hslxx
+                                         p_tslxx.
+
+  FIELD-SYMBOLS: <fs_campo> TYPE any.
+  DATA: l_nombre_campo(40),
+        l_month(2)     TYPE n.
+  CLEAR p_hslxx.
+
+  IF p_saldo = abap_false.
+    CLEAR l_month.
+    ADD lv_rpmax TO l_month.
+    CONCATENATE 'HSL' l_month INTO l_nombre_campo.
+    ASSIGN COMPONENT l_nombre_campo OF STRUCTURE p_i_zzmapxt TO <fs_campo>.
+    IF sy-subrc EQ 0.
+      p_hslxx = p_hslxx + <fs_campo>.
+    ENDIF.
+
+  ELSE.
+    l_nombre_campo = c_hslvt.
+    ASSIGN COMPONENT l_nombre_campo OF STRUCTURE p_i_zzmapxt TO <fs_campo>.
+    IF sy-subrc EQ 0.
+      p_hslxx = p_hslxx + <fs_campo>.
+    ENDIF.
+  ENDIF.
+  IF p_montr = abap_true.
+    IF p_saldo = abap_false.
+      CLEAR l_month.
+      ADD lv_rpmax TO l_month.
+      CONCATENATE 'TSL' l_month INTO l_nombre_campo.
+      ASSIGN COMPONENT l_nombre_campo OF STRUCTURE p_i_zzmapxt TO <fs_campo>.
+      IF sy-subrc EQ 0.
+        p_tslxx = p_tslxx + <fs_campo>.
+      ELSE.
+        p_tslxx = p_hslxx.
+      ENDIF.
+
+    ELSE.
+      l_nombre_campo = c_tslvt.
+      ASSIGN COMPONENT l_nombre_campo OF STRUCTURE p_i_zzmapxt TO <fs_campo>.
+      IF sy-subrc EQ 0.
+        p_tslxx = p_tslxx + <fs_campo>.
+      ELSE.
+        p_tslxx = p_hslxx.
+      ENDIF.
+    ENDIF.
+  ELSE.
+    p_tslxx = p_hslxx.
+  ENDIF.
+** CRG INI 31102025 Modificación moneda KWD
+  IF p_i_zzmapxt-rtcur = 'KWD'.
+    p_tslxx = p_tslxx / 10.
+  ENDIF.
+** CRG FIN 31102025
+ENDFORM.                    " F_OBTIENE_IMPORTE_DELTA_MAP3
+*&---------------------------------------------------------------------*
+*&      Form  F_OBTIENE_IMPORTE_COMBI_MAP3
+*&---------------------------------------------------------------------*
+* Clonada de F_OBTIENE_IMPORTE_COMBI_MAP4 cambiando el tipo
+*----------------------------------------------------------------------*
+FORM f_obtiene_importe_combi_map3  USING p_i_zzmapxt STRUCTURE wa_zzmap3t
+                                         p_lastmonth
+                                CHANGING p_hslxx
+                                         p_tslxx.
+
+  FIELD-SYMBOLS: <fs_campo> TYPE any.
+  DATA: l_nombre_campo(40),
+        l_month(2)     TYPE n.
+  CLEAR p_hslxx.
+
+
+  l_nombre_campo = c_hslvt.
+  ASSIGN COMPONENT l_nombre_campo OF STRUCTURE p_i_zzmapxt TO <fs_campo>.
+  IF sy-subrc EQ 0.
+    p_hslxx = p_hslxx + <fs_campo>.
+  ENDIF.
+
+  IF p_montr = abap_true.
+    l_nombre_campo = c_tslvt.
+    ASSIGN COMPONENT l_nombre_campo OF STRUCTURE p_i_zzmapxt TO <fs_campo>.
+    IF sy-subrc EQ 0.
+      p_tslxx = p_tslxx + <fs_campo>.
+    ELSE.
+      p_tslxx = p_hslxx.
+    ENDIF.
+  ELSE.
+    p_tslxx = p_hslxx.
+  ENDIF.
+** CRG INI 31102025 Modificación moneda KWD
+  IF p_i_zzmapxt-rtcur = 'KWD'.
+    p_tslxx = p_tslxx / 10.
+  ENDIF.
+** CRG FIN 31102025
+ENDFORM.                    " F_OBTIENE_IMPORTE_COMBI_MAP3
+*&---------------------------------------------------------------------*
+*&  Include           ZMFIR_PABIERTAS_PROV_ACR_ACTI
+*&---------------------------------------------------------------------*
+AT SELECTION-SCREEN ON VALUE-REQUEST FOR p_filna.
+  PERFORM f_obtiene_nombre_archiv_serv  CHANGING p_filna.
+
+AT SELECTION-SCREEN OUTPUT.
+  PERFORM f_ocultarcampos.
