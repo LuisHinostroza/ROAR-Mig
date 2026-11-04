@@ -1,0 +1,140 @@
+Implementacion estandar******************************************************************
+METHOD if_ex_me_process_po_cust~process_item.
+
+    DATA: po_item     TYPE mepoitem,
+          flog_active TYPE boolean.
+    DATA(lo_validation) = cl_flog_ret_pcpr_validation=>create( ).
+
+    TEST-SEAM check_feature.
+      cl_flog_core_generic=>is_flog_businessfeature_active(
+        IMPORTING
+          ev_active = flog_active                 " Boolean Variable (X = True, - = False, Space = Unknown)
+      ).
+    END-TEST-SEAM.
+
+    CHECK flog_active IS NOT INITIAL.               "#EC CHECK_POSITION
+
+    DATA(lo_utility)  = cl_flog_ret_factory=>get_ret_utility( ).
+
+    TEST-SEAM get_data.
+      po_item = im_item->get_data( ).
+    END-TEST-SEAM.
+
+    IF po_item-lgort IS NOT INITIAL AND po_item-bstae IS INITIAL.
+
+      TEST-SEAM ewm_check.
+        DATA(ewm_active) = lo_utility->is_ewm_active(
+          iv_plant = po_item-werks
+          iv_stloc = po_item-lgort ).
+      END-TEST-SEAM.
+
+      IF ewm_active = abap_true.
+
+        SELECT  SINGLE reswk
+          FROM  flog_plant
+          INTO  @DATA(supplying_plant)
+          WHERE werks = @po_item-werks.
+
+        IF sy-subrc = 0.
+
+          DATA(sto_doc_type) = lo_utility->get_sto_doc_type(
+            i_supplying_plant = supplying_plant               " Supplying (Issuing) Plant in Stock Transport Order
+            i_plant           = po_item-werks                 " Plant
+          ).
+
+          IF sto_doc_type IS NOT INITIAL.
+
+            IF ( po_item-knttp = 'F' OR po_item-knttp = 'N' ) AND po_item-pstyp = '7'.
+              CLEAR po_item-bstae.
+            ELSE.
+              po_item-bstae = lo_utility->get_confirmation_ctrl_key(
+              i_sto_doc_type     = sto_doc_type               " Order Type (Purchasing)
+              i_plant            = po_item-werks              " Plant
+              i_storage_location = po_item-lgort              " Storage Location
+            ).
+            ENDIF.
+
+            TEST-SEAM set_data.
+              im_item->set_data( im_data = po_item ).
+            END-TEST-SEAM.
+
+          ENDIF.
+        ENDIF.
+      ENDIF.
+    ENDIF.
+
+  ENDMETHOD.
+
+Implementacion Z*********************************************************************
+METHOD IF_EX_ME_PROCESS_PO_CUST~PROCESS_ITEM .
+
+  DATA: ls_mepoitem TYPE mepoitem,
+        ls_customer TYPE mepo_badi_exampl,
+        ls_tbsg     TYPE tbsg,
+        lv_dummy    TYPE c LENGTH 128.
+
+  INCLUDE mm_messages_mac. "useful macros for message handling
+
+*---------------------------------------------------------------------*
+* here we check customers data
+*---------------------------------------------------------------------*
+
+  ls_mepoitem = im_item->get_data( ).
+
+  IF ls_mepoitem-loekz EQ 'D'.
+
+* a physical deletion of the item was carried out. therrefor we have to
+* delete customer data on the level of the item
+    ls_customer-ebeln = ls_mepoitem-ebeln.
+    ls_customer-ebelp = ls_mepoitem-ebelp.
+    CALL FUNCTION 'MEPOBADIEX_SET_DATA'
+      EXPORTING
+        im_data                    = ls_customer
+        im_physical_delete_request = 'X'.
+
+  ELSE.
+
+* update/insert operation
+    CALL FUNCTION 'MEPOBADIEX_GET_DATA'
+      EXPORTING
+        im_ebeln = ls_mepoitem-ebeln
+        im_ebelp = ls_mepoitem-ebelp
+      IMPORTING
+        ex_data  = ls_customer.
+* check customers data
+
+* check field badi_bsgru. This should be carried out only for new items. Once the PO is posted the
+* field should no longer be changeable. This is done in Method FIELDSELECTION_ITEM.
+    IF im_item->is_persistent( ) EQ mmpur_no.
+      IF ls_customer-badi_bsgru IS INITIAL.
+* Place the cursor onto field badi_bsgru. The metafield was defined in BAdI ME_GUI_PO_CUST,
+* Method MAP_DYNPRO_FIELDS.
+        mmpur_metafield mmmfd_cust_01.
+        MESSAGE w083(me) WITH text-002 '' INTO lv_dummy.
+        mmpur_message_forced sy-msgty sy-msgid sy-msgno
+                             sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4.
+      ELSE.
+* check whether the field is valid
+        SELECT SINGLE * FROM tbsg INTO ls_tbsg WHERE bsgru EQ ls_customer-badi_bsgru.
+        IF NOT sy-subrc IS INITIAL.
+          mmpur_metafield mmmfd_cust_01.
+          MESSAGE e083(me) WITH text-004 space INTO lv_dummy.
+          mmpur_message_forced sy-msgty sy-msgid sy-msgno
+                               sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4.
+* invalidate the object
+          CALL METHOD im_item->invalidate( ).
+        ENDIF.
+      ENDIF.
+    ENDIF.
+
+* check field badi_afnam
+    IF ls_customer-badi_afnam IS INITIAL.
+      mmpur_metafield mmmfd_cust_02.
+      MESSAGE w083(me) WITH text-003 space INTO lv_dummy.
+      mmpur_message_forced sy-msgty sy-msgid sy-msgno
+                           sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4.
+    ENDIF.
+
+  ENDIF.
+
+ENDMETHOD.                    "IF_EX_ME_PROCESS_PO_CUST~PROCESS_ITEM
