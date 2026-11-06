@@ -1,3 +1,586 @@
+Va con B. El CBU viaja completo al correo y un flag aparte decide si cuenta como cambio.
+
+ZMMMMF_SAVE_DATA queda igual que en la versión completa que te pasé (IV_CBU → gv_cbu). ZMMMMF_START_SEND_EMAIL y ZMMMMF_REFRESH van completas abajo. Del método y de ZMMMMF_SEND_EMAIL te paso los bloques con su ancla exacta: son objetos de cientos de líneas escritos por otros, y reescribirlos a mano completos tiene más riesgo de colar un error de transcripción que de ayudar.
+
+1. TOP include del grupo de funciones
+abap
+*** ROAR Rollout S/4HANA Argentina 06/11/2026 LUISHIN Ini.
+DATA gv_cbu TYPE string.                                " ROAR: Notificación de bancos Argentina
+*** ROAR Rollout S/4HANA Argentina 06/11/2026 LUISHIN Fin.
+2. Método IF_MDG_SE_BP_BULK_REPLRQ_IN~INBOUND_PROCESSING
+
+a) Constante. En lc_custom_field, después del bloque us:
+
+abap
+                 BEGIN OF us,       " 1000020009, ROUS - Routing number notif finanzas
+                   routing_number TYPE arbcig_gen_cust_field_name VALUE 'Routing.Number.US',
+                 END OF us,
+*** ROAR Rollout S/4HANA Argentina 06/11/2026 LUISHIN Ini.
+                 BEGIN OF ar,       " ROAR: Notificación de bancos Argentina
+                   cbu TYPE arbcig_gen_cust_field_name VALUE 'CBU',
+                 END OF ar,
+*** ROAR Rollout S/4HANA Argentina 06/11/2026 LUISHIN Fin.
+               END OF lc_custom_field.
+
+b) Declaraciones. Después del bloque de 1000039877:
+
+abap
+*** ROAR Rollout S/4HANA Argentina 06/11/2026 LUISHIN Ini.
+    DATA lv_cbu         TYPE string.
+    DATA lv_cbu_changed TYPE abap_bool.
+    DATA lv_cbu_bankl   TYPE string.
+    DATA lv_cbu_bankn   TYPE string.
+*** ROAR Rollout S/4HANA Argentina 06/11/2026 LUISHIN Fin.
+
+c) Lectura del custom field. Después de DATA(lv_routing_number) = ... y su comentario de cierre:
+
+abap
+*** ROAR Rollout S/4HANA Argentina 06/11/2026 LUISHIN Ini.
+    " CBU Argentina: el valor viaja siempre completo al correo;
+    " lv_cbu_changed indica si debe disparar la notificación
+    lv_cbu = VALUE #( <lt_custom_fields>[ name = lc_custom_field-ar-cbu ]-content OPTIONAL ).
+    lv_cbu = condense( val = lv_cbu from = ` ` to = `` ).
+    lv_cbu_changed = xsdbool( lv_cbu IS NOT INITIAL ).
+*** ROAR Rollout S/4HANA Argentina 06/11/2026 LUISHIN Fin.
+
+d) Comparación contra BD (rama BP existente). Inmediatamente antes de:
+
+abap
+      IF lt_bukrs IS NOT INITIAL.
+        lv_a = abap_true.
+      ENDIF.
+
+insertar:
+
+abap
+*** ROAR Rollout S/4HANA Argentina 06/11/2026 LUISHIN Ini.
+      " CBU Argentina: si ya existe en BUT0BK no se considera cambio
+      IF lv_cbu_changed = abap_true.
+        SELECT bankl, bankn
+          FROM but0bk
+          WHERE partner = @lv_lifnr
+          INTO TABLE @DATA(lt_but0bk_cbu).
+        IF sy-subrc = 0.
+          LOOP AT lt_but0bk_cbu ASSIGNING FIELD-SYMBOL(<ls_but0bk_cbu>).
+            lv_cbu_bankl = condense( val = CONV string( <ls_but0bk_cbu>-bankl ) from = ` ` to = `` ).
+            lv_cbu_bankn = condense( val = CONV string( <ls_but0bk_cbu>-bankn ) from = ` ` to = `` ).
+            IF    lv_cbu = lv_cbu_bankn
+               OR lv_cbu = lv_cbu_bankl
+               OR lv_cbu = |{ lv_cbu_bankl }{ lv_cbu_bankn }|.
+              lv_cbu_changed = abap_false.
+              EXIT.
+            ENDIF.
+          ENDLOOP.
+        ENDIF.
+      ENDIF.
+*** ROAR Rollout S/4HANA Argentina 06/11/2026 LUISHIN Fin.
+
+e) Flag lv_b (modificación). Reemplazar:
+
+abap
+      IF    lv_iban         IS NOT INITIAL
+         OR lv_cuenta_clabe IS NOT INITIAL.     " ROMX: Notificación de bancos México
+        lv_b = abap_true.
+      ENDIF.
+
+      lv_activ = lc_02.
+
+por:
+
+abap
+      IF    lv_iban         IS NOT INITIAL
+         OR lv_cuenta_clabe IS NOT INITIAL      " ROMX: Notificación de bancos México
+*** ROAR Rollout S/4HANA Argentina 06/11/2026 LUISHIN Ini.
+         OR lv_cbu_changed  = abap_true.        " ROAR: Notificación de bancos Argentina
+*** ROAR Rollout S/4HANA Argentina 06/11/2026 LUISHIN Fin.
+        lv_b = abap_true.
+      ENDIF.
+
+      lv_activ = lc_02.
+
+f) Flag lv_d (alta). Reemplazar:
+
+abap
+      IF    lv_iban         IS NOT INITIAL
+         OR lv_cuenta_clabe IS NOT INITIAL.     " ROMX: Notificación de bancos México
+        lv_d = abap_true.
+      ENDIF.
+
+por:
+
+abap
+      IF    lv_iban         IS NOT INITIAL
+         OR lv_cuenta_clabe IS NOT INITIAL      " ROMX: Notificación de bancos México
+*** ROAR Rollout S/4HANA Argentina 06/11/2026 LUISHIN Ini.
+         OR lv_cbu_changed  = abap_true.        " ROAR: Notificación de bancos Argentina
+*** ROAR Rollout S/4HANA Argentina 06/11/2026 LUISHIN Fin.
+        lv_d = abap_true.
+      ENDIF.
+
+g) Llamada a ZMMMMF_SAVE_DATA. Después de iv_fact_mail:
+
+abap
+          iv_fact_mail               = lv_fact_mail                   " 1000016827 Modificación 11/08/2025 MLCRIS3
+*** ROAR Rollout S/4HANA Argentina 06/11/2026 LUISHIN Ini.
+          iv_cbu                     = lv_cbu                         " ROAR: Notificación de bancos Argentina
+*** ROAR Rollout S/4HANA Argentina 06/11/2026 LUISHIN Fin.
+        TABLES
+3. ZMMMMF_SEND_EMAIL
+
+a) Firma (SE37, Import): IV_CBU, TYPE STRING, pasar por valor, opcional. Tiene que ser por valor porque la FM se llama con STARTING NEW TASK.
+
+b) Constante de país. Después de lc_usa:
+
+abap
+  CONSTANTS lc_usa                TYPE land1       VALUE 'US'. " 1000020009, ROUS - Routing number notif finanzas
+*** ROAR Rollout S/4HANA Argentina 06/11/2026 LUISHIN Ini.
+  CONSTANTS lc_argentina          TYPE land1       VALUE 'AR'. " ROAR: Notificación de bancos Argentina
+*** ROAR Rollout S/4HANA Argentina 06/11/2026 LUISHIN Fin.
+
+c) Tag. En lc_tag, después de fact_mail:
+
+abap
+               fact_mail               TYPE string VALUE '&EMAIL&',                     " 1000016827, Modificación 11/08/2025 MLCRIS3
+*** ROAR Rollout S/4HANA Argentina 06/11/2026 LUISHIN Ini.
+               cbu                     TYPE string VALUE '&CBU&',                       " ROAR: Notificación de bancos Argentina
+*** ROAR Rollout S/4HANA Argentina 06/11/2026 LUISHIN Fin.
+             END OF lc_tag.
+
+d) Textos. En lc_noti, después de upd_ban_us:
+
+abap
+               upd_ban_us  TYPE tdobname VALUE 'ZMMM_EMAIL_B_LIFNR_U_BANCO_US',     " 1000020009, ROUS - Routing number notif finanzas
+*** ROAR Rollout S/4HANA Argentina 06/11/2026 LUISHIN Ini.
+               new_ban_ar  TYPE tdobname VALUE 'ZMMM_EMAIL_D_LIFNR_I_BANCO_AR',     " ROAR: Notificación de bancos Argentina
+               upd_ban_ar  TYPE tdobname VALUE 'ZMMM_EMAIL_B_LIFNR_U_BANCO_AR',     " ROAR: Notificación de bancos Argentina
+*** ROAR Rollout S/4HANA Argentina 06/11/2026 LUISHIN Fin.
+             END OF lc_noti.
+
+e) Selección del texto. En el CASE iv_land1, después de WHEN lc_usa:
+
+abap
+    WHEN lc_usa.                                                                " 1000020009, ROUS - Routing number notif finanzas
+      lv_text_name = SWITCH #( iv_type
+                               WHEN lc_type-new_ban THEN lc_noti-new_ban_us
+                               WHEN lc_type-upd_ban THEN lc_noti-upd_ban_us
+                               ELSE                      lv_text_name ).
+
+*** ROAR Rollout S/4HANA Argentina 06/11/2026 LUISHIN Ini.
+    WHEN lc_argentina.                                                          " ROAR: Notificación de bancos Argentina
+      lv_text_name = SWITCH #( iv_type
+                               WHEN lc_type-new_ban THEN lc_noti-new_ban_ar
+                               WHEN lc_type-upd_ban THEN lc_noti-upd_ban_ar
+                               ELSE                      lv_text_name ).
+*** ROAR Rollout S/4HANA Argentina 06/11/2026 LUISHIN Fin.
+
+  ENDCASE.
+
+f) Sustitución. Después del REPLACE de fact_mail:
+
+abap
+*** 1000016827 Modificación 11/08/2025 MLCRIS3 Ini.
+        REPLACE lc_tag-fact_mail INTO ls_message-line WITH iv_fact_mail.
+*** 1000016827 Modificación 11/08/2025 MLCRIS3 Fin.
+
+*** ROAR Rollout S/4HANA Argentina 06/11/2026 LUISHIN Ini.
+        REPLACE lc_tag-cbu INTO ls_message-line WITH iv_cbu.            " ROAR: Notificación de bancos Argentina
+*** ROAR Rollout S/4HANA Argentina 06/11/2026 LUISHIN Fin.
+4. ZMMMMF_START_SEND_EMAIL (completa)
+abap
+FUNCTION zmmmmf_start_send_email.
+*"----------------------------------------------------------------------
+*"*"Local Interface:
+*"  IMPORTING
+*"     REFERENCE(IV_LIFNR) TYPE  LIFNR OPTIONAL
+*"     REFERENCE(IV_PARTNER) TYPE  BAPI_JBD_DTE_PARTNER OPTIONAL
+*"----------------------------------------------------------------------
+***********************************************************************************
+* Created by:
+* Created on: 02-06-2020
+* Purpose   : Sending Mail for the Respective Person's SAP Inbox and External Email id.
+***********************************************************************************
+* *&Get the Email id and User id Whom you want to Send  ******
+  DATA: lt_bukrs      TYPE STANDARD TABLE OF zdst_bukrs,
+        ls_bukrs      LIKE LINE OF lt_bukrs,
+        lt_return     TYPE STANDARD TABLE OF bapireturn,
+        lt_emails_aux TYPE STANDARD TABLE OF zdst_emails,
+        lv_type       TYPE char1.
+
+
+  IF gt_emails[] IS INITIAL AND gt_emails_iban[] IS INITIAL
+*** 1000097556 Modificación 01/02/2023 MLCRIS3 Ini.
+    AND gt_emails_admon[] IS INITIAL.
+*** 1000097556 Modificación 01/02/2023 MLCRIS3 Fin.
+    RETURN.
+  ENDIF.
+
+
+  CLEAR gt_sort_email.
+
+  LOOP AT gt_emails INTO DATA(ls_emails).          "#EC CI_LOOP_INTO_WA
+    gs_sort_email = CORRESPONDING #( ls_emails ).
+    COLLECT gs_sort_email INTO gt_sort_email.
+  ENDLOOP.
+
+  SORT gt_sort_email BY smtp_addr ASCENDING.
+
+  IF gv_a = abap_true OR gv_c = abap_true.
+    IF gv_a = abap_true.
+      lv_type = 'A'.
+    ELSEIF gv_c = abap_true.
+      lv_type = 'C'.
+    ENDIF.
+
+    LOOP AT gt_sort_email INTO gs_sort_email.      "#EC CI_LOOP_INTO_WA
+      ls_emails = CORRESPONDING #( gs_sort_email ).
+
+      ls_bukrs = ls_emails-bukrs.
+      CLEAR ls_emails-bukrs.
+      COLLECT ls_emails INTO lt_emails_aux.
+      COLLECT ls_bukrs INTO lt_bukrs.
+      AT END OF smtp_addr.
+
+        CALL FUNCTION 'ZMMMMF_SEND_EMAIL' STARTING NEW TASK 'EMAIL_SLP'
+          EXPORTING
+            iv_lifnr                   = iv_lifnr
+            iv_partner                 = iv_partner
+            iv_iban                    = gv_iban
+            iv_regimen_impositivo      = gv_regimen_impositivo          " ROCO
+            iv_tipo_cuenta_co          = gv_tipo_cuenta_co              " 1000012745, ROCO Distinción Tipo de Cta Bancaria Prov
+            iv_name                    = gv_name
+            iv_type                    = lv_type
+            iv_land1                   = gv_land1                       " ROCO
+            iv_actividad               = gv_actividad                   " 1000014294 Modificación 13/05/2024 MLCRIS3
+            iv_pais_banco              = gv_pais_banco                  " ROMX: Notificación de bancos México
+            iv_cuenta_clabe            = gv_cuenta_clabe                " ROMX: Notificación de bancos México
+            iv_numbero_aba             = gv_numbero_aba                 " ROMX: Notificación de bancos México
+            iv_numero_convenio_cie     = gv_numero_convenio_cie         " ROMX: Notificación de bancos México
+            iv_referencia_convenio_cie = gv_referencia_convenio_cie     " ROMX: Notificación de bancos México
+            iv_routing_number          = gv_routing_number              " 1000020009, ROUS - Routing number notif finanzas
+            iv_fact_mail               = gv_fact_mail                   " 1000016827 Modificación 11/08/2025 MLCRIS3 Ini
+          TABLES
+            pt_emails                  = lt_emails_aux
+            pt_bukrs                   = lt_bukrs
+            pt_return                  = lt_return.
+
+        CLEAR: lt_emails_aux, lt_bukrs, lt_return.
+      ENDAT.
+    ENDLOOP.
+  ENDIF.
+  CLEAR gt_sort_email.
+  LOOP AT gt_emails_iban INTO ls_emails.           "#EC CI_LOOP_INTO_WA
+    gs_sort_email = CORRESPONDING #( ls_emails ).
+    COLLECT gs_sort_email INTO gt_sort_email.
+  ENDLOOP.
+
+  SORT gt_sort_email BY smtp_addr ASCENDING.
+  IF gv_b = abap_true OR gv_d = abap_true.
+    IF gv_b = abap_true.
+      lv_type = 'B'.
+
+    ELSEIF gv_d = abap_true.
+      lv_type = 'D'.
+    ENDIF.
+
+    LOOP AT gt_sort_email INTO gs_sort_email.      "#EC CI_LOOP_INTO_WA
+      ls_emails = CORRESPONDING #( gs_sort_email ).
+      ls_bukrs = ls_emails-bukrs.
+      CLEAR ls_emails-bukrs.
+      COLLECT ls_emails INTO lt_emails_aux.
+      COLLECT ls_bukrs INTO lt_bukrs.
+      AT END OF smtp_addr.
+
+        CALL FUNCTION 'ZMMMMF_SEND_EMAIL' STARTING NEW TASK 'EMAIL_SLP'
+          EXPORTING
+            iv_lifnr                   = iv_lifnr
+            iv_partner                 = iv_partner
+            iv_iban                    = gv_iban
+            iv_regimen_impositivo      = gv_regimen_impositivo          " ROCO
+            iv_tipo_cuenta_co          = gv_tipo_cuenta_co              " 1000012745, ROCO Distinción Tipo de Cta Bancaria Prov
+            iv_name                    = gv_name
+            iv_type                    = lv_type
+            iv_bkref                   = gv_bkref                       " 1000001832 Modificación 16/06/2023 MLCRIS3
+            iv_banka                   = gv_banka                       " 1000001832 Modificación 16/06/2023 MLCRIS3
+            iv_waers                   = gv_waers                       " 1000001832 Modificación 16/06/2023 MLCRIS3
+            iv_land1                   = gv_land1                       " 1000001832 Modificación 16/06/2023 MLCRIS3
+            is_attachment              = gs_attachment                  " 1000015798 Modificación 30/07/2024 MLCRIS3
+            iv_pais_banco              = gv_pais_banco                  " ROMX: Notificación de bancos México
+            iv_cuenta_clabe            = gv_cuenta_clabe                " ROMX: Notificación de bancos México
+            iv_numbero_aba             = gv_numbero_aba                 " ROMX: Notificación de bancos México
+            iv_numero_convenio_cie     = gv_numero_convenio_cie         " ROMX: Notificación de bancos México
+            iv_referencia_convenio_cie = gv_referencia_convenio_cie     " ROMX: Notificación de bancos México
+            iv_routing_number          = gv_routing_number              " 1000020009, ROUS - Routing number notif finanzas
+*** ROAR Rollout S/4HANA Argentina 06/11/2026 LUISHIN Ini.
+            iv_cbu                     = gv_cbu                         " ROAR: Notificación de bancos Argentina
+*** ROAR Rollout S/4HANA Argentina 06/11/2026 LUISHIN Fin.
+          TABLES
+            pt_emails                  = lt_emails_aux
+            pt_bukrs                   = lt_bukrs
+            pt_return                  = lt_return.
+
+        CLEAR lt_emails_aux.
+        CLEAR lt_bukrs.
+        CLEAR lt_return.
+      ENDAT.
+    ENDLOOP.
+  ENDIF.
+
+*--------------------------------------------------------------------*    "ADD 1000097556 - MU ARIBA_SLP notificación cambios admon - HRamirez oct2022
+  CHECK gt_emails_admon[] IS NOT INITIAL.
+
+  gt_sort_email = VALUE #( FOR ls_email_admon IN gt_emails_admon
+                           ( smtp_addr = ls_email_admon-smtp_addr
+                             spras     = ls_email_admon-spras
+                             bukrs     = ls_email_admon-bukrs ) ).
+
+  SORT gt_sort_email BY smtp_addr ASCENDING.
+  DELETE ADJACENT DUPLICATES FROM gt_sort_email COMPARING smtp_addr.
+
+  IF ( gv_e EQ abap_true ) OR ( gv_f EQ abap_true ).
+    lv_type = 'E'.
+    IF gv_f EQ abap_true.
+      lv_type = 'F'.
+    ENDIF.
+
+    LOOP AT gt_sort_email INTO gs_sort_email.      "#EC CI_LOOP_INTO_WA
+      ls_emails = CORRESPONDING #( gs_sort_email ).
+      ls_bukrs = ls_emails-bukrs.
+      CLEAR ls_emails-bukrs.
+      COLLECT ls_emails INTO lt_emails_aux.
+      COLLECT ls_bukrs INTO lt_bukrs.
+      AT END OF smtp_addr.
+
+        CALL FUNCTION 'ZMMMMF_SEND_EMAIL' STARTING NEW TASK 'EMAIL_SLP'
+          EXPORTING
+            iv_lifnr              = iv_lifnr
+            iv_partner            = iv_partner
+            iv_iban               = gv_iban
+            iv_regimen_impositivo = gv_regimen_impositivo       " ROCO
+            iv_tipo_cuenta_co     = gv_tipo_cuenta_co           " 1000012745, ROCO Distinción Tipo de Cta Bancaria Prov
+            iv_name               = gv_name
+            iv_type               = lv_type
+            iv_name_org           = gv_name_org
+            iv_name_fis           = gv_name_fis
+            iv_land1              = gv_land1                    " ROCO
+          TABLES
+            pt_emails             = lt_emails_aux
+            pt_bukrs              = lt_bukrs
+            pt_return             = lt_return.
+
+        CLEAR: lt_emails_aux, lt_bukrs, lt_return.
+      ENDAT.
+    ENDLOOP.
+  ENDIF.
+*--------------------------------------------------------------------*
+
+*** 1000107180 Modificación 01/03/2023 MLCRIS3 Ini.
+  CALL FUNCTION 'ZMMMMF_REFRESH'.
+*** 1000107180 Modificación 01/03/2023 MLCRIS3 Fin.
+
+ENDFUNCTION.                                              "#EC CI_CYCLO
+5. ZMMMMF_REFRESH (completa)
+abap
+FUNCTION zmmmmf_refresh.
+*"----------------------------------------------------------------------
+*"*"Local Interface:
+*"----------------------------------------------------------------------
+  CLEAR gv_name.
+  CLEAR gv_a.
+  CLEAR gv_b.
+  CLEAR gv_c.
+  CLEAR gv_d.
+  CLEAR gv_e.
+  CLEAR gv_f.
+  CLEAR gv_name_org.
+  CLEAR gv_name_fis.
+  CLEAR gv_iban.
+  CLEAR gv_regimen_impositivo.      " ROCO
+  CLEAR gv_tipo_cuenta_co.          " 1000012745, ROCO Distinción Tipo de Cta Bancaria Prov
+
+  "<!-- ROMX: Notificación de bancos México
+  CLEAR gv_pais_banco.
+  CLEAR gv_cuenta_clabe.
+  CLEAR gv_numbero_aba.
+  CLEAR gv_numero_convenio_cie.
+  CLEAR gv_referencia_convenio_cie.
+  "--> ROMX: Notificación de bancos México
+
+  CLEAR gv_routing_number.          " 1000020009, ROUS - Routing number notif finanzas
+
+*** ROAR Rollout S/4HANA Argentina 06/11/2026 LUISHIN Ini.
+  CLEAR gv_cbu.                     " ROAR: Notificación de bancos Argentina
+*** ROAR Rollout S/4HANA Argentina 06/11/2026 LUISHIN Fin.
+
+  REFRESH gt_emails_admon.
+  REFRESH gt_emails.
+  REFRESH gt_emails_iban.
+
+ENDFUNCTION.
+Activación, transporte y prueba
+Orden de activación: TOP include → firmas de ZMMMMF_SAVE_DATA y ZMMMMF_SEND_EMAIL → el resto de las FMs → el método. Mejor activar todo junto desde la lista de inactivos.
+Transporte: en la misma orden van el TOP, las 4 FMs y la clase. Los textos ZMMM_EMAIL_B_LIFNR_U_BANCO_AR y ZMMM_EMAIL_D_LIFNR_I_BANCO_AR, en ES y EN, se meten con RSTXTRAN.
+Prueba en calidad con el BP 2001115893:
+Revisa primero en BUT0BK cómo quedó grabado el CBU (BANKL, BANKN o partido).
+Reprocesa el mensaje desde SRT_MONI en tres escenarios:
+Mismo CBU y misma cuenta: no sale correo.
+CBU distinto: sale correo con la cuenta y el CBU.
+Solo cambia la cuenta: sale correo y el CBU aparece completo.
+
+gasto muchos tokens si te pido que me generes todo? pero solo modificando nuestros puntos?
+
+Sí, bastantes. El método tiene unas 1,500 líneas y ZMMMMF_SEND_EMAIL unas 400, así que regenerarlos completos son decenas de miles de tokens de salida. Además, al reescribirlos a mano corro el riesgo de cambiar sin querer algo que no era de nuestro alcance.
+
+Hay una forma mejor: súbeme los dos fuentes como archivo (.txt o .abap). Copias el código desde SE24/SE37 a un bloc de notas y lo adjuntas. Yo aplico solo nuestros cambios con un script en mi entorno, sobre el texto original exacto, y te devuelvo los archivos completos listos para pegar.
+
+Así gastas mucho menos, porque yo solo genero las ediciones y no las 1,900 líneas. Y no hay riesgo de transcripción: el resto del código queda idéntico al original, byte por byte. Te paso también un resumen de qué líneas cambiaron para que lo revises rápido.
+
+Si quieres, súbelos y en cuanto los tenga te devuelvo el método y ZMMMMF_SEND_EMAIL completos.
+
+es que en la interfaz no me pones exactamente en donde meter el codigo
+
+Tienes razón, algunos bloques no estaban bien anclados. Aquí va el método IF_MDG_SE_BP_BULK_REPLRQ_IN~INBOUND_PROCESSING punto por punto. En cada uno te indico qué buscar con Ctrl+F (es texto único en el método) y cómo debe quedar, con las líneas de alrededor para que no haya duda.
+
+a) Constante CBU
+
+Buscar: END OF us,
+
+abap
+                 BEGIN OF us,       " 1000020009, ROUS - Routing number notif finanzas
+                   routing_number TYPE arbcig_gen_cust_field_name VALUE 'Routing.Number.US',
+                 END OF us,
+*** ROAR Rollout S/4HANA Argentina 06/11/2026 LUISHIN Ini.
+                 BEGIN OF ar,       " ROAR: Notificación de bancos Argentina
+                   cbu TYPE arbcig_gen_cust_field_name VALUE 'CBU',
+                 END OF ar,
+*** ROAR Rollout S/4HANA Argentina 06/11/2026 LUISHIN Fin.
+               END OF lc_custom_field.
+b) Declaraciones
+
+Buscar: DATA lv_datum
+
+abap
+*** 1000039877 Modificación 05/11/2026 MLCRIS3 Ini.
+    DATA ls_addr                    TYPE bapibus1006_address.
+    DATA lt_aduse                   TYPE TABLE OF bapibus1006_addressusage.
+    DATA lt_address_usages          TYPE bus_ei_bupa_addressusage_t.
+    DATA lv_datum                   TYPE sy-datum.
+*** 1000039877 Modificación 05/11/2026 MLCRIS3 Fin.
+*** ROAR Rollout S/4HANA Argentina 06/11/2026 LUISHIN Ini.
+    DATA lv_cbu                     TYPE string.
+    DATA lv_cbu_changed             TYPE abap_bool.
+    DATA lv_cbu_bankl               TYPE string.
+    DATA lv_cbu_bankn               TYPE string.
+*** ROAR Rollout S/4HANA Argentina 06/11/2026 LUISHIN Fin.
+c) Lectura del CBU
+
+Buscar: DATA(lv_routing_number)
+
+abap
+    "<!-- 1000020009, ROUS - Routing number notif finanzas
+    DATA(lv_routing_number) = VALUE #( <lt_custom_fields>[ name = lc_custom_field-us-routing_number ]-content OPTIONAL ).
+    "--> 1000020009, ROUS - Routing number notif finanzas
+
+*** ROAR Rollout S/4HANA Argentina 06/11/2026 LUISHIN Ini.
+    " CBU Argentina: el valor viaja siempre completo al correo;
+    " lv_cbu_changed indica si debe disparar la notificación
+    lv_cbu = VALUE #( <lt_custom_fields>[ name = lc_custom_field-ar-cbu ]-content OPTIONAL ).
+    lv_cbu = condense( val = lv_cbu from = ` ` to = `` ).
+    lv_cbu_changed = xsdbool( lv_cbu IS NOT INITIAL ).
+*** ROAR Rollout S/4HANA Argentina 06/11/2026 LUISHIN Fin.
+
+    "<!-- ROCO
+    DATA(lv_regimen_impositivo) =
+d) Comparación contra BUT0BK
+
+Buscar: lv_a = abap_true
+
+Va entre el ENDIF. que cierra el bloque bancario de 1000039448 y el IF lt_bukrs IS NOT INITIAL.:
+
+abap
+          ENDLOOP.
+        ENDIF.
+*** 1000039448 Modificación 23/10/2026 MLCRIS3 Fin.
+      ENDIF.
+
+*** ROAR Rollout S/4HANA Argentina 06/11/2026 LUISHIN Ini.
+      " CBU Argentina: si ya existe en BUT0BK no se considera cambio
+      IF lv_cbu_changed = abap_true.
+        SELECT bankl, bankn
+          FROM but0bk
+          WHERE partner = @lv_lifnr
+          INTO TABLE @DATA(lt_but0bk_cbu).
+        IF sy-subrc = 0.
+          LOOP AT lt_but0bk_cbu ASSIGNING FIELD-SYMBOL(<ls_but0bk_cbu>).
+            lv_cbu_bankl = condense( val = CONV string( <ls_but0bk_cbu>-bankl ) from = ` ` to = `` ).
+            lv_cbu_bankn = condense( val = CONV string( <ls_but0bk_cbu>-bankn ) from = ` ` to = `` ).
+            IF    lv_cbu = lv_cbu_bankn
+               OR lv_cbu = lv_cbu_bankl
+               OR lv_cbu = |{ lv_cbu_bankl }{ lv_cbu_bankn }|.
+              lv_cbu_changed = abap_false.
+              EXIT.
+            ENDIF.
+          ENDLOOP.
+        ENDIF.
+      ENDIF.
+*** ROAR Rollout S/4HANA Argentina 06/11/2026 LUISHIN Fin.
+
+      IF lt_bukrs IS NOT INITIAL.
+        lv_a = abap_true.
+      ENDIF.
+e) Flag de modificación
+
+Buscar: lv_b = abap_true
+
+abap
+      IF    lv_iban         IS NOT INITIAL
+         OR lv_cuenta_clabe IS NOT INITIAL      " ROMX: Notificación de bancos México
+*** ROAR Rollout S/4HANA Argentina 06/11/2026 LUISHIN Ini.
+         OR lv_cbu_changed  = abap_true.        " ROAR: Notificación de bancos Argentina
+*** ROAR Rollout S/4HANA Argentina 06/11/2026 LUISHIN Fin.
+        lv_b = abap_true.
+      ENDIF.
+
+      lv_activ = lc_02.
+
+Fíjate que se quita el punto después de IS NOT INITIAL en la línea de lv_cuenta_clabe.
+
+f) Flag de alta
+
+Buscar: lv_d = abap_true
+
+abap
+      IF lt_bukrs IS NOT INITIAL.
+        lv_c = abap_true.
+      ENDIF.
+
+      IF    lv_iban         IS NOT INITIAL
+         OR lv_cuenta_clabe IS NOT INITIAL      " ROMX: Notificación de bancos México
+*** ROAR Rollout S/4HANA Argentina 06/11/2026 LUISHIN Ini.
+         OR lv_cbu_changed  = abap_true.        " ROAR: Notificación de bancos Argentina
+*** ROAR Rollout S/4HANA Argentina 06/11/2026 LUISHIN Fin.
+        lv_d = abap_true.
+      ENDIF.
+
+    ENDIF.
+
+Aquí también se quita el punto en la línea de lv_cuenta_clabe.
+
+g) Llamada a ZMMMMF_SAVE_DATA
+
+Buscar: iv_fact_mail               = lv_fact_mail
+
+abap
+          iv_routing_number          = lv_routing_number              " 1000020009, ROUS - Routing number notif finanzas
+          iv_fact_mail               = lv_fact_mail                   " 1000016827 Modificación 11/08/2025 MLCRIS3
+*** ROAR Rollout S/4HANA Argentina 06/11/2026 LUISHIN Ini.
+          iv_cbu                     = lv_cbu                         " ROAR: Notificación de bancos Argentina
+*** ROAR Rollout S/4HANA Argentina 06/11/2026 LUISHIN Fin.
+        TABLES
+          pt_emails                  = lt_emails
+
+Con eso el método queda completo. Si en ZMMMMF_SEND_EMAIL también quieres el mismo formato de “buscar → cómo queda”, te lo paso igual.
+*********************************************************************************************************************************
+******************************************************************************************************************************
 Ya está casi todo. Con ZMMMMF_SEND_EMAIL y ZMMMMF_START_SEND_EMAIL queda claro el flujo completo, y solo me falta un dato.
 
 Lo que necesito: el nombre exacto de la variable que dejaron en los textos SO10 ZMMM_EMAIL_B_LIFNR_U_BANCO_AR y ZMMM_EMAIL_D_LIFNR_I_BANCO_AR en desarrollo (&CBU&, &NUMERO_CBU&, etc.). El REPLACE tiene que coincidir letra por letra. De paso, revisa en qué idiomas los crearon: el idioma sale de ZFI14A-SPRAS de la sociedad, y si para AR viene uno distinto de ES y el texto no existe en ese idioma, el READ_TEXT falla y el correo sale vacío.
