@@ -1,0 +1,2236 @@
+  METHOD if_mdg_se_bp_bulk_replrq_in~inbound_processing.
+
+    TYPES: BEGIN OF t_bukrs_new,
+             bukrs TYPE bukrs,
+           END OF t_bukrs_new.
+    TYPES: BEGIN OF t_lfa1,
+             lifnr TYPE lifnr,
+             name1 TYPE name1_gp,
+             name2 TYPE name2_gp,
+             name3 TYPE name3_gp,
+             name4 TYPE name4_gp,
+           END OF   t_lfa1.
+    TYPES: BEGIN OF t_lfbk,
+             lifnr TYPE lifnr,
+             banks TYPE banks,
+             bankl TYPE bankk,
+             bankn TYPE bankn,
+             bkont TYPE bkont,
+           END OF   t_lfbk.
+    TYPES: BEGIN OF t_tiban,
+             banks TYPE banks,
+             bankl TYPE bankk,
+             bankn TYPE bankn35,
+             bkont TYPE bkont,
+             iban  TYPE iban,
+           END OF   t_tiban.
+    TYPES: BEGIN OF t_but0bk,
+             partner TYPE bu_partner,
+             bkvid   TYPE bu_bkvid,
+*** 1000039448 Modificación 23/10/2026 MLCRIS3 Ini.
+             bankn   TYPE bu_bankn,
+*** 1000039448 Modificación 23/10/2026 MLCRIS3 Fin.
+*** 1000001832 Modificación 16/06/2023 MLCRIS3 Ini.
+             bkref   TYPE bkref,
+*** 1000001832 Modificación 16/06/2023 MLCRIS3 Fin.
+             iban    TYPE bu_iban,
+*** 1000001832 Modificación 16/06/2023 MLCRIS3 Ini.
+             banka   TYPE banka,
+*** 1000001832 Modificación 16/06/2023 MLCRIS3 Fin.
+           END OF t_but0bk.
+
+    CONSTANTS lc_01                 TYPE bu_aktdb                                  VALUE '01'.
+    CONSTANTS lc_02                 TYPE bu_aktdb                                  VALUE '02'.
+    CONSTANTS lc_error              TYPE c LENGTH 1                                VALUE 'E'.
+    CONSTANTS lc_abort              TYPE c LENGTH 1                                VALUE 'A'.
+    CONSTANTS lc_zar                TYPE zfi14a-znumasi_low                        VALUE 'ZAR'.
+    CONSTANTS lc_person             TYPE string
+                                    VALUE 'OUT-PARTNER-CENTRAL_DATA-COMMON-DATA-BP_PERSON'.
+    CONSTANTS lc_organization       TYPE string
+                                    VALUE 'OUT-PARTNER-CENTRAL_DATA-COMMON-DATA-BP_ORGANIZATION'.
+    CONSTANTS lc_central            TYPE string
+                                    VALUE 'OUT-PARTNER-CENTRAL_DATA-COMMON-DATA-BP_CENTRALDATA'.
+    CONSTANTS lc_personx            TYPE string
+                                    VALUE 'OUT-PARTNER-CENTRAL_DATA-COMMON-DATAX-BP_PERSON'.
+    CONSTANTS lc_organizationx      TYPE string
+                                    VALUE 'OUT-PARTNER-CENTRAL_DATA-COMMON-DATAX-BP_ORGANIZATION'.
+    CONSTANTS lc_centralx           TYPE string
+                                    VALUE 'OUT-PARTNER-CENTRAL_DATA-COMMON-DATAX-BP_CENTRALDATA'.
+    CONSTANTS lc_nif_ppal           TYPE c LENGTH 3                                VALUE 'ES1'.
+    CONSTANTS lc_numbers            TYPE c LENGTH 10                               VALUE '0123456789'.
+    CONSTANTS lc_nie                TYPE c LENGTH 2                                VALUE 'XY'.
+    CONSTANTS lc_type_person        TYPE bu_type                                   VALUE '1'.
+    CONSTANTS lc_type_organization  TYPE bu_type                                   VALUE '2'.
+    CONSTANTS lc_validuntildate     TYPE bapibus1006_bprole_validity-bprolevalidto VALUE '99991231'.
+    CONSTANTS lc_upd                LIKE out-partner-header-object_task            VALUE 'U'.
+    CONSTANTS lc_msgid              TYPE sy-msgid                                  VALUE 'ZMXX'.
+    CONSTANTS lc_msgnr_552          TYPE sy-msgno                                  VALUE '552'.
+    CONSTANTS lc_msgnr_564          TYPE sy-msgno                                  VALUE '564'.
+    CONSTANTS lc_msgid_r1           TYPE sy-msgid                                  VALUE 'R1'.
+    CONSTANTS lc_msgnr_286          TYPE sy-msgno                                  VALUE '286'.
+    CONSTANTS lc_tipo_via           TYPE arbcig_generic_custom_field-name          VALUE 'Tipo_Via'.
+    CONSTANTS lc_sociedades_alta    TYPE arbcig_generic_custom_field-name          VALUE 'Sociedades_Alta'.
+    CONSTANTS lc_iban               TYPE arbcig_generic_custom_field-name          VALUE 'IBAN'.
+    CONSTANTS lc_regimen_impositivo TYPE arbcig_generic_custom_field-name          VALUE 'Regimen_impositivo'. " ROCO
+    CONSTANTS lc_tipo_cuenta_co     TYPE arbcig_generic_custom_field-name          VALUE 'Tipo_cuentaCO'. " 1000012745, ROCO Distinción Tipo de Cta Bancaria Prov
+*** 1000001832 Modificación 16/06/2023 MLCRIS3 Ini.
+    CONSTANTS lc_tipocuenta         TYPE arbcig_generic_custom_field-name          VALUE 'Tipo_cuenta'.
+    CONSTANTS lc_nombrebanco        TYPE arbcig_generic_custom_field-name          VALUE 'Nombre_banco'.
+    CONSTANTS lc_monedapago         TYPE arbcig_generic_custom_field-name          VALUE 'Moneda_Pago'.
+*** 1000001832 Modificación 16/06/2023 MLCRIS3 Fin.
+    CONSTANTS lc_nombre_pcompras    TYPE arbcig_generic_custom_field-name          VALUE 'Nombre_Pcompras'.
+    CONSTANTS lc_apellidos_pcompras TYPE arbcig_generic_custom_field-name          VALUE 'Apellidos_Pcompras'.
+    CONSTANTS lc_telefono_pcompras  TYPE arbcig_generic_custom_field-name          VALUE 'Telefono_Pcompras'.
+    CONSTANTS lc_email_pcompras     TYPE arbcig_generic_custom_field-name          VALUE 'Email_Pcompras'.
+
+*** 1000014294 Modificación 13/05/2024 MLCRIS3 Ini.
+    CONSTANTS lc_actividad          TYPE arbcig_generic_custom_field-name          VALUE 'Actividad_prov'.
+*>TINGUAR 29/09/2021 Nuevos campos persona física
+    CONSTANTS lc_field_sexkz        TYPE c LENGTH 5                                VALUE 'SEXKZ'. " Género
+    CONSTANTS lc_field_gbort        TYPE c LENGTH 5                                VALUE 'GBORT'. " Lugar nacimiento
+    CONSTANTS lc_field_gbdat        TYPE c LENGTH 5                                VALUE 'GBDAT'. " Fecha nacimiento
+    CONSTANTS lc_field_title        TYPE c LENGTH 5                                VALUE 'TITLE'. " Tratamiento
+    CONSTANTS lc_field_natio        TYPE c LENGTH 5                                VALUE 'NATIO'.
+    CONSTANTS lc_f                  TYPE c LENGTH 1                                VALUE 'F'.
+    CONSTANTS lc_masculino          TYPE sexkz                                     VALUE '2'.
+    CONSTANTS lc_femenino           TYPE sexkz                                     VALUE '1'.
+*** 1000097556 Modificación 02/02/2023 MLCRIS3 Ini.
+    CONSTANTS lc_es                 TYPE spras                                     VALUE 'S'.
+*** 1000103599 Modificación 19/05/2023 MLCRIS3 Ini.
+    CONSTANTS lc_toggle_provpot     TYPE sftgl_ft_id                               VALUE 'ZMSD_SLP_PROVPOT'.
+    CONSTANTS lc_sociedad           TYPE arbcig_gen_cust_field_name                VALUE 'Sociedades_Alta'.
+*** 1000000576 Modificación 05/06/2023 MLCRIS3 Ini.
+    CONSTANTS lc_toggle_excbp       TYPE sftgl_ft_id                               VALUE 'ZMSD_SLP_EXCL_BP'.
+*** 1000001832 Modificación 16/06/2023 MLCRIS3 Ini.
+    CONSTANTS lc_guatemala          TYPE land1                                     VALUE 'GT'.
+*** 1000012230 Modificación 29/02/2024 MLCRIS3 Ini.
+    CONSTANTS lc_insert             TYPE vmd_ei_purchasing_task                    VALUE 'I'.
+    CONSTANTS lc_modify             TYPE vmd_ei_purchasing_task                    VALUE 'M'.
+*** 1000004766 Modificación 13/07/2023 MLCRIS3 Ini.
+    CONSTANTS lc_true               TYPE c LENGTH 4                                VALUE 'true'.
+* Inicio: ROCA - CVSM
+    CONSTANTS lc_nif_pa2            TYPE bptaxtype                                 VALUE 'PA2'. " Taxtype que se puede duplicar en Panama
+    CONSTANTS lc_nif_tr1            TYPE bptaxtype                                 VALUE 'TR1'. " Taxtype que se puede duplicar en Turquía - Roll Out 29.09.2025
+
+*** 1000031084 Modificación 24/02/2026 MLCRIS3 Ini.
+    CONSTANTS lc_toggle_acmid       TYPE sftgl_ft_id                               VALUE 'ZARB_SLP_ACMID_MAPPING'.
+*** 1000031084 Modificación 24/02/2026 MLCRIS3 Fin.
+
+    DATA lt_taxdetails              TYPE STANDARD TABLE OF bapibus1006tax.
+    DATA lt_bukrs_new               TYPE STANDARD TABLE OF t_bukrs_new.
+    DATA ls_funct                   TYPE vmds_ei_functions.
+    DATA lt_taxdet_aux              TYPE STANDARD TABLE OF bapibus1006tax.
+    DATA lv_isnot_nif_ppal          TYPE c LENGTH 1.
+    DATA ls_bp_org_in               TYPE bapibus1006_central_organ.
+    DATA ls_bp_per_in               TYPE bapibus1006_central_person.
+    DATA ls_bp_grp_in               TYPE bapibus1006_central_group.
+    DATA lv_acmid                   TYPE arbcig_systidmap-systemid.
+*** 1000001832 Modificación 16/06/2023 MLCRIS3 Fin.
+    DATA lv_flag_comm               TYPE c LENGTH 1.
+    DATA lt_tpaer                   TYPE STANDARD TABLE OF tpaer.
+    DATA ls_taxdetails              LIKE LINE OF lt_taxdetails.
+    DATA lv_len                     TYPE i.
+    DATA lv_person                  TYPE c LENGTH 1.
+    DATA lv_tax_type                TYPE bu_type.
+    DATA lv_flag_mapeo              LIKE abap_true.
+    DATA lv_langu                   TYPE spras.
+    DATA ls_bp_org                  TYPE bapibus1006_central_organ.
+    DATA ls_custfld                 LIKE LINE OF in-business_partner-supplier-zmdg_bp_generic_custom_field.
+    DATA lv_tipo_via                TYPE string.
+    DATA lv_tipo_via_aux            TYPE string.
+    DATA l_addtabix                 TYPE sytabix.
+    DATA lt_bukrs                   TYPE STANDARD TABLE OF zdst_bukrs.
+    DATA lr_range_soc               TYPE RANGE OF bukrs.
+    DATA lr_range_org               TYPE RANGE OF ekorg.
+    "<!-- ROMX: Notificación de bancos México
+    DATA lv_pais_banco              TYPE string.
+    DATA lv_cuenta_clabe            TYPE string.
+    DATA lv_numbero_aba             TYPE string.
+    DATA lv_numero_convenio_cie     TYPE string.
+    DATA lv_referencia_convenio_cie TYPE string.
+    DATA lv_flag                    TYPE c LENGTH 1.
+    DATA lv_role                    TYPE bapibus1006_bproles-partnerrole.
+    DATA lt_return                  TYPE TABLE OF bapiret2.
+    DATA ls_but000                  TYPE but000.
+    DATA lv_category                LIKE out-partner-central_data-common-data-bp_control-category.
+    DATA lv_group                   LIKE out-partner-central_data-common-data-bp_control-grouping.
+    DATA lv_parvw                   LIKE ls_funct-data_key-parvw.
+    DATA lv_defpa                   LIKE ls_funct-data-defpa.
+    DATA lv_valid_from              TYPE c LENGTH 20.
+    DATA lv_valid_to                TYPE c LENGTH 20.
+    DATA ls_addr_data               TYPE bapibus1006_address.
+    DATA lt_adtel                   TYPE STANDARD TABLE OF bapiadtel.
+    DATA lt_adsmtp                  TYPE STANDARD TABLE OF bapiadsmtp.
+    DATA lt_add_usage               TYPE STANDARD TABLE OF bapibus1006_addressusage.
+    DATA lv_lifnr                   TYPE lifnr.
+    DATA lv_lif_partner             TYPE bapi_jbd_dte_partner.
+    DATA lv_iban                    TYPE /fscaa/iban.
+*** 1000097556 Modificación 02/02/2023 MLCRIS3 Fin.
+*** 1000001832 Modificación 16/06/2023 MLCRIS3 Ini.
+    DATA lv_bkref                   TYPE bkref.
+    DATA lv_banka                   TYPE banka.
+    DATA lv_waers                   TYPE waers.
+*** 1000014294 Modificación 13/05/2024 MLCRIS3 Ini.
+    DATA lv_actividad               TYPE string.
+    DATA lt_but0bk                  TYPE STANDARD TABLE OF t_but0bk.
+*** 1000107180 Modifciación 03/03/2023 MLCRIS3 Ini.
+    DATA lv_iban_db                 TYPE /fscaa/iban.
+    DATA lv_a                       TYPE c LENGTH 1.
+    DATA lv_b                       TYPE c LENGTH 1.
+    DATA lv_activ                   TYPE bu_aktdb.
+    DATA lv_partner                 TYPE but000-partner.
+    DATA ls_taxnumbers              LIKE LINE OF out-partner-central_data-taxnumber-taxnumbers.
+    DATA lv_name1                   TYPE string.
+    DATA lv_name2                   TYPE string.
+*** 1000107180 Modificación 03/03/2023 MLCRIS3 Ini.
+    DATA lv_current_name            TYPE string.
+*** 1000097556 Modificación 02/02/2023 MLCRIS3 Ini.
+    DATA lv_e                       TYPE c LENGTH 1.
+    DATA lv_name_org                TYPE char100.
+    DATA lv_f                       TYPE c LENGTH 1.
+    DATA lv_name_fis                TYPE char100.
+    DATA lt_emails_admon            TYPE STANDARD TABLE OF zdst_emails.
+    DATA lv_c                       TYPE c LENGTH 1.
+    DATA lv_d                       TYPE c LENGTH 1.
+    DATA lt_emails                  TYPE STANDARD TABLE OF zdst_emails.
+    DATA lt_bukrs_email             TYPE STANDARD TABLE OF zdst_bukrs.
+    DATA lt_emails_iban             TYPE STANDARD TABLE OF zdst_emails.
+    DATA lv_intca3                  TYPE intca3.
+    DATA ls_data                    TYPE bapibus1006_central.
+    DATA ls_data_person             TYPE bapibus1006_central_person.
+    DATA ls_data_organ              TYPE bapibus1006_central_organ.
+    DATA ls_data_group              TYPE bapibus1006_central_group.
+    DATA lv_name                    TYPE char100.
+*** 1000039448 Modificación 23/10/2026 MLCRIS3 Ini.
+    DATA lv_bankn_db                TYPE bu_bankn.
+*** 1000039448 Modificación 23/10/2026 MLCRIS3 Fin.
+*** 1000023929 Modificación 01/06/2026 MLCRIS3 Ini.
+    DATA lv_bp_central_subs         TYPE lifnr.
+*** 1000023929 Modificación 01/06/2026 MLCRIS3 Fin.
+
+*** 1000039877 Modificación 05/11/2026 MLCRIS3 Ini.
+    DATA ls_addr                    TYPE bapibus1006_address.
+    DATA lt_aduse                   TYPE TABLE OF bapibus1006_addressusage.
+    DATA lt_address_usages          TYPE bus_ei_bupa_addressusage_t.
+    DATA lv_datum                   TYPE sy-datum.
+*** 1000039877 Modificación 05/11/2026 MLCRIS3 Fin.
+
+    FIELD-SYMBOLS <ls_est_orig> TYPE any.
+    FIELD-SYMBOLS <ls_est_dest> TYPE any.
+    FIELD-SYMBOLS <lv_origen>   TYPE any.
+    FIELD-SYMBOLS <lv_destino>  TYPE any.
+    FIELD-SYMBOLS <ls_est_x>    TYPE any.
+    FIELD-SYMBOLS <lv_x>        TYPE any.
+
+*** 1000014294 Modificación 13/05/2024 MLCRIS3 Fin.
+
+*<TINGUAR 29/09/2021 Nuevos campos persona física
+
+    CONSTANTS: BEGIN OF lc_custom_field,
+                 hierarchy               TYPE arbcig_gen_cust_field_name VALUE `Hier`,
+                 ACMId                   TYPE arbcig_gen_cust_field_name VALUE `ACMID`,
+*** 1000031084 Modificación 24/02/2026 MLCRIS3 Ini.
+                 zs4id                   TYPE arbcig_gen_cust_field_name VALUE 'ZS4ID',
+*** 1000031084 Modificación 24/02/2026 MLCRIS3 Fin.
+                 euid                    TYPE arbcig_gen_cust_field_name VALUE `EUID`,
+                 lei                     TYPE arbcig_gen_cust_field_name VALUE `LEI`,
+                 matriz_euid             TYPE arbcig_gen_cust_field_name VALUE `MatrizEUID`,
+                 matriz_lei              TYPE arbcig_gen_cust_field_name VALUE `MatrizLEI`,
+                 razon_social_matriz     TYPE arbcig_gen_cust_field_name VALUE `RazonSocialMatriz`,
+                 nombre_proveedor_matriz TYPE arbcig_gen_cust_field_name VALUE `NombreProveedorMatriz`,
+                 codigo_pais_iso_matriz  TYPE arbcig_gen_cust_field_name VALUE `CodigoISOMatriz`,
+                 tipo_id_matriz_pf       TYPE arbcig_gen_cust_field_name VALUE `TipoIDMatrizPF`,
+                 id_matriz_pf            TYPE arbcig_gen_cust_field_name VALUE `IDMatrizPF`,
+                 requester_country       TYPE arbcig_gen_cust_field_name VALUE `RequesterCountry`,
+                 BEGIN OF mx,       " ROMX: Notificación de bancos México
+                   pais_banco     TYPE arbcig_gen_cust_field_name VALUE 'Pais_banco',
+                   cuenta_clabe   TYPE arbcig_gen_cust_field_name VALUE 'Cuenta_CLABE',
+                   numero_aba     TYPE arbcig_gen_cust_field_name VALUE 'Numero_ABA',
+                   convenio_cie   TYPE arbcig_gen_cust_field_name VALUE 'Convenio_CIE',
+                   referencia_cie TYPE arbcig_gen_cust_field_name VALUE 'Referencia_CIE',
+                 END OF mx,
+                 BEGIN OF us,       " 1000020009, ROUS - Routing number notif finanzas
+                   routing_number TYPE arbcig_gen_cust_field_name VALUE 'Routing.Number.US',
+                 END OF us,
+               END OF lc_custom_field.
+
+    DATA ls_bukrs_new   LIKE LINE OF lt_bukrs_new.
+    DATA lv_n           TYPE n LENGTH 2.
+    DATA lv_var         TYPE c LENGTH 20.
+    DATA ls_tbc001      TYPE tbc001.
+    DATA ls_t077k       TYPE t077k.
+    DATA ls_emails      TYPE zdst_emails.
+    DATA lt_lfbk        TYPE STANDARD TABLE OF t_lfbk.
+    DATA ls_lfbk        TYPE t_lfbk.
+    DATA lt_tiban       TYPE STANDARD TABLE OF t_tiban.
+    DATA ls_tiban       TYPE t_tiban.
+*** 1000107180 Modifciación 03/03/2023 MLCRIS3 Fin.
+    DATA lt_zfi14a      TYPE STANDARD TABLE OF zfi14a.
+    DATA lt_zfi15       TYPE STANDARD TABLE OF zfi15.
+    DATA ls_zfi15       TYPE zfi15.
+    DATA ls_vendor      TYPE vmds_ei_purchasing.
+    "<!-- 1000092342 Inicio
+*          lt_contacto     TYPE TABLE OF t_contacto.        " 1000005154, ARIBA Error en la integ de Contactos y M
+    "--> 1000092342 Fin
+
+    DATA ls_taxdet_aux  LIKE LINE OF lt_taxdet_aux.
+
+    "--> ROMX: Notificación de bancos México
+
+* Fin: ROCA - CVSM
+
+    in_message_container->remove_message( iv_id     = lc_msgid_r1
+                                          iv_number = lc_msgnr_286 ).
+
+* Inicio: ROCA - CVSM
+    CLEAR lv_isnot_nif_ppal.
+
+    ls_bp_org_in = out-partner-central_data-common-data-bp_organization.
+    ls_bp_per_in = out-partner-central_data-common-data-bp_person.
+    ls_bp_grp_in = out-partner-central_data-common-data-bp_group.
+* Fin: ROCA - CVSM
+
+    "<!-- [RCJAIM1 - 20210803] - No actualizar los datos bancarios
+    CLEAR out-partner-central_data-bankdetail.
+    "--> [RCJAIM1 - 20210803] - No actualizar los datos bancarios
+
+    "<!-- 1000010138, MU- SLP CATEGORIZA. PROVEEDORES FASE II
+    zcl_arb_utl_supplier=>get( )->sync_categories_new_thread( CONV #( in-business_partner-internal_id ) ).
+    "--> 1000010138, MU- SLP CATEGORIZA. PROVEEDORES FASE II
+
+    ASSIGN in-business_partner-supplier-zmdg_bp_generic_custom_field
+           TO FIELD-SYMBOL(<lt_custom_fields>).
+
+*** 1000031084 Modificación 24/02/2026 MLCRIS3 Ini.
+    IF cl_feature_toggle=>is_active( iv_toggle_id = lc_toggle_acmid ) = abap_true.
+      lv_acmid = VALUE #( <lt_custom_fields>[ name = lc_custom_field-zs4id ]-content OPTIONAL ).
+    ELSE.
+*** 1000031084 Modificación 24/02/2026 MLCRIS3 Fin.
+      lv_acmid = VALUE #( <lt_custom_fields>[ name = lc_custom_field-ACMId ]-content OPTIONAL ).
+*** 1000031084 Modificación 24/02/2026 MLCRIS3 Ini.
+    ENDIF.
+*** 1000031084 Modificación 24/02/2026 MLCRIS3 Fin.
+
+    DATA(lv_euid)                    = VALUE #( <lt_custom_fields>[ name = lc_custom_field-euid ]-content OPTIONAL ).
+    DATA(lv_lei)                     = VALUE #( <lt_custom_fields>[ name = lc_custom_field-lei ]-content OPTIONAL ).
+    DATA(lv_matriz_euid)             = VALUE #( <lt_custom_fields>[ name = lc_custom_field-matriz_euid ]-content OPTIONAL ).
+    DATA(lv_matriz_lei)              = VALUE #( <lt_custom_fields>[ name = lc_custom_field-matriz_lei ]-content OPTIONAL ).
+    DATA(lv_razon_social_matriz)     = VALUE #( <lt_custom_fields>[ name = lc_custom_field-razon_social_matriz ]-content OPTIONAL ).
+    DATA(lv_nombre_proveedor_matriz) = VALUE #( <lt_custom_fields>[ name = lc_custom_field-nombre_proveedor_matriz ]-content OPTIONAL ).
+    DATA(lv_codigo_pais_iso_matriz)  = VALUE #( <lt_custom_fields>[ name = lc_custom_field-codigo_pais_iso_matriz ]-content OPTIONAL ).
+    DATA(lv_tipo_id_matriz_pf)       = VALUE #( <lt_custom_fields>[ name = lc_custom_field-tipo_id_matriz_pf ]-content OPTIONAL ).
+    DATA(lv_id_matriz_pf)            = VALUE #( <lt_custom_fields>[ name = lc_custom_field-id_matriz_pf ]-content OPTIONAL ).
+
+    IF lv_codigo_pais_iso_matriz IS NOT INITIAL.
+
+      SELECT
+        FROM I_Country
+        FIELDS Country
+        WHERE CountryThreeLetterISOCode = @lv_codigo_pais_iso_matriz
+        INTO @DATA(lv_codigo_pais_matriz)
+        UP TO 1 ROWS.
+      ENDSELECT.
+      IF sy-subrc <> 0 OR lv_codigo_pais_matriz IS INITIAL.
+        in_message_container->add_bapi_message( is_bapiret    = VALUE #( type       = 'E'
+                                                                         id         = 'ZMXX'
+                                                                         number     = 130
+                                                                         message_v1 = lv_codigo_pais_iso_matriz )
+                                                iv_main_error = abap_true ).
+      ENDIF.
+
+    ELSE.
+
+      CLEAR lv_codigo_pais_matriz.
+
+    ENDIF.
+
+    DATA(lv_requester_country_iso)  = VALUE #( <lt_custom_fields>[ name = lc_custom_field-requester_country ]-content OPTIONAL ).
+
+    IF lv_requester_country_iso IS NOT INITIAL.
+
+      SELECT
+        FROM I_Country
+        FIELDS Country
+        WHERE CountryThreeLetterISOCode = @lv_requester_country_iso
+        INTO @DATA(lv_requester_country)
+        UP TO 1 ROWS.
+      ENDSELECT.
+      IF sy-subrc <> 0 OR lv_requester_country IS INITIAL.
+        in_message_container->add_bapi_message( is_bapiret    = VALUE #( type       = 'E'
+                                                                         id         = 'ZMXX'
+                                                                         number     = 130
+                                                                         message_v1 = lv_requester_country_iso )
+                                                iv_main_error = abap_true ).
+      ENDIF.
+
+    ELSE.
+
+      CLEAR lv_requester_country.
+
+    ENDIF.
+
+*** 1000103599 Modificación 19/05/2023 MLCRIS3 Ini.
+    IF cl_feature_toggle=>is_active( iv_toggle_id = lc_toggle_provpot ) = abap_true.
+      DATA(lv_provpot) = abap_false.
+      TRY.
+          DATA(ls_custom_field) = VALUE #( in-business_partner-supplier-zmdg_bp_generic_custom_field[
+                                               name = lc_sociedad ] ).
+        CATCH cx_sy_itab_line_not_found.
+          DATA(lv_nosoc) = abap_true.
+      ENDTRY.
+      IF ls_custom_field-content IS INITIAL.
+        lv_nosoc = abap_true.
+      ENDIF.
+      TRY.
+          DATA(ls_procurement) = VALUE #( in-business_partner-supplier-procurement_arrangement[ 1 ] ).
+        CATCH cx_sy_itab_line_not_found.
+          DATA(lv_noorg) = abap_true.
+      ENDTRY.
+      IF ls_procurement-purchasing_organisation_id IS INITIAL.
+        lv_noorg = abap_true.
+      ENDIF.
+      IF lv_nosoc = abap_true AND lv_noorg = abap_true.
+        lv_provpot = abap_true.
+      ENDIF.
+
+      IF lv_provpot IS NOT INITIAL.
+        DATA(ls_message) = VALUE bapiret2( type   = 'E'
+                                           id     = zcx_xx_static_check=>potencial_vendor-msgid
+                                           number = zcx_xx_static_check=>potencial_vendor-msgno ).
+
+        MESSAGE ID ls_message-id TYPE ls_message-type
+                NUMBER ls_message-number INTO ls_message-message.
+
+        in_message_container->add_bapi_message( is_bapiret    = ls_message
+                                                iv_main_error = abap_true ).
+        lv_flag_comm = abap_false.
+        EXIT.
+      ENDIF.
+    ENDIF.
+*** 1000103599 Modificación 19/05/2023 MLCRIS3 Fin.
+
+    " 1) Assign the corresponding Partner Function
+    SELECT parvw
+      FROM tpaer
+      INTO CORRESPONDING FIELDS OF TABLE @lt_tpaer
+      WHERE pargr = (
+          SELECT parge
+            FROM t077k
+            WHERE ktokk = (
+               SELECT ktokk
+                 FROM tbc001
+                 WHERE bu_group = @in-business_partner-nr_interval_bp_group_code "#EC CI_BUFFSUBQ.
+                           )                          "#EC CI_BUFFSUBQ.
+                       )                              "#EC CI_BUFFSUBQ.
+        AND papfl = @abap_true         "#EC CI_BYPASS "#EC CI_BUFFSUBQ.
+      ORDER BY parvw.
+    IF sy-subrc = 0.
+      LOOP AT out-vendor-purchasing_data-purchasing ASSIGNING FIELD-SYMBOL(<ls_purchasing>).
+        LOOP AT lt_tpaer ASSIGNING FIELD-SYMBOL(<ls_tpaer>). "#EC CI_NESTED.
+          APPEND INITIAL LINE TO <ls_purchasing>-functions-functions.
+          ASSIGN <ls_purchasing>-functions-functions[ sy-tabix ] TO FIELD-SYMBOL(<ls_function>).
+          IF sy-subrc = 0.
+            <ls_function>-data_key-parvw = <ls_tpaer>-parvw.
+          ENDIF.
+        ENDLOOP.
+      ENDLOOP.
+    ENDIF.
+
+*********************************************************************************************************
+    LOOP AT in-business_partner-tax_number ASSIGNING FIELD-SYMBOL(<ls_tax_number>).
+      IF <ls_tax_number>-country_code IS INITIAL.
+        CONTINUE.
+      ENDIF.
+
+      CLEAR ls_taxdetails.
+      ls_taxdetails-taxtype = <ls_tax_number>-country_code && <ls_tax_number>-tax_identification_number_type-content.
+      IF <ls_tax_number>-party_tax_id-content IS NOT INITIAL.
+        ls_taxdetails-taxnumber = <ls_tax_number>-party_tax_id-content.
+      ELSE.
+        ls_taxdetails-taxnumxl = <ls_tax_number>-long_party_tax_id-content.
+      ENDIF.
+      APPEND ls_taxdetails TO lt_taxdetails.
+
+      IF ls_taxdetails-taxtype = lc_nif_ppal.
+*             Formato NIF Personas fisicas
+        ls_taxdetails-taxnumber = condense( ls_taxdetails-taxnumber ).
+        lv_len = strlen( ls_taxdetails-taxnumber ).
+        IF     lv_len = 9 AND ls_taxdetails-taxnumber+8(1) CO sy-abcde
+           AND ls_taxdetails-taxnumber(8) CO lc_numbers.  "#EC CI_MAGIC
+          lv_person = abap_true.
+        ELSEIF lv_len = 9 AND ls_taxdetails-taxnumber(1) CO lc_nie
+           AND ls_taxdetails-taxnumber+1(7) CO lc_numbers. "#EC CI_MAGIC
+          lv_person = abap_true.
+        ENDIF.
+      ELSE.
+
+        lv_isnot_nif_ppal = abap_true.
+
+        SELECT SINGLE taxtype,
+                      type,
+                      name
+          INTO @DATA(ls_tax_det)
+          FROM zmfi_bp_type_det
+          WHERE taxtype = @ls_taxdetails-taxtype.
+        IF sy-subrc = 0.
+          IF ls_tax_det-type = '4'.
+            CALL FUNCTION ls_tax_det-name
+              EXPORTING
+                pi_taxtype    = ls_taxdetails-taxtype
+                pi_bptaxnum   = ls_taxdetails-taxnumber
+              IMPORTING
+                pe_type       = lv_tax_type
+              EXCEPTIONS
+                wrong_taxtype = 1
+                OTHERS        = 2.
+            IF sy-subrc = 0.
+              out-partner-central_data-common-data-bp_control-category = lv_tax_type.
+            ENDIF.
+          ELSE.
+            out-partner-central_data-common-data-bp_control-category = ls_tax_det-type.
+          ENDIF.
+        ENDIF.
+      ENDIF.
+    ENDLOOP.
+
+    IF lv_person = abap_true.
+      out-partner-central_data-common-data-bp_control-category = lc_type_person.
+    ENDIF.
+
+    CLEAR out-partner-central_data-common-data-bp_centraldata-notreleased.
+
+    " Configuración de mapeos
+    SELECT est_orig,
+           campo_orig,
+           est_dest,
+           campo_dest
+      INTO TABLE @DATA(lt_mapeo)
+      FROM zmmm_mapeo_slp
+      WHERE type = @out-partner-central_data-common-data-bp_control-category.
+    IF sy-subrc = 0.
+
+      LOOP AT lt_mapeo ASSIGNING FIELD-SYMBOL(<ls_mapeo>).
+        UNASSIGN <ls_est_orig>.
+        UNASSIGN <ls_est_dest>.
+        UNASSIGN <lv_origen>.
+        UNASSIGN <lv_destino>.
+        CASE <ls_mapeo>-est_orig.
+          WHEN 1.                                         "#EC CI_MAGIC
+            ASSIGN (lc_person) TO <ls_est_orig>.          "#EC CI_SUBRC
+          WHEN 2.                                         "#EC CI_MAGIC
+            ASSIGN (lc_organization) TO <ls_est_orig>.    "#EC CI_SUBRC
+          WHEN 3.                                         "#EC CI_MAGIC
+            ASSIGN (lc_central) TO <ls_est_orig>.         "#EC CI_SUBRC
+        ENDCASE.
+
+        CASE <ls_mapeo>-est_dest.
+          WHEN 1.                                         "#EC CI_MAGIC
+            ASSIGN (lc_person) TO <ls_est_dest>.          "#EC CI_SUBRC
+          WHEN 2.                                         "#EC CI_MAGIC
+            ASSIGN (lc_organization) TO <ls_est_dest>.    "#EC CI_SUBRC
+          WHEN 3.                                         "#EC CI_MAGIC
+            ASSIGN (lc_central) TO <ls_est_dest>.         "#EC CI_SUBRC
+        ENDCASE.
+
+        IF    <ls_est_orig>         IS NOT ASSIGNED OR <ls_est_dest>         IS NOT ASSIGNED
+           OR <ls_mapeo>-campo_dest IS INITIAL      OR <ls_mapeo>-campo_orig IS INITIAL.
+          CONTINUE.
+        ENDIF.
+
+        ASSIGN COMPONENT <ls_mapeo>-campo_orig OF STRUCTURE <ls_est_orig> TO <lv_origen>. "#EC CI_SUBRC
+        ASSIGN COMPONENT <ls_mapeo>-campo_dest OF STRUCTURE <ls_est_dest> TO <lv_destino>. "#EC CI_SUBRC
+
+        IF <lv_origen> IS ASSIGNED AND <lv_destino> IS ASSIGNED.
+
+          <lv_destino> = <lv_origen>.
+          lv_flag_mapeo = abap_true.
+
+          "<!-- [RCJAIM1] 1000006062, Error proveedores freelance
+          CASE <ls_mapeo>-est_dest.
+            WHEN gc_mapping-person.
+              ASSIGN (lc_personx) TO <ls_est_x>.
+            WHEN gc_mapping-person.
+              ASSIGN (lc_organizationx) TO <ls_est_x>.
+            WHEN gc_mapping-person.
+              ASSIGN (lc_centralx) TO <ls_est_x>.
+          ENDCASE.
+
+          IF sy-subrc = 0 AND <ls_est_x> IS ASSIGNED.
+
+            ASSIGN COMPONENT <ls_mapeo>-campo_dest OF STRUCTURE <ls_est_x> TO <lv_x>.
+
+            IF sy-subrc = 0 AND <lv_x> IS ASSIGNED.
+              <lv_x> = abap_true.
+              UNASSIGN <lv_x>.
+            ENDIF.
+
+            UNASSIGN <ls_est_x>.
+
+          ENDIF.
+          "--> [RCJAIM1] 1000006062, Error proveedores freelance
+
+        ENDIF.
+
+      ENDLOOP.
+
+      IF lv_flag_mapeo = abap_true AND out-partner-central_data-common-data-bp_control-category = 1.
+        ASSIGN in-business_partner-address_information[ 1 ] TO FIELD-SYMBOL(<ls_langu>).
+        IF sy-subrc = 0 AND <ls_langu>-address-communication_preference-correspondence_language_code IS NOT INITIAL.
+          CALL FUNCTION 'CONVERSION_EXIT_ISOLA_INPUT'
+            EXPORTING
+              input            = <ls_langu>-address-communication_preference-correspondence_language_code
+            IMPORTING
+              output           = lv_langu
+            EXCEPTIONS
+              unknown_language = 1
+              OTHERS           = 2.
+          IF sy-subrc = 0.
+            out-partner-central_data-common-data-bp_person-correspondlanguage = lv_langu.
+          ENDIF.
+
+        ENDIF.
+        ls_bp_org = out-partner-central_data-common-data-bp_organization.
+        CLEAR out-partner-central_data-common-data-bp_organization.
+      ENDIF.
+
+    ENDIF.
+
+    "<!-- [RCJAIM1] Jerarquías de proveedores
+    TRY.
+        DATA(lv_hierarchy_name) =
+            in-business_partner-supplier-zmdg_bp_generic_custom_field[ name = lc_custom_field-hierarchy ]-content.
+
+        DATA(lo_bupa_hierarchy) = zcl_mxx_utl_bupa_hierarchy=>get( ).
+
+        IF lo_bupa_hierarchy->build_code_from_name( CONV #( lv_hierarchy_name ) ) IS NOT INITIAL.
+
+          TRY.
+              DATA(lv_hierarchy_code) =
+                COND #(
+                    LET lv_hierarchy = lo_bupa_hierarchy->read_code_from_name( CONV #( lv_hierarchy_name ) ) IN
+                    WHEN lv_hierarchy IS INITIAL
+                    THEN lo_bupa_hierarchy->create_for_name( CONV #( lv_hierarchy_name ) )
+                    ELSE lv_hierarchy ).
+            CATCH zcx_mxx_bupa_hierarchy INTO DATA(lx_bupa_hierarchy).
+              add_messages_from_exception( ix_exception         = lx_bupa_hierarchy
+                                           io_message_container = in_message_container ).
+          ENDTRY.
+
+        ENDIF.
+
+        out-partner-central_data-common-data-zz_hierarchy  = lv_hierarchy_code.
+        out-partner-central_data-common-datax-zz_hierarchy = abap_true.
+      CATCH cx_sy_itab_line_not_found.
+    ENDTRY.
+    "--> [RCJAIM1] Jerarquías de proveedores
+
+    READ TABLE in-business_partner-supplier-zmdg_bp_generic_custom_field
+         INTO  ls_custfld
+         WITH KEY name = lc_tipo_via.                    "#EC CI_STDSEQ
+    IF sy-subrc = 0.
+
+      lv_tipo_via = ls_custfld-content.
+      lv_tipo_via_aux = lv_tipo_via && space.
+      lv_len = ( strlen( lv_tipo_via ) ) + 1.
+      LOOP AT out-partner-central_data-address-addresses INTO DATA(ls_address).
+        l_addtabix = sy-tabix.
+        IF ls_address-data-postal-data-street(3) <> lv_tipo_via_aux.
+          CONCATENATE lv_tipo_via ls_address-data-postal-data-street
+                      INTO ls_address-data-postal-data-street SEPARATED BY space.
+          MODIFY out-partner-central_data-address-addresses FROM ls_address INDEX l_addtabix.
+        ENDIF.
+      ENDLOOP.
+    ENDIF.
+
+    READ TABLE in-business_partner-supplier-zmdg_bp_generic_custom_field
+         INTO  ls_custfld
+         WITH KEY name = lc_sociedades_alta.             "#EC CI_STDSEQ
+    IF sy-subrc = 0.
+      SPLIT ls_custfld-content AT ',' INTO TABLE lt_bukrs.
+    ENDIF.
+    " Seleccionamos el NIF
+
+    SELECT vendorid
+      FROM arbcig_systidmap
+      WHERE systemid = @lv_acmid
+      INTO @DATA(lv_supplier_id)
+      UP TO 1 ROWS.
+    ENDSELECT.
+    IF sy-subrc <> 0.
+
+      CLEAR lv_supplier_id.
+
+* Inicio: ROCA - CVSM
+      lt_taxdet_aux[] = lt_taxdetails[].
+      DELETE lt_taxdet_aux WHERE taxtype = lc_nif_pa2.
+* Fin: ROCA - CVSM
+      DELETE lt_taxdet_aux WHERE taxtype = lc_nif_tr1. "Taxtype que se puede duplicar en Turquía - Roll Out 29.09.2025
+
+      IF lt_taxdet_aux[] IS NOT INITIAL.   " ROCA - CVSM
+
+** Inicio: ROCA - CVSM: Se comenta el query original que se hacia con la tabla interna
+** lt_taxdetails y se hace el query con la tabla lt_taxdet_aux luego de haber borrado
+** registros con taxtype = PA2
+
+        SELECT a~partner,
+               b~xblck
+          INTO TABLE @DATA(lt_dfkk)
+          FROM dfkkbptaxnum AS a
+                 INNER JOIN
+                   but000 AS b ON a~partner = b~partner
+          FOR ALL ENTRIES IN @lt_taxdet_aux
+          WHERE a~taxnum   = @lt_taxdet_aux-taxnumber
+            AND a~taxnumxl = @lt_taxdet_aux-taxnumxl. "#EC CI_SEL_NESTED "#EC CI_NOFIELD
+
+** Inicio: ROCA - CVSM: lineas originales comentadas.
+*      SELECT a~partner,
+*             b~xblck
+*       INTO TABLE @DATA(lt_dfkk) FROM dfkkbptaxnum AS a
+*        INNER JOIN but000 AS b
+*            ON a~partner = b~partner
+*       FOR ALL ENTRIES IN @lt_taxdetails
+*       WHERE a~taxnum = @lt_taxdetails-taxnumber
+*         AND a~taxnumxl = @lt_taxdetails-taxnumxl. "#EC CI_SEL_NESTED "#EC CI_NOFIELD
+** Fin: ROCA - CVSM: lineas originales comentadas.
+
+      ENDIF.                               " ROCA - CVSM
+
+      DATA(lv_lines) = lines( lt_dfkk ).
+      IF lv_lines > 1.
+        IF line_exists( lt_dfkk[ xblck = abap_true ] ).
+          DELETE lt_dfkk WHERE xblck = abap_true.
+        ENDIF.
+        lv_lines = lines( lt_dfkk ).
+        IF lv_lines > 1.
+          SELECT lifnr
+            INTO TABLE @DATA(lt_xdezv)
+            FROM lfb1
+            FOR ALL ENTRIES IN @lt_dfkk
+            WHERE lifnr = @lt_dfkk-partner
+              AND xdezv = @abap_true.
+          IF sy-subrc = 0.
+
+          ENDIF.
+          LOOP AT lt_dfkk INTO DATA(ls_dfkk).
+            DATA(lv_tabix_aux) = sy-tabix.
+            IF NOT line_exists( lt_xdezv[ lifnr = ls_dfkk-partner ] ).
+              DELETE lt_dfkk INDEX lv_tabix_aux.
+            ENDIF.
+          ENDLOOP.
+        ENDIF.
+      ENDIF.
+
+*** 1000000576 Modificación 05/06/2023 MLCRIS3 Ini.
+      IF cl_feature_toggle=>is_active( iv_toggle_id = lc_toggle_excbp ) = abap_true.
+        DELETE lt_dfkk WHERE xblck IS NOT INITIAL.
+
+        IF lines( lt_dfkk ) >= 1.
+
+          ASSIGN lt_dfkk[ 1 ] TO FIELD-SYMBOL(<fs_dfkk>).
+          IF sy-subrc = 0.
+            SELECT SINGLE bu_group
+              FROM but000
+              INTO @DATA(lv_bu_group)
+              WHERE partner = @<fs_dfkk>-partner.
+            IF sy-subrc = 0 AND lv_bu_group IS NOT INITIAL.
+              SELECT SINGLE excluded
+                FROM zarb_bu_group_ex
+                WHERE bu_group = @lv_bu_group
+                INTO @DATA(lv_excluded).
+              IF sy-subrc = 0 AND lv_excluded IS NOT INITIAL.
+
+                ls_message = VALUE bapiret2( type       = 'E'
+                                             id         = zcx_xx_static_check=>invalid_bpgroup-msgid
+                                             number     = zcx_xx_static_check=>invalid_bpgroup-msgno
+                                             message_v1 = lv_bu_group ).
+
+                MESSAGE ID ls_message-id TYPE ls_message-type
+                        NUMBER ls_message-number INTO ls_message-message.
+
+                in_message_container->add_bapi_message( is_bapiret    = ls_message
+                                                        iv_main_error = abap_true ).
+                lv_flag_comm = abap_false.
+                EXIT.
+              ELSE.
+                LOOP AT in-business_partner-supplier-zmdg_bp_generic_custom_field ASSIGNING FIELD-SYMBOL(<fs_custom>) WHERE name = lc_sociedad.
+                  IF <fs_custom>-content IS NOT INITIAL.
+                    INSERT VALUE #( sign   = 'I'
+                                    option = 'EQ'
+                                    low    = <fs_custom>-content ) INTO TABLE lr_range_soc.
+                  ENDIF.
+                ENDLOOP.
+
+                LOOP AT in-business_partner-supplier-procurement_arrangement ASSIGNING FIELD-SYMBOL(<fs_procurement>).
+*** 1000004766 Modificación 13/07/2023 MLCRIS3 Ini.
+                  IF <fs_procurement>-purchasing_terms-purchasing_blocked_indicator <> lc_true.
+                    CONTINUE.
+                  ENDIF.
+*** 1000004766 Modificación 13/07/2023 MLCRIS3 Fin.
+                  IF <fs_procurement>-purchasing_organisation_id IS NOT INITIAL.
+                    INSERT VALUE #( sign   = 'I'
+                                    option = 'EQ'
+                                    low    = <fs_procurement>-purchasing_organisation_id ) INTO TABLE lr_range_org.
+                  ENDIF.
+                ENDLOOP.
+
+*** 1000004766 Modificación 13/07/2023 MLCRIS3 Ini.
+                IF lr_range_soc[] IS NOT INITIAL.
+*** 1000004766 Modificación 13/07/2023 MLCRIS3 Fin.
+                  SELECT lifnr,bukrs,sperr
+                    FROM lfb1
+                    WHERE lifnr  = @<fs_dfkk>-partner
+                      AND bukrs IN @lr_range_soc
+                    INTO TABLE @DATA(lt_lfb1_block).
+                  IF sy-subrc = 0.
+                    LOOP AT lt_lfb1_block ASSIGNING FIELD-SYMBOL(<fs_lfb1_block>) WHERE sperr IS NOT INITIAL.
+                      ls_message = VALUE bapiret2( type       = 'E'
+                                                   id         = zcx_xx_static_check=>blocked_company-msgid
+                                                   number     = zcx_xx_static_check=>blocked_company-msgno
+                                                   message_v1 = <fs_lfb1_block>-bukrs ).
+
+                      MESSAGE ID ls_message-id TYPE ls_message-type
+                              NUMBER ls_message-number INTO ls_message-message.
+
+                      in_message_container->add_bapi_message( is_bapiret    = ls_message
+                                                              iv_main_error = abap_true ).
+                      lv_flag_comm = abap_false.
+                    ENDLOOP.
+                  ENDIF.
+*** 1000004766 Modificación 13/07/2023 MLCRIS3 Ini.
+                ENDIF.
+
+                IF lr_range_org[] IS NOT INITIAL.
+*** 1000004766 Modificación 13/07/2023 MLCRIS3 Fin.
+                  SELECT lifnr,ekorg,sperm
+                    FROM lfm1
+                    WHERE lifnr = @<fs_dfkk>-partner
+*** 1000020561 Modificación 10/12/2024 MLCRIS3 Ini.
+*                  AND ekorg IN @lr_range_org
+*** 1000020561 Modificación 10/12/2024 MLCRIS3 Fin.
+                    INTO TABLE @DATA(lt_lfm1_block).
+                  IF sy-subrc = 0.
+                    LOOP AT lt_lfm1_block ASSIGNING FIELD-SYMBOL(<fs_lfm1_block>) WHERE sperm IS NOT INITIAL.
+*** 1000020561 Modificación 10/12/2024 MLCRIS3 Ini.
+                      IF <fs_lfm1_block>-ekorg NOT IN lr_range_org.
+*** 1000020561 Modificación 10/12/2024 MLCRIS3 Fin.
+                        ls_message = VALUE bapiret2( type       = 'E'
+                                                     id         = zcx_xx_static_check=>blocked_purch-msgid
+                                                     number     = zcx_xx_static_check=>blocked_purch-msgno
+                                                     message_v1 = <fs_lfm1_block>-ekorg ).
+
+                        MESSAGE ID ls_message-id TYPE ls_message-type
+                                NUMBER ls_message-number INTO ls_message-message.
+
+                        in_message_container->add_bapi_message( is_bapiret    = ls_message
+                                                                iv_main_error = abap_true ).
+                        lv_flag_comm = abap_false.
+*** 1000020561 Modificación 10/12/2024 MLCRIS3 Ini.
+                      ENDIF.
+*** 1000020561 Modificación 10/12/2024 MLCRIS3 Fin.
+                    ENDLOOP.
+                  ENDIF.
+*** 1000004766 Modificación 13/07/2023 MLCRIS3 Ini.
+                ENDIF.
+*** 1000004766 Modificación 13/07/2023 MLCRIS3 Fin.
+                IF lv_flag_comm = abap_true.
+                  EXIT.
+                ENDIF.
+              ENDIF.
+            ENDIF.
+          ENDIF.
+        ENDIF.
+      ENDIF.
+*** 1000000576 Modificación 05/06/2023 MLCRIS3 Fin.
+
+    ENDIF.
+
+*** 1000001832 Modificación 16/06/2023 MLCRIS3 Ini.
+    DATA(ls_address_info) = VALUE #( in-business_partner-address_information[ 1 ] OPTIONAL ).
+    "<!-- [RCJAIM1] 1000006062, Error proveedores freelance
+*    DATA(lv_land_bp) = ls_address_info-address-postal_address[ 1 ]-country_code.
+    DATA(lv_land_bp) = VALUE #( ls_address_info-address-postal_address[ 1 ]-country_code OPTIONAL ).
+    "--> [RCJAIM1] 1000006062, Error proveedores freelance
+*** 1000001832 Modificación 16/06/2023 MLCRIS3 Fin.
+
+*** 1000016827 Modificación 11/08/2025 MLCRIS3 Ini.
+    DATA(lv_fact_mail) = VALUE #( ls_address_info-address-email[ 1 ]-uri-content OPTIONAL ).
+*** 1000016827 Modificación 11/08/2025 MLCRIS3 Fin.
+
+    "<!-- ROMX: Notificación de bancos México
+    lv_pais_banco              = VALUE #( <lt_custom_fields>[ name = lc_custom_field-mx-pais_banco ]-content OPTIONAL ).
+    lv_cuenta_clabe            = VALUE #( <lt_custom_fields>[ name = lc_custom_field-mx-cuenta_clabe ]-content OPTIONAL ).
+    lv_numbero_aba             = VALUE #( <lt_custom_fields>[ name = lc_custom_field-mx-numero_aba ]-content OPTIONAL ).
+    lv_numero_convenio_cie     = VALUE #( <lt_custom_fields>[ name = lc_custom_field-mx-convenio_cie ]-content OPTIONAL ).
+    lv_referencia_convenio_cie = VALUE #( <lt_custom_fields>[ name = lc_custom_field-mx-referencia_cie ]-content OPTIONAL ).
+    "--> ROMX: Notificación de bancos México
+
+    "<!-- 1000020009, ROUS - Routing number notif finanzas
+    DATA(lv_routing_number) = VALUE #( <lt_custom_fields>[ name = lc_custom_field-us-routing_number ]-content OPTIONAL ).
+    "--> 1000020009, ROUS - Routing number notif finanzas
+
+    "<!-- ROCO
+    DATA(lv_regimen_impositivo) =
+      VALUE #( in-business_partner-supplier-zmdg_bp_generic_custom_field[ name = lc_regimen_impositivo ]-content OPTIONAL ).
+    "--> ROCO
+
+    "<!-- 1000012745, ROCO Distinción Tipo de Cta Bancaria Prov
+    DATA(lv_tipo_cuenta_co) =
+      VALUE #( in-business_partner-supplier-zmdg_bp_generic_custom_field[ name = lc_tipo_cuenta_co ]-content OPTIONAL ).
+    "--> 1000012745, ROCO Distinción Tipo de Cta Bancaria Prov
+
+*** 1000023929 Modificación 01/06/2026 MLCRIS3 Ini.
+    IF cl_feature_toggle=>is_active( iv_toggle_id = gc_toggle_central_subs ) = abap_true.
+
+      IF in-business_partner-receiver_internal_id IS INITIAL.
+
+        check_central_subs(
+          EXPORTING
+            iv_sm_vendor_id = CONV #( in-business_partner-internal_id )
+            iv_land_bp      = lv_land_bp
+            it_taxdetails   = lt_taxdetails
+          IMPORTING
+            es_message      = ls_message
+            ev_bp           = lv_bp_central_subs ).
+
+        IF ls_message IS NOT INITIAL.
+
+          MESSAGE ID ls_message-id TYPE ls_message-type
+            NUMBER ls_message-number INTO ls_message-message.
+
+          in_message_container->add_bapi_message( is_bapiret    = ls_message
+                                                  iv_main_error = abap_true ).
+          lv_flag_comm = abap_false.
+
+        ELSEIF ls_message IS INITIAL AND lv_bp_central_subs IS NOT INITIAL.
+
+          lv_supplier_id = lv_bp_central_subs.
+
+        ENDIF.
+
+      ENDIF.
+    ENDIF.
+*** 1000023929 Modificación 01/06/2026 MLCRIS3 Fin.
+
+    lv_lines = lines( lt_dfkk ).
+    IF lv_lines >= 1 OR lv_supplier_id IS NOT INITIAL.
+      " Modificación de BP Existente
+      READ TABLE lt_dfkk INTO ls_dfkk INDEX 1.          "#EC CI_NOORDER
+      IF sy-subrc = 0 OR lv_supplier_id IS NOT INITIAL.
+        " Existe un BP con ese NIF
+        IF lv_supplier_id IS INITIAL.
+
+          SELECT \_SupplierToBusinessPartner\_BusinessPartner-BusinessPartner,
+                 \_SupplierToBusinessPartner\_BusinessPartner-BusinessPartnerUUID,
+                 \_SupplierToBusinessPartner\_BusinessPartner-BusinessPartnerCategory,
+                 Supplier
+            FROM I_Supplier
+            WHERE \_SupplierToBusinessPartner\_BusinessPartner-BusinessPartner = @ls_dfkk-partner
+            INTO @DATA(ls_but000_guid)
+            UP TO 1 ROWS.
+          ENDSELECT.
+
+          IF sy-subrc <> 0.
+            SELECT BusinessPartner,
+                   BusinessPartnerUUID,
+                   BusinessPartnerCategory
+              FROM I_BusinessPartner
+              WHERE BusinessPartner = @ls_dfkk-partner
+              INTO @ls_but000_guid
+              UP TO 1 ROWS.
+            ENDSELECT.
+          ENDIF.
+
+        ELSE.
+
+          SELECT \_SupplierToBusinessPartner\_BusinessPartner-BusinessPartner,
+                 \_SupplierToBusinessPartner\_BusinessPartner-BusinessPartnerUUID,
+                 \_SupplierToBusinessPartner\_BusinessPartner-BusinessPartnerCategory,
+                 Supplier
+            FROM I_Supplier
+            WHERE Supplier = @lv_supplier_id
+            INTO @ls_but000_guid
+            UP TO 1 ROWS.
+          ENDSELECT.
+
+        ENDIF.
+        IF sy-subrc = 0.
+
+          out-partner-header-object_instance-bpartner     = ls_but000_guid-BusinessPartner.
+          out-partner-header-object_instance-bpartnerguid = ls_but000_guid-BusinessPartnerUUID.
+          out-vendor-header-object_instance-lifnr         = ls_but000_guid-Supplier.
+          out-partner-header-object_task                  = lc_upd.
+          out-vendor-header-object_task                   = lc_upd.
+
+          " Extraemos datos del proveedor
+          SELECT SINGLE *
+            INTO @DATA(ls_lfa1)
+            FROM lfa1
+            WHERE lifnr = @out-vendor-header-object_instance-lifnr. "#EC CI_ALL_FIELDS_NEEDED
+          IF sy-subrc = 0.
+            out-vendor-central_data-central-data = CORRESPONDING #( ls_lfa1 ).
+
+            WHILE lv_flag = space.
+              ASSIGN COMPONENT sy-index OF STRUCTURE out-vendor-central_data-central-datax TO FIELD-SYMBOL(<lv_datax>).
+              IF sy-subrc = 0.
+                <lv_datax> = abap_true.
+              ELSE.
+                lv_flag = abap_true.
+              ENDIF.
+            ENDWHILE.
+
+          ELSE.
+
+            READ TABLE out-partner-central_data-role-roles INTO DATA(ls_role) INDEX 1.
+            IF sy-subrc = 0.
+              lv_role = ls_role-data_key.
+              CALL FUNCTION 'BAPI_BUPA_ROLE_ADD_2'
+                EXPORTING
+                  businesspartner     = ls_but000_guid-BusinessPartner
+                  businesspartnerrole = lv_role
+                  validuntildate      = lc_validuntildate
+                TABLES
+                  return              = lt_return.
+              lv_flag_comm = abap_true.
+            ENDIF.
+
+          ENDIF.
+
+* Inicio: ROCA - CVSM
+          IF lv_isnot_nif_ppal IS NOT INITIAL.
+            IF     out-partner-central_data-common-data-bp_control-category <> ls_but000_guid-BusinessPartnerCategory
+               AND ls_but000_guid-BusinessPartnerCategory                   IS NOT INITIAL.
+
+*              IF out-partner-central_data-common-data-bp_control-category = lc_type_person AND
+*                 out-partner-central_data-common-data-bp_control-category <> in-business_partner-category_code.
+
+              out-partner-central_data-common-data-bp_control-category = ls_but000_guid-BusinessPartnerCategory.
+
+              CLEAR lv_flag_mapeo.
+
+              SELECT est_orig,
+                     campo_orig,
+                     est_dest,
+                     campo_dest
+                INTO TABLE @DATA(lt_mapeo_dif)
+                FROM zmmm_mapeo_slp
+                WHERE type = @out-partner-central_data-common-data-bp_control-category.
+
+              IF sy-subrc = 0.
+                LOOP AT lt_mapeo_dif ASSIGNING FIELD-SYMBOL(<ls_mapeo_dif>).
+                  UNASSIGN <ls_est_orig>.
+                  UNASSIGN <ls_est_dest>.
+                  UNASSIGN <lv_origen>.
+                  UNASSIGN <lv_destino>.
+                  CASE <ls_mapeo_dif>-est_orig.
+                    WHEN 1.                               "#EC CI_MAGIC
+                      ASSIGN (lc_person) TO <ls_est_orig>. "#EC CI_SUBRC
+                    WHEN 2.                               "#EC CI_MAGIC
+                      ASSIGN (lc_organization) TO <ls_est_orig>. "#EC CI_SUBRC
+                    WHEN 3.                               "#EC CI_MAGIC
+                      ASSIGN (lc_central) TO <ls_est_orig>. "#EC CI_SUBRC
+                  ENDCASE.
+
+                  CASE <ls_mapeo_dif>-est_dest.
+                    WHEN 1.                               "#EC CI_MAGIC
+                      ASSIGN (lc_person) TO <ls_est_dest>. "#EC CI_SUBRC
+                    WHEN 2.                               "#EC CI_MAGIC
+                      ASSIGN (lc_organization) TO <ls_est_dest>. "#EC CI_SUBRC
+                    WHEN 3.                               "#EC CI_MAGIC
+                      ASSIGN (lc_central) TO <ls_est_dest>. "#EC CI_SUBRC
+                  ENDCASE.
+
+                  IF     <ls_est_orig>             IS ASSIGNED    AND <ls_est_dest>             IS ASSIGNED
+                     AND <ls_mapeo_dif>-campo_dest IS NOT INITIAL AND <ls_mapeo_dif>-campo_orig IS NOT INITIAL.
+                    ASSIGN COMPONENT <ls_mapeo_dif>-campo_orig OF STRUCTURE <ls_est_orig> TO <lv_origen>. "#EC CI_SUBRC
+                    ASSIGN COMPONENT <ls_mapeo_dif>-campo_dest OF STRUCTURE <ls_est_dest> TO <lv_destino>. "#EC CI_SUBRC
+                    IF <lv_origen> IS ASSIGNED AND <lv_destino> IS ASSIGNED.
+                      <lv_destino> = <lv_origen>.
+                      lv_flag_mapeo = abap_true.
+                    ENDIF.
+                  ENDIF.
+                ENDLOOP.
+                IF lv_flag_mapeo = abap_true AND out-partner-central_data-common-data-bp_control-category = 1.
+                  ASSIGN in-business_partner-address_information[ 1 ] TO FIELD-SYMBOL(<ls_langu_in>).
+                  IF sy-subrc = 0 AND <ls_langu_in>-address-communication_preference-correspondence_language_code IS NOT INITIAL.
+                    CALL FUNCTION 'CONVERSION_EXIT_ISOLA_INPUT'
+                      EXPORTING
+                        input            = <ls_langu_in>-address-communication_preference-correspondence_language_code
+                      IMPORTING
+                        output           = lv_langu
+                      EXCEPTIONS
+                        unknown_language = 1
+                        OTHERS           = 2.
+                    IF sy-subrc = 0.
+                      out-partner-central_data-common-data-bp_person-correspondlanguage = lv_langu.
+                    ENDIF.
+
+                  ENDIF.
+                ENDIF.
+              ENDIF.
+
+              CASE ls_but000_guid-BusinessPartnerCategory.
+                WHEN lc_type_person.
+                  CLEAR out-partner-central_data-common-data-bp_organization.
+                WHEN lc_type_organization.
+                  CLEAR out-partner-central_data-common-data-bp_person.
+                  out-partner-central_data-common-data-bp_organization = ls_bp_org_in.
+              ENDCASE.
+
+            ENDIF.
+          ENDIF.
+* Fin: ROCA - CVSM
+
+          CLEAR ls_but000.
+          ls_but000-natpers    = out-partner-central_data-taxnumber-common-data-nat_person.
+          ls_but000-name_org1  = out-partner-central_data-common-data-bp_organization-name1.
+          ls_but000-name_org2  = out-partner-central_data-common-data-bp_organization-name2.
+          ls_but000-name_org3  = out-partner-central_data-common-data-bp_organization-name3.
+          ls_but000-name_org4  = out-partner-central_data-common-data-bp_organization-name4.
+          ls_but000-name_first = out-partner-central_data-common-data-bp_person-firstname.
+          ls_but000-name_last  = out-partner-central_data-common-data-bp_person-lastname.
+          ls_but000-name_last2 = out-partner-central_data-common-data-bp_person-birthname.
+          ls_but000-namemiddle = out-partner-central_data-common-data-bp_person-middlename.
+          lv_category = out-partner-central_data-common-data-bp_control-category.
+          lv_group = out-partner-central_data-common-data-bp_control-grouping.
+
+          LOOP AT out-vendor-purchasing_data-purchasing ASSIGNING FIELD-SYMBOL(<ls_purch>). "#EC CI_NESTING
+            DO 3 TIMES.                                   "#EC CI_MAGIC
+              CASE sy-index.
+                WHEN 1.                                   "#EC CI_MAGIC
+                  lv_parvw = 'BA'.
+                  lv_defpa = abap_true.
+                WHEN 2.                                   "#EC CI_MAGIC
+                  lv_parvw = 'LF'.
+                  lv_defpa = abap_false.
+                WHEN 3.                                   "#EC CI_MAGIC
+                  lv_parvw = 'RS'.
+                  lv_defpa = abap_true.
+              ENDCASE.
+              ASSIGN <ls_purch>-functions-functions[ data_key-parvw = lv_parvw ] TO FIELD-SYMBOL(<ls_funct>). "#EC CI_STDSEQ
+              IF sy-subrc <> 0.
+                ls_funct-data_key-parvw = lv_parvw.
+                ls_funct-data_key-parza = '001'.
+                ls_funct-data-partner = ls_but000_guid-BusinessPartner.
+                ls_funct-data-defpa   = lv_defpa.
+              ELSE.
+                <ls_funct>-data-partner = ls_but000_guid-BusinessPartner.
+                ls_funct-data-defpa = lv_defpa.
+                ls_funct-data_key-parza = '001'.
+              ENDIF.
+            ENDDO.                                      "#EC CI_NESTING
+            DELETE <ls_purch>-functions-functions WHERE data-partner IS INITIAL. "#EC CI_STDSEQ
+          ENDLOOP.
+        ENDIF.
+      ENDIF.
+
+      " Extraemos los roles
+      SELECT partner,
+             rltyp,
+             valid_from,
+             valid_to
+        INTO TABLE @DATA(lt_but100)
+        FROM but100
+        WHERE partner = @out-partner-header-object_instance-bpartner.
+      IF sy-subrc = 0.
+        LOOP AT lt_but100 ASSIGNING FIELD-SYMBOL(<ls_but100>).
+          READ TABLE out-partner-central_data-role-roles
+               INTO DATA(ls_roles)
+               WITH KEY data_key = <ls_but100>-rltyp.    "#EC CI_STDSEQ
+          IF sy-subrc = 0.
+            CONTINUE.
+          ENDIF.
+
+          CLEAR ls_roles.
+          ls_roles-data_key = <ls_but100>-rltyp.
+          lv_valid_from = <ls_but100>-valid_from.
+          lv_valid_to = <ls_but100>-valid_to.
+          lv_valid_to = condense( lv_valid_to ).
+          lv_valid_from = condense( lv_valid_from ).
+
+          ls_roles-data-valid_from = lv_valid_from(10).
+          ls_roles-data-valid_to   = lv_valid_to(10).
+          ls_roles-datax-valid_from = abap_true.
+          ls_roles-datax-valid_to   = abap_true.
+          ls_roles-task = lc_upd.
+          IF <ls_but100>-rltyp+4(2) = `00`.
+            INSERT ls_roles INTO out-partner-central_data-role-roles INDEX 1.
+          ELSE.
+            APPEND ls_roles TO out-partner-central_data-role-roles.
+          ENDIF.
+        ENDLOOP.
+      ENDIF.
+
+      " Sociedad Proveedor
+      SELECT lifnr,
+             bukrs
+        FROM lfb1
+        INTO TABLE @DATA(lt_lfb1)
+        WHERE lifnr = @out-partner-header-object_instance-bpartner.
+      IF sy-subrc = 0.
+        LOOP AT lt_lfb1 INTO DATA(ls_lfb1).
+          READ TABLE lt_bukrs INTO DATA(ls_bukrs) WITH KEY bukrs = ls_lfb1-bukrs. "#EC CI_STDSEQ
+          IF sy-subrc <> 0.
+            APPEND ls_lfb1-bukrs TO lt_bukrs_new.
+          ENDIF.
+        ENDLOOP.
+      ENDIF.
+
+*** UPGRADE 757 MLCRIS3 Ini.
+*      CLEAR: out-partner-central_data-common-datax-bp_organization,
+*             out-partner-central_data-common-datax-bp_centraldata,
+*             out-partner-central_data-common-datax-bp_person,
+*             out-partner-central_data-common-datax-bp_group,
+*             out-vendor-company_data-company,
+*             out-vendor-company_data-current_state.
+
+      CLEAR out-partner-central_data-common-datax-bp_centraldata.
+      CLEAR out-partner-central_data-common-datax-bp_group.
+      CLEAR out-vendor-company_data-company.
+      CLEAR out-vendor-company_data-current_state.
+
+      CASE ls_but000_guid-BusinessPartnerCategory.
+        WHEN lc_type_person.
+          CLEAR out-partner-central_data-common-data-bp_organization.
+        WHEN lc_type_organization.
+          CLEAR out-partner-central_data-common-data-bp_person.
+          out-partner-central_data-common-data-bp_organization = ls_bp_org_in.
+      ENDCASE.
+*** UPGRADE 757 MLCRIS3 Fin.
+
+      IF out-partner-central_data-common-data-bp_control-grouping = 'GRUP'.
+        out-partner-central_data-common-datax-bp_organization-name1 = abap_true.
+      ENDIF.
+
+      " Se busca si contiene todas las organizaciones dadas de alta, en caso de que no, se quita el flag de datos actuales
+      SELECT ekorg
+        INTO TABLE @DATA(lt_lfm1)
+        FROM lfm1
+        WHERE lifnr = @out-vendor-header-object_instance-lifnr.
+      IF sy-subrc = 0.
+        LOOP AT lt_lfm1 INTO DATA(ls_lfm1).
+*** 1000012230 Modificación 29/02/2024 MLCRIS3 Ini.
+*          READ TABLE out-vendor-purchasing_data-purchasing WITH KEY data_key-ekorg = ls_lfm1-ekorg TRANSPORTING NO FIELDS.
+          ASSIGN out-vendor-purchasing_data-purchasing[ data_key-ekorg = ls_lfm1-ekorg ] TO FIELD-SYMBOL(<fs_purch>).
+*** 1000012230 Modificación 29/02/2024 MLCRIS3 Fin.
+          IF sy-subrc <> 0.
+            out-vendor-purchasing_data-current_state = space.
+*** 1000012230 Modificación 29/02/2024 MLCRIS3 Ini.
+          ELSE.
+            IF <fs_purch>-task = lc_insert.
+              <fs_purch>-task = lc_modify.
+            ENDIF.
+*** 1000012230 Modificación 29/02/2024 MLCRIS3 Fin.
+          ENDIF.
+        ENDLOOP.
+      ENDIF.
+
+*** 1000039877 Modificación 28/10/2026 MLCRIS3 Ini.
+      CALL FUNCTION 'BAPI_BUPA_ADDRESS_GETDETAIL'
+        EXPORTING
+          businesspartner = ls_but000_guid-BusinessPartner
+        IMPORTING
+          addressdata     = ls_addr_data
+        TABLES
+          bapiadtel       = lt_adtel
+          bapiadsmtp      = lt_adsmtp
+          addressusage    = lt_add_usage.
+
+*      ASSIGN out-partner-central_data-address-addresses[ 1 ] TO FIELD-SYMBOL(<ls_address>).
+*      IF sy-subrc = 0.
+*        <ls_address>-data-postal-data = CORRESPONDING #( ls_addr_data ).
+*        LOOP AT <ls_address>-data-communication-phone-phone ASSIGNING FIELD-SYMBOL(<ls_phone>).
+*          READ TABLE lt_adtel INTO DATA(ls_adtel) INDEX 1.
+*          IF sy-subrc = 0.
+*            <ls_phone>-contact-data = CORRESPONDING #( ls_adtel ).
+*          ENDIF.
+*          EXIT.
+*        ENDLOOP.
+*
+*        LOOP AT <ls_address>-data-communication-smtp-smtp ASSIGNING FIELD-SYMBOL(<ls_smtp>).
+*          READ TABLE lt_adsmtp INTO DATA(ls_adsmtp) INDEX 1.
+*          IF sy-subrc = 0.
+*            <ls_smtp>-contact-data = CORRESPONDING #( ls_adsmtp ).
+*          ENDIF.
+*          EXIT.
+*        ENDLOOP.
+*
+*        LOOP AT <ls_address>-data-addr_usage-addr_usages ASSIGNING FIELD-SYMBOL(<ls_usages>).
+*          READ TABLE lt_add_usage INTO DATA(ls_add_usage) INDEX 1.
+*          IF sy-subrc = 0.
+*            IF ls_add_usage-usagevalidfrom <> <ls_usages>-data-valid_from.
+*              <ls_usages>-data-valid_from = ls_add_usage-usagevalidfrom.
+*            ENDIF.
+*
+*            IF ls_add_usage-usagevalidto <> <ls_usages>-data_key-valid_to.
+*              <ls_usages>-data_key-valid_to = ls_add_usage-usagevalidto.
+*            ENDIF.
+*          ENDIF.
+*        ENDLOOP.
+*      ENDIF.
+
+      SELECT * FROM but020
+      INTO TABLE @DATA(lt_but020)
+      WHERE partner = @ls_but000_guid-BusinessPartner.
+      IF sy-subrc = 0 AND lt_but020[] IS NOT INITIAL.
+
+        IF lines( out-partner-central_data-address-addresses ) < lines( lt_but020 ).
+          LOOP AT lt_but020 INTO DATA(ls_but020).
+            TRY.
+                DATA(ls_addresses) = out-partner-central_data-address-addresses[ data_key = ls_but020-address_guid ].
+              CATCH cx_sy_itab_line_not_found.
+
+                CALL FUNCTION 'BUPA_ADDRESS_GET_DETAIL'
+                  EXPORTING
+                    iv_partner  = ls_but000_guid-BusinessPartner
+                    iv_addrguid = ls_but020-address_guid
+                    iv_valdt    = lv_datum
+                  IMPORTING
+                    es_address  = ls_addr
+                  TABLES
+                    et_aduse    = lt_aduse.
+
+                IF lt_aduse[] IS NOT INITIAL.
+
+                  TRY.
+                      DATA(ls_aduse) = lt_aduse[ 1 ].
+
+                      IF ls_aduse-usagevalidto >= sy-datum.
+                        ASSIGN out-partner-central_data-address-addresses[ 1 ] TO FIELD-SYMBOL(<ls_address>).
+                        IF sy-subrc = 0.
+                          <ls_address>-data-postal-data = CORRESPONDING #( ls_addr ).
+                          LOOP AT <ls_address>-data-communication-phone-phone ASSIGNING FIELD-SYMBOL(<ls_phone>).
+                            READ TABLE lt_adtel INTO DATA(ls_adtel) INDEX 1.
+                            IF sy-subrc = 0.
+                              <ls_phone>-contact-data = CORRESPONDING #( ls_adtel ).
+                            ENDIF.
+                            EXIT.
+                          ENDLOOP.
+
+                          LOOP AT <ls_address>-data-communication-smtp-smtp ASSIGNING FIELD-SYMBOL(<ls_smtp>).
+                            READ TABLE lt_adsmtp INTO DATA(ls_adsmtp) INDEX 1.
+                            IF sy-subrc = 0.
+                              <ls_smtp>-contact-data = CORRESPONDING #( ls_adsmtp ).
+                            ENDIF.
+                            EXIT.
+                          ENDLOOP.
+                          LOOP AT <ls_address>-data-addr_usage-addr_usages ASSIGNING FIELD-SYMBOL(<ls_usages>).
+                            IF sy-subrc = 0.
+                              IF ls_aduse-usagevalidfrom <> <ls_usages>-data-valid_from.
+                                <ls_usages>-data-valid_from = ls_aduse-usagevalidfrom.
+                              ENDIF.
+
+                              IF ls_aduse-usagevalidto <> <ls_usages>-data_key-valid_to.
+                                <ls_usages>-data_key-valid_to = ls_aduse-usagevalidto.
+                              ENDIF.
+                            ENDIF.
+                          ENDLOOP.
+                        ENDIF.
+                      ELSE.
+
+                        ASSIGN out-partner-central_data-address-addresses[ 1 ] TO <ls_address>.
+                        IF sy-subrc = 0.
+                        ENDIF.
+
+                        INSERT VALUE #( task = 'I'
+                                        data_key  = VALUE #( addresstype = ls_aduse-addresstype
+                                                             valid_to = ls_aduse-usagevalidto )
+                                        data      = VALUE #( standard = space
+                                                             valid_from = ls_aduse-usagevalidfrom )
+                                        datax     = VALUE #( standard = abap_true
+                                                              valid_from = abap_true ) ) INTO TABLE lt_address_usages.
+                        INSERT VALUE #( task      = 'I'
+                                        data_key  = ls_but020-address_guid
+                                        data      = VALUE #( postal = VALUE #( data = CORRESPONDING #( ls_addr )
+                                                                               datax = <ls_address>-data-postal-datax )
+                                                             addr_usage-addr_usages = lt_address_usages ) )
+                        INTO TABLE out-partner-central_data-address-addresses.
+                        CLEAR lt_address_usages[].
+                      ENDIF.
+
+                    CATCH cx_sy_itab_line_not_found.
+                      CONTINUE.
+                  ENDTRY.
+                ENDIF.
+            ENDTRY.
+          ENDLOOP.
+        ENDIF.
+      ENDIF.
+*** 1000039877 Modificación 28/10/2026 MLCRIS3 Fin.
+
+      LOOP AT lt_bukrs ASSIGNING FIELD-SYMBOL(<ls_bukrs>).
+        l_addtabix = sy-tabix.
+        READ TABLE lt_lfb1 INTO ls_lfb1 WITH KEY bukrs = <ls_bukrs>-bukrs. "#EC CI_STDSEQ
+        IF sy-subrc = 0.
+          DELETE lt_bukrs INDEX l_addtabix.              "#EC CI_STDSEQ
+        ENDIF.
+      ENDLOOP.
+
+      lv_lif_partner = out-partner-header-object_instance-bpartner.
+      lv_lifnr = lv_lif_partner.
+
+      READ TABLE in-business_partner-supplier-zmdg_bp_generic_custom_field
+           INTO  ls_custfld
+           WITH KEY name = lc_iban.                      "#EC CI_STDSEQ
+      IF sy-subrc = 0.
+        lv_iban = ls_custfld-content.
+      ENDIF.
+
+*** 1000001832 Modificación 16/06/2023 MLCRIS3 Ini.
+      " Tipo_cuenta
+      CLEAR ls_custfld.
+      ls_custfld = VALUE #( in-business_partner-supplier-zmdg_bp_generic_custom_field[ name = lc_tipocuenta ] OPTIONAL ).
+      IF ls_custfld-content IS NOT INITIAL.
+        lv_bkref = ls_custfld-content.
+      ENDIF.
+      " Nombre_banco
+      CLEAR ls_custfld.
+      ls_custfld = VALUE #( in-business_partner-supplier-zmdg_bp_generic_custom_field[ name = lc_nombrebanco ] OPTIONAL ).
+      IF ls_custfld-content IS NOT INITIAL.
+        lv_banka = ls_custfld-content.
+      ENDIF.
+      " Moneda_Pago
+      CLEAR ls_custfld.
+      ls_custfld = VALUE #( in-business_partner-supplier-zmdg_bp_generic_custom_field[ name = lc_monedapago ] OPTIONAL ).
+      IF ls_custfld-content IS NOT INITIAL.
+        lv_waers = ls_custfld-content.
+      ENDIF.
+*** 1000001832 Modificación 16/06/2023 MLCRIS3 Fin.
+
+*** 1000014294 Modificación 13/05/2024 MLCRIS3 Ini.
+      " Actividad económica
+      CLEAR ls_custfld.
+      ls_custfld = VALUE #( in-business_partner-supplier-zmdg_bp_generic_custom_field[ name = lc_actividad ] OPTIONAL ).
+      IF ls_custfld-content IS NOT INITIAL.
+        lv_actividad = ls_custfld-content.
+      ENDIF.
+*** 1000014294 Modificación 13/05/2024 MLCRIS3 Fin.
+
+      " Extraemos los datos bancarios.
+      SELECT a~partner,
+             a~bkvid,
+*** 1000039448 Modificación 23/10/2026 MLCRIS3 Ini.
+             a~bankn,
+*** 1000039448 Modificación 23/10/2026 MLCRIS3 Fin.
+*** 1000001832 Modificación 16/06/2023 MLCRIS3 Ini.
+             a~bkref,
+*** 1000001832 Modificación 16/06/2023 MLCRIS3 Fin.
+             b~iban,
+*** 1000001832 Modificación 16/06/2023 MLCRIS3 Ini.
+             c~banka
+*** 1000001832 Modificación 16/06/2023 MLCRIS3 Fin.
+        INTO TABLE @lt_but0bk
+        FROM but0bk AS a
+               INNER JOIN
+                 tiban AS b ON  b~banks = a~banks
+                            AND b~bankl = a~bankl
+                            AND b~bankn = a~bankn
+                            AND b~bkont = a~bkont
+*** 1000001832 Modificación 16/06/2023 MLCRIS3 Ini.
+                   INNER JOIN
+                     bnka AS c ON  c~banks = a~banks
+                               AND c~bankl = a~bankl
+*** 1000001832 Modificación 16/06/2023 MLCRIS3 Fin.
+        WHERE a~partner = @lv_lifnr.
+      IF sy-subrc = 0.
+        LOOP AT lt_but0bk ASSIGNING FIELD-SYMBOL(<ls_but0bk>).
+*** 1000107180 Modifciación 03/03/2023 MLCRIS3 Ini.
+*          IF lv_iban = <ls_but0bk>-iban.
+*** 1000039448 Modificación 23/10/2026 MLCRIS3 Ini.
+          IF <ls_but0bk>-iban IS NOT INITIAL.
+*** 1000039448 Modificación 23/10/2026 MLCRIS3 Fin.
+            CLEAR lv_iban_db.
+            lv_iban_db = <ls_but0bk>-iban.
+            CONDENSE lv_iban NO-GAPS.
+            CONDENSE lv_iban_db NO-GAPS.
+            IF lv_iban = lv_iban_db.
+*** 1000011381 Modificación 06/02/2024 MLCRIS3 Ini.
+***** 1000001832 Modificación 16/06/2023 MLCRIS3 Ini.
+**          AND lv_bkref = <ls_but0bk>-bkref
+**          AND lv_banka = <ls_but0bk>-banka.
+***** 1000001832 Modificación 16/06/2023 MLCRIS3 Fin.
+***** 1000107180 Modifciación 03/03/2023 MLCRIS3 Fin.
+*** 1000011381 Modificación 06/02/2024 MLCRIS3 Fin.
+              CLEAR lv_iban.
+            ENDIF.
+*** 1000039448 Modificación 23/10/2026 MLCRIS3 Ini.
+          ELSE.
+            IF <ls_but0bk>-bankn IS NOT INITIAL.
+              CLEAR lv_bankn_db.
+              lv_bankn_db = <ls_but0bk>-bankn.
+              CONDENSE lv_bankn_db NO-GAPS.
+              IF lv_iban IS NOT INITIAL.
+                CONDENSE lv_iban NO-GAPS.
+                IF lv_iban = lv_bankn_db.
+                  CLEAR lv_iban.
+                ENDIF.
+              ELSE.
+                CONDENSE lv_cuenta_clabe NO-GAPS.
+                IF lv_cuenta_clabe = lv_bankn_db.
+                  CLEAR lv_cuenta_clabe.
+                ENDIF.
+              ENDIF.
+            ENDIF.
+          ENDIF.
+*** 1000039448 Modificación 23/10/2026 MLCRIS3 Fin.
+        ENDLOOP.
+*** 1000039448 Modificación 23/10/2026 MLCRIS3 Ini.
+      ELSE.
+        SELECT partner,bankn FROM but0bk
+        WHERE partner = @lv_lifnr
+        INTO TABLE @DATA(lt_bankdata).
+        IF sy-subrc = 0 AND lt_bankdata[] IS NOT INITIAL.
+          LOOP AT lt_bankdata ASSIGNING FIELD-SYMBOL(<ls_bankdata>).
+            IF <ls_bankdata>-bankn IS NOT INITIAL.
+              CLEAR lv_bankn_db.
+              lv_bankn_db = <ls_bankdata>-bankn.
+              CONDENSE lv_bankn_db NO-GAPS.
+              IF lv_iban IS NOT INITIAL.
+                CONDENSE lv_iban NO-GAPS.
+                IF lv_iban = lv_bankn_db.
+                  CLEAR lv_iban.
+                ENDIF.
+              ELSE.
+                CONDENSE lv_cuenta_clabe NO-GAPS.
+                IF lv_cuenta_clabe = lv_bankn_db.
+                  CLEAR lv_cuenta_clabe.
+                ENDIF.
+              ENDIF.
+            ENDIF.
+          ENDLOOP.
+        ENDIF.
+*** 1000039448 Modificación 23/10/2026 MLCRIS3 Fin.
+      ENDIF.
+
+      IF lt_bukrs IS NOT INITIAL.
+        lv_a = abap_true.
+      ENDIF.
+
+      IF    lv_iban         IS NOT INITIAL
+         OR lv_cuenta_clabe IS NOT INITIAL.     " ROMX: Notificación de bancos México
+        lv_b = abap_true.
+      ENDIF.
+
+      lv_activ = lc_02.
+      lv_partner = ls_but000_guid-BusinessPartner.
+
+      SELECT taxtype,
+             taxnum,
+             taxnumxl
+        INTO TABLE @DATA(lt_taxtype)
+        FROM dfkkbptaxnum
+        WHERE partner = @out-partner-header-object_instance-bpartner.
+      IF sy-subrc = 0.
+        LOOP AT lt_taxtype INTO DATA(ls_taxtype).
+          IF NOT line_exists( out-partner-central_data-taxnumber-taxnumbers[ data_key = ls_taxtype ] ).
+            CLEAR ls_taxnumbers.
+            ls_taxnumbers-task     = 'I'.
+            ls_taxnumbers-data_key = ls_taxtype.
+            APPEND ls_taxnumbers TO out-partner-central_data-taxnumber-taxnumbers.
+          ENDIF.
+        ENDLOOP.
+      ENDIF.
+
+*** 1000097556 Modifciación 02/02/2023 MLCRIS3 Ini.
+      DATA(ls_common) = in-business_partner-common[ 1 ].
+
+      lv_name1 = ls_common-organisation-name-first_line_name. " Razón Social
+*** 1000015587 Modificación 26/06/2024 MLCRIS3 Ini.
+*      lv_name2 = ls_common-organisation-name-second_line_name. "Nombre (Persona física)
+      lv_name2 = |{ ls_common-organisation-name-first_line_name }{ ls_common-organisation-name-second_line_name }|. " Nombre (Persona física)
+*** 1000015587 Modificación 26/06/2024 MLCRIS3 Fin.
+
+      SELECT SINGLE partner,name_org1,name_org2,name_org3,name_org4, name_last,name_first,name_last2,namemiddle
+        FROM but000
+        WHERE partner = @lv_lifnr
+        INTO @DATA(ls_bp_names).
+      IF sy-subrc = 0.
+        IF lv_category = 1.
+          lv_current_name = |{ ls_bp_names-name_first } { ls_bp_names-name_last } { ls_bp_names-name_last2 } { ls_bp_names-namemiddle }|.
+        ELSE.
+          lv_current_name = |{ ls_bp_names-name_org1 } { ls_bp_names-name_org2 } { ls_bp_names-name_org3 } { ls_bp_names-name_org4 }|.
+        ENDIF.
+*** 1000107180 Modifciación 03/03/2023 MLCRIS3 Ini.
+        lv_name1 = condense( val  = lv_name1
+                             from = ` `
+                             to   = `` ).
+        lv_name2 = condense( val  = lv_name2
+                             from = ` `
+                             to   = `` ).
+        lv_current_name = condense( val  = lv_current_name
+                                    from = ` `
+                                    to   = `` ).
+*** 1000107180 Modifciación 03/03/2023 MLCRIS3 Fin.
+*** 1000015587 Modificación 26/06/2024 MLCRIS3 Ini.
+        IF lv_category = 2.
+*** 1000015587 Modificación 26/06/2024 MLCRIS3 Fin.
+          IF lv_name1 IS NOT INITIAL AND lv_name1 <> lv_current_name.
+            lv_e = abap_true.
+            lv_name_org = ls_common-organisation-name-first_line_name.
+          ENDIF.
+*** 1000015587 Modificación 26/06/2024 MLCRIS3 Ini.
+
+          CLEAR out-partner-central_data-common-data-bp_person.
+          out-partner-central_data-common-data-bp_organization-name1 = ls_bp_names-name_org1.
+          out-partner-central_data-common-data-bp_organization-name2 = ls_bp_names-name_org2.
+          out-partner-central_data-common-data-bp_organization-name3 = ls_bp_names-name_org3.
+          out-partner-central_data-common-data-bp_organization-name4 = ls_bp_names-name_org4.
+          out-partner-central_data-common-datax-bp_organization-name1 = abap_true.
+          out-partner-central_data-common-datax-bp_organization-name2 = abap_true.
+          out-partner-central_data-common-datax-bp_organization-name3 = abap_true.
+          out-partner-central_data-common-datax-bp_organization-name4 = abap_true.
+
+        ELSE.
+*** 1000015587 Modificación 26/06/2024 MLCRIS3 Fin.
+          IF lv_name2 IS NOT INITIAL AND lv_name2 <> lv_current_name.
+            lv_f = abap_true.
+*** 1000015587 Modificación 26/06/2024 MLCRIS3 Ini.
+*            lv_name_fis = ls_common-organisation-name-second_line_name.
+            lv_name_fis = |{ ls_common-organisation-name-first_line_name }{ ls_common-organisation-name-second_line_name }|.
+*** 1000015587 Modificación 26/06/2024 MLCRIS3 Fin.
+          ENDIF.
+*** 1000015587 Modificación 26/06/2024 MLCRIS3 Ini.
+
+          CLEAR out-partner-central_data-common-data-bp_organization.
+          out-partner-central_data-common-data-bp_person-firstname  = ls_bp_names-name_first.
+          out-partner-central_data-common-data-bp_person-lastname   = ls_bp_names-name_last.
+          out-partner-central_data-common-data-bp_person-birthname  = ls_bp_names-name_last2.
+          out-partner-central_data-common-data-bp_person-middlename = ls_bp_names-namemiddle.
+          out-partner-central_data-common-datax-bp_person-firstname  = abap_true.
+          out-partner-central_data-common-datax-bp_person-lastname   = abap_true.
+          out-partner-central_data-common-datax-bp_person-birthname  = abap_true.
+          out-partner-central_data-common-datax-bp_person-middlename = abap_true.
+
+        ENDIF.
+*** 1000015587 Modificación 26/06/2024 MLCRIS3 Fin.
+      ENDIF.
+
+      IF lt_lfb1[] IS NOT INITIAL.
+*** 1000001491 Modificación 08/05/2023 MLCRIS3 Ini.
+*        SELECT bukrs,land1 FROM t001
+*        FOR ALL ENTRIES IN @lt_lfb1
+*        WHERE bukrs = @lt_lfb1-bukrs
+*        INTO TABLE @DATA(lt_land1).
+*        IF sy-subrc = 0 AND lt_land1[] IS NOT INITIAL.
+*          SELECT land1,spras FROM t005
+*          FOR ALL ENTRIES IN @lt_land1
+*          WHERE land1 = @lt_land1-land1
+*          INTO TABLE @DATA(lt_spras).
+*          IF sy-subrc <> 0.
+*            CLEAR lt_spras[].
+*          ENDIF.
+*        ENDIF.
+*
+*        SELECT bukrs,smtp_addr FROM zarb_email_bukrs
+*        INTO TABLE @DATA(lt_email_bukrs).
+*        IF sy-subrc = 0.
+*          lt_emails_admon = VALUE #( FOR ls_lfb1_aux IN lt_lfb1
+*                                     LET ls_bukrs_aux = COND #( WHEN line_exists( lt_email_bukrs[ bukrs = ls_lfb1_aux-bukrs ] )
+*                                                                THEN lt_email_bukrs[ bukrs = ls_lfb1_aux-bukrs ]
+*                                                                ELSE lt_email_bukrs[ bukrs = '*' ] )
+*                                         ls_land1 = COND #( WHEN line_exists( lt_land1[ bukrs = ls_bukrs_aux-bukrs ] )
+*                                                            THEN lt_land1[ bukrs = ls_bukrs_aux-bukrs ] )
+*                                     IN ( bukrs = ls_lfb1_aux-bukrs
+*                                          spras = COND #( WHEN line_exists( lt_spras[ land1 = ls_land1-land1 ] )
+*                                                          THEN lt_spras[ land1 = ls_land1-land1 ]-spras
+*                                                          ELSE lc_es )
+*                                          smtp_addr = ls_bukrs_aux-smtp_addr ) ).
+*        ENDIF.
+
+        SELECT
+          FROM zfi14a AS a
+                 INNER JOIN
+                   zfi15 AS b ON a~zgroup = b~zgroup
+          FIELDS a~bukrs,
+                 a~spras,
+                 b~zmailinterf
+          FOR ALL ENTRIES IN @lt_lfb1
+          WHERE a~bukrs     = @lt_lfb1-bukrs
+            AND znumasi_low = @lc_zar
+          INTO TABLE @lt_emails_admon.
+*** 1000001491 Modificación 08/05/2023 MLCRIS3 Fin.
+
+*** 1000016827 Modificación 11/08/2025 MLCRIS3 Ini.
+        LOOP AT lt_lfb1 INTO ls_lfb1.
+          update_zema_text( iv_lifnr = ls_lfb1-lifnr
+                            iv_bukrs = ls_lfb1-bukrs
+                            iv_mail  = lv_fact_mail
+                            iv_langu = lv_langu ).
+        ENDLOOP.
+*** 1000016827 Modificación 11/08/2025 MLCRIS3 Fin.
+      ENDIF.
+*** 1000097556 Modifciación 02/02/2023 MLCRIS3 Fin.
+
+    ELSE.
+      " Nuevo BP
+      lv_activ = lc_01.
+      CLEAR lv_partner.
+
+      READ TABLE in-business_partner-supplier-zmdg_bp_generic_custom_field
+           INTO  ls_custfld
+           WITH KEY name = lc_iban.                      "#EC CI_STDSEQ
+      IF sy-subrc = 0.
+        lv_iban = ls_custfld-content.
+      ENDIF.
+
+*** 1000001832 Modificación 16/06/2023 MLCRIS3 Ini.
+      " Tipo_cuenta
+      CLEAR ls_custfld.
+      ls_custfld = VALUE #( in-business_partner-supplier-zmdg_bp_generic_custom_field[ name = lc_tipocuenta ] OPTIONAL ).
+      IF ls_custfld-content IS NOT INITIAL.
+        lv_bkref = ls_custfld-content.
+      ENDIF.
+      " Nombre_banco
+      CLEAR ls_custfld.
+      ls_custfld = VALUE #( in-business_partner-supplier-zmdg_bp_generic_custom_field[ name = lc_nombrebanco ] OPTIONAL ).
+      IF ls_custfld-content IS NOT INITIAL.
+        lv_banka = ls_custfld-content.
+      ENDIF.
+      " Moneda_Pago
+      CLEAR ls_custfld.
+      ls_custfld = VALUE #( in-business_partner-supplier-zmdg_bp_generic_custom_field[ name = lc_monedapago ] OPTIONAL ).
+      IF ls_custfld-content IS NOT INITIAL.
+        lv_waers = ls_custfld-content.
+      ENDIF.
+*** 1000001832 Modificación 16/06/2023 MLCRIS3 Fin.
+
+*** 1000014294 Modificación 13/05/2024 MLCRIS3 Ini.
+      " Actividad económica
+      CLEAR ls_custfld.
+      ls_custfld = VALUE #( in-business_partner-supplier-zmdg_bp_generic_custom_field[ name = lc_actividad ] OPTIONAL ).
+      IF ls_custfld-content IS NOT INITIAL.
+        lv_actividad = ls_custfld-content.
+      ENDIF.
+*** 1000014294 Modificación 13/05/2024 MLCRIS3 Fin.
+
+      CLEAR ls_but000.
+      ls_but000-name_first = out-partner-central_data-common-data-bp_person-firstname.
+      ls_but000-name_last  = out-partner-central_data-common-data-bp_person-lastname.
+      ls_but000-name_last2 = out-partner-central_data-common-data-bp_person-birthname.
+      ls_but000-namemiddle = out-partner-central_data-common-data-bp_person-middlename.
+      ls_but000-natpers    = out-partner-central_data-taxnumber-common-data-nat_person.
+      ls_but000-name_org1  = out-partner-central_data-common-data-bp_organization-name1.
+      ls_but000-name_org2  = out-partner-central_data-common-data-bp_organization-name2.
+      ls_but000-name_org3  = out-partner-central_data-common-data-bp_organization-name3.
+      ls_but000-name_org4  = out-partner-central_data-common-data-bp_organization-name4.
+
+      lv_category = out-partner-central_data-common-data-bp_control-category.
+      lv_group    = out-partner-central_data-common-data-bp_control-grouping.
+
+      IF lt_bukrs IS NOT INITIAL.
+        lv_c = abap_true.
+      ENDIF.
+
+      IF    lv_iban         IS NOT INITIAL
+         OR lv_cuenta_clabe IS NOT INITIAL.     " ROMX: Notificación de bancos México
+        lv_d = abap_true.
+      ENDIF.
+
+    ENDIF.
+
+    IF out-partner-header-object_instance-bpartner IS NOT INITIAL.
+      SELECT
+        FROM but0id
+        FIELDS *
+        WHERE type    IN ( @zif_mxx_bp_constants=>id_type-lei,
+                           @zif_mxx_bp_constants=>id_type-euid )
+          AND partner  = @out-partner-header-object_instance-bpartner
+        INTO TABLE @DATA(lt_ids).
+      IF sy-subrc <> 0.
+        CLEAR lt_ids.
+      ENDIF.
+    ENDIF.
+
+    IF         lv_lei IS NOT INITIAL
+       AND NOT line_exists( lt_ids[ type     = zif_mxx_bp_constants=>id_type-lei
+                                    idnumber = lv_lei ] ).
+
+      INSERT VALUE #( task                            = gc_task-insert
+                      data_key-identificationcategory = zif_mxx_bp_constants=>id_type-lei
+                      data_key-identificationnumber   = lv_lei
+                      data-identrydate                = sy-datum
+                      datax-identrydate               = abap_true )
+             INTO TABLE out-partner-central_data-ident_number-ident_numbers.
+
+    ENDIF.
+
+    IF         lv_euid IS NOT INITIAL
+       AND NOT line_exists( lt_ids[ type     = zif_mxx_bp_constants=>id_type-euid
+                                    idnumber = lv_euid ] ).
+
+      INSERT VALUE #( task                            = gc_task-insert
+                      data_key-identificationcategory = zif_mxx_bp_constants=>id_type-euid
+                      data_key-identificationnumber   = lv_euid
+                      data-identrydate                = sy-datum
+                      datax-identrydate               = abap_true )
+             INTO TABLE out-partner-central_data-ident_number-ident_numbers.
+
+    ENDIF.
+
+    out-partner-central_data-common-data-zparentcompanyeuid_bus   = lv_matriz_euid.
+    out-partner-central_data-common-datax-zparentcompanyeuid_bus  = abap_true.
+
+    out-partner-central_data-common-data-zparentcompanylei_bus    = lv_matriz_lei.
+    out-partner-central_data-common-datax-zparentcompanylei_bus   = abap_true.
+
+    out-partner-central_data-common-data-zparentcompanyname_bus   = lv_razon_social_matriz.
+    out-partner-central_data-common-datax-zparentcompanyname_bus  = abap_true.
+
+    out-partner-central_data-common-data-zparentsuppliername_bus  = lv_nombre_proveedor_matriz.
+    out-partner-central_data-common-datax-zparentsuppliername_bus = abap_true.
+
+    out-partner-central_data-common-data-zparentcountry_bus       = lv_codigo_pais_matriz.
+    out-partner-central_data-common-datax-zparentcountry_bus      = abap_true.
+
+    out-partner-central_data-common-data-ztypeidparentnatper_bus  = lv_tipo_id_matriz_pf.
+    out-partner-central_data-common-datax-ztypeidparentnatper_bus = abap_true.
+
+    out-partner-central_data-common-data-zparentnatpersid_bus     = lv_id_matriz_pf.
+    out-partner-central_data-common-datax-zparentnatpersid_bus    = abap_true.
+
+    out-partner-central_data-common-data-zrequestercountry_bus    = lv_requester_country.
+    out-partner-central_data-common-datax-zrequestercountry_bus   = abap_true.
+
+    IF lt_bukrs IS NOT INITIAL.
+      " Configuración de correos
+      SELECT
+        FROM zfi14a AS a
+               INNER JOIN
+                 zfi15 AS b ON a~zgroup = b~zgroup
+        FIELDS a~bukrs,
+               a~spras,
+               b~zmailinterf
+        FOR ALL ENTRIES IN @lt_bukrs
+        WHERE a~bukrs     = @lt_bukrs-bukrs
+          AND znumasi_low = @lc_zar
+        INTO TABLE @lt_emails.                            "#EC CI_SUBRC
+
+    ENDIF.
+
+    IF lv_b = abap_true.
+      LOOP AT lt_lfb1 ASSIGNING FIELD-SYMBOL(<ls_lfb1>).
+        APPEND <ls_lfb1>-bukrs TO lt_bukrs_email.
+      ENDLOOP.
+      APPEND LINES OF lt_bukrs TO lt_bukrs_email.
+      SORT lt_bukrs BY bukrs ASCENDING.
+      DELETE ADJACENT DUPLICATES FROM lt_bukrs_email.
+      IF lt_bukrs_email IS NOT INITIAL.
+        " Configuración de correos
+        SELECT
+          FROM zfi14a AS a
+                 INNER JOIN
+                   zfi15 AS b ON a~zgroup = b~zgroup
+          FIELDS a~bukrs,
+                 a~spras,
+                 b~zmailinterf
+          FOR ALL ENTRIES IN @lt_bukrs_email
+          WHERE a~bukrs     = @lt_bukrs_email-bukrs
+            AND znumasi_low = @lc_zar
+          INTO TABLE @lt_emails_iban.                     "#EC CI_SUBRC
+      ENDIF.
+    ELSE.
+      lt_emails_iban = lt_emails.
+    ENDIF.
+
+*>TINGUAR 29/09/2021 Nuevos campos persona física
+    IF out-partner-central_data-common-data-bp_control-category = lc_type_person.
+
+      " Persona física
+      out-partner-central_data-taxnumber-common-data-nat_person = abap_true.
+      out-partner-central_data-taxnumber-common-datax-nat_person = abap_true.
+
+      " Género
+      ASSIGN in-business_partner-supplier-zmdg_bp_generic_custom_field[ name = lc_field_sexkz ] TO FIELD-SYMBOL(<fs_custom_field>). "#EC CI_STDSEQ
+      IF sy-subrc = 0.
+        IF strlen( <fs_custom_field>-content ) <> 0.
+          IF <fs_custom_field>-content(1) = lc_f.
+            out-partner-central_data-common-data-bp_person-sex = lc_femenino.
+          ELSE.
+            out-partner-central_data-common-data-bp_person-sex = lc_masculino.
+          ENDIF.
+          out-partner-central_data-common-datax-bp_person-sex = abap_true.
+        ENDIF.
+      ENDIF.
+
+      " Lugar de nacimiento
+      ASSIGN in-business_partner-supplier-zmdg_bp_generic_custom_field[ name = lc_field_gbort ] TO <fs_custom_field>. "#EC CI_STDSEQ
+      IF sy-subrc = 0.
+        out-partner-central_data-common-data-bp_person-birthplace = <fs_custom_field>-content.
+        out-partner-central_data-common-datax-bp_person-birthplace = abap_true.
+      ENDIF.
+
+      " Fecha de nacimiento
+      ASSIGN in-business_partner-supplier-zmdg_bp_generic_custom_field[ name = lc_field_gbdat ] TO <fs_custom_field>. "#EC CI_STDSEQ
+      IF sy-subrc = 0.
+        IF strlen( <fs_custom_field>-content ) = 8.
+          out-partner-central_data-common-data-bp_person-birthdate = <fs_custom_field>-content.
+          out-partner-central_data-common-datax-bp_person-birthdate = abap_true.
+        ELSEIF strlen( <fs_custom_field>-content ) > 8.
+          CONCATENATE <fs_custom_field>-content(4)
+                      <fs_custom_field>-content+5(2)
+                      <fs_custom_field>-content+8(2) INTO out-partner-central_data-common-data-bp_person-birthdate.
+          out-partner-central_data-common-datax-bp_person-birthdate = abap_true.
+        ENDIF.
+      ENDIF.
+
+      " TITLE
+      ASSIGN in-business_partner-supplier-zmdg_bp_generic_custom_field[ name = lc_field_title ] TO <fs_custom_field>. "#EC CI_STDSEQ
+      IF sy-subrc = 0.
+        out-partner-central_data-common-data-bp_centraldata-titleletter = <fs_custom_field>-content.
+        out-partner-central_data-common-datax-bp_centraldata-titleletter = abap_true.
+      ENDIF.
+
+      " NATIO
+      ASSIGN in-business_partner-supplier-zmdg_bp_generic_custom_field[ name = lc_field_natio ] TO <fs_custom_field>. "#EC CI_STDSEQ
+      IF sy-subrc = 0.
+        CLEAR lv_intca3.
+        lv_intca3 = <fs_custom_field>-content.
+        IF lv_intca3 IS NOT INITIAL.
+          " Seleccionamos pais e iso
+          SELECT SINGLE land1, intca
+            INTO ( @out-partner-central_data-common-data-bp_person-nationality,
+                   @out-partner-central_data-common-data-bp_person-nationalityiso )
+            FROM t005
+            WHERE intca3 = @lv_intca3.
+          IF out-partner-central_data-common-data-bp_person-nationality IS NOT INITIAL.
+            out-partner-central_data-common-datax-bp_person-nationality = abap_true.
+          ENDIF.
+          IF out-partner-central_data-common-data-bp_person-nationalityiso IS NOT INITIAL.
+            out-partner-central_data-common-datax-bp_person-nationalityiso = abap_true.
+          ENDIF.
+        ENDIF.
+      ENDIF.
+
+    ENDIF.
+*<TINGUAR 29/09/2021 Nuevos campos persona física
+
+    IF zcl_mxx_utilities=>get( )->is_toggle_active_and_exists( 'ZBUPA_FURTHER_CHECK_NEW' ) = abap_false.
+
+      " Validaciones
+      DATA(lo_validacion) = NEW zcl_im_bupa_further_checks( i_batch = abap_true
+                                                            i_tax   = lt_taxdetails ).
+      IF lo_validacion IS BOUND.
+        CLEAR lt_return.
+        lo_validacion->if_ex_bupa_further_checks~check_central( EXPORTING iv_activity    = lv_activ
+                                                                          iv_partner     = lv_partner
+                                                                          iv_category    = lv_category
+                                                                          iv_group       = lv_group
+                                                                          is_data        = ls_data
+                                                                          is_data_person = ls_data_person
+                                                                          is_data_organ  = ls_data_organ
+                                                                          is_data_group  = ls_data_group
+                                                                          is_but000      = ls_but000
+                                                                CHANGING  et_return      = lt_return ).
+        LOOP AT lt_return INTO DATA(ls_return) WHERE id = lc_msgid
+                                                 AND ( number = lc_msgnr_552 OR number = lc_msgnr_564 ). "#EC CI_STDSEQ
+          sy-subrc = 0.
+        ENDLOOP.
+        IF sy-subrc = 0.
+
+          out-partner-central_data-taxnumber-common-data-nat_person = abap_true.
+          ls_but000-natpers = out-partner-central_data-taxnumber-common-data-nat_person.
+          out-partner-central_data-taxnumber-current_state = abap_true.
+          CLEAR lt_return.
+          lo_validacion->if_ex_bupa_further_checks~check_central( EXPORTING iv_activity    = lv_activ
+                                                                            iv_partner     = lv_partner
+                                                                            iv_category    = lv_category
+                                                                            iv_group       = lv_group
+                                                                            is_data        = ls_data
+                                                                            is_data_person = ls_data_person
+                                                                            is_data_organ  = ls_data_organ
+                                                                            is_data_group  = ls_data_group
+                                                                            is_but000      = ls_but000
+                                                                  CHANGING  et_return      = lt_return ).
+        ENDIF.
+
+        LOOP AT lt_return INTO ls_return WHERE type = lc_abort
+                                            OR type = lc_error. "#EC CI_STDSEQ
+
+          in_message_container->add_bapi_message( is_bapiret    = ls_return
+                                                  iv_main_error = abap_true ).
+          lv_flag_comm = abap_false.
+        ENDLOOP.
+        IF lv_flag_comm = abap_true.
+          CALL FUNCTION 'BAPI_TRANSACTION_COMMIT'
+            EXPORTING
+              wait = abap_true.
+        ENDIF.
+      ENDIF.
+
+    ENDIF.
+
+    IF ls_but000_guid IS NOT INITIAL.
+      SELECT SINGLE name_first,
+                    name_last,
+                    name_last2,
+                    namemiddle,
+                    name_org1,
+                    name_org2,
+                    name_org3,
+                    name_org4
+        INTO @DATA(ls_names)
+        FROM but000
+        WHERE partner = @ls_but000_guid-BusinessPartner.
+      IF sy-subrc = 0.
+        ls_but000 = CORRESPONDING #( ls_names ).
+      ENDIF.
+    ENDIF.
+
+    IF lv_category = 1.
+      CONCATENATE ls_but000-name_first
+                  ls_but000-name_last
+                  ls_but000-name_last2
+                  ls_but000-namemiddle
+                  INTO lv_name SEPARATED BY space.
+
+    ELSE.
+      CONCATENATE ls_but000-name_org1
+                  ls_but000-name_org2
+                  ls_but000-name_org3
+                  ls_but000-name_org4
+                  INTO lv_name SEPARATED BY space.
+    ENDIF.
+
+*** 1000015798 Modificación 30/07/2024 MLCRIS3 Ini.
+    IF     cl_feature_toggle=>is_active( gc_toggle_bankcert )
+       AND ( lv_b IS NOT INITIAL OR lv_d IS NOT INITIAL ).
+
+      TRY.
+*          DATA(ls_attachment) = get_cert_bank( CONV #( in-business_partner-internal_id ) ).
+          DATA(ls_attachment) = get_cert_bank( iv_sm_vendor = CONV #( in-business_partner-internal_id )
+                                               iv_land_bp   = lv_land_bp ).
+        CATCH /rslt/cx_arbapi INTO DATA(lx_arbapi).
+
+          LOOP AT zcl_adu_messages=>create( )->add_exception( lx_arbapi )->get_messages( ) ASSIGNING FIELD-SYMBOL(<ls_messge>).
+            in_message_container->add_bapi_message( <ls_messge> ).
+          ENDLOOP.
+
+      ENDTRY.
+
+    ENDIF.
+*** 1000015798 Modificación 30/07/2024 MLCRIS3 Fin.
+
+*** 1000022455 Modificación 04/02/2025 MLCRIS3 Ini.
+    IF cl_feature_toggle=>is_active( iv_toggle_id = gc_toggle_deactivate_notif ) = abap_false.
+*** 1000022455 Modificación 04/02/2025 MLCRIS3 Fin.
+
+      CALL FUNCTION 'ZMMMMF_SAVE_DATA'
+        EXPORTING
+          iv_natpers                 = ls_but000-natpers
+          iv_a                       = lv_a
+          iv_b                       = lv_b
+          iv_c                       = lv_c
+          iv_d                       = lv_d
+*** 1000097556 Modificación 02/02/2023 MLCRIS3 Ini.
+          iv_e                       = lv_e
+          iv_f                       = lv_f
+*** 1000097556 Modificación 02/02/2023 MLCRIS3 Fin.
+          iv_iban                    = lv_iban
+          iv_regimen_impositivo      = lv_regimen_impositivo       " ROCO
+          iv_tipo_cuenta_co          = lv_tipo_cuenta_co           " 1000012745, ROCO Distinción Tipo de Cta Bancaria Prov
+          iv_name                    = lv_name
+          iv_acmid                   = lv_acmid
+*** 1000097556 Modificación 02/02/2023 MLCRIS3 Ini.
+          iv_name_org                = lv_name_org
+          iv_name_fis                = lv_name_fis
+*** 1000097556 Modificación 02/02/2023 MLCRIS3 Fin.
+*** 1000001832 Modificación 16/06/2023 MLCRIS3 Ini.
+          iv_bkref                   = lv_bkref
+          iv_banka                   = lv_banka
+          iv_waers                   = lv_waers
+          iv_land1                   = lv_land_bp
+*** 1000001832 Modificación 16/06/2023 MLCRIS3 Fin.
+*** 1000014294 Modificación 13/05/2024 MLCRIS3 Ini.
+          iv_actividad               = lv_actividad
+*** 1000014294 Modificación 13/05/2024 MLCRIS3 Fin.
+*** 1000015798 Modificación 30/07/2024 MLCRIS3 Ini.
+          is_attachment              = ls_attachment
+*** 1000015798 Modificación 30/07/2024 MLCRIS3 Fin.
+          iv_pais_banco              = lv_pais_banco                  " ROMX: Notificación de bancos México
+          iv_cuenta_clabe            = lv_cuenta_clabe                " ROMX: Notificación de bancos México
+          iv_numbero_aba             = lv_numbero_aba                 " ROMX: Notificación de bancos México
+          iv_numero_convenio_cie     = lv_numero_convenio_cie         " ROMX: Notificación de bancos México
+          iv_referencia_convenio_cie = lv_referencia_convenio_cie     " ROMX: Notificación de bancos México
+          iv_routing_number          = lv_routing_number              " 1000020009, ROUS - Routing number notif finanzas
+          iv_fact_mail               = lv_fact_mail                   " 1000016827 Modificación 11/08/2025 MLCRIS3
+        TABLES
+          pt_emails                  = lt_emails
+          pt_emails_iban             = lt_emails_iban
+*** 1000097556 Modificación 02/02/2023 MLCRIS3 Ini.
+          pt_emails_admon            = lt_emails_admon.
+*** 1000097556 Modificación 02/02/2023 MLCRIS3 Fin.
+
+*** 1000022455 Modificación 04/02/2025 MLCRIS3 Ini.
+    ENDIF.
+*** 1000022455 Modificación 04/02/2025 MLCRIS3 Fin.
+
+    IF out-vendor-header-object_instance-lifnr IS NOT INITIAL.
+      SELECT ekorg,
+             zzname,
+             zzname_last,
+             zztel_number,
+             zzsmtp_addr,
+             zztipo_envio
+        INTO TABLE @DATA(lt_cust_fld)
+        FROM lfm1
+        WHERE lifnr = @out-vendor-header-object_instance-lifnr.
+      IF sy-subrc = 0.
+
+      ENDIF.
+    ENDIF.
+    "<!-- 1000005154, ARIBA Error en la integ de Contactos y M
+    "<!-- 1000092342 Inicio
+*    IMPORT lt_contacto TO lt_contacto FROM MEMORY ID gc_memory_id_contacto.
+*    FREE MEMORY ID gc_memory_id_contacto.
+
+    DATA(lt_contacts) = build_contacts( in-business_partner ).
+    "--> 1000005154, ARIBA Error en la integ de Contactos y M
+
+** XTAH Inicio
+    LOOP AT out-vendor-purchasing_data-purchasing ASSIGNING FIELD-SYMBOL(<lw_vendor>).
+      "<!-- 1000092342 Inicio
+
+*** 1000031358 Modificación 27/11/2025 MLCRIS3 Ini.
+      <lw_vendor>-data-webre = abap_true.
+      <lw_vendor>-datax-webre = abap_true.
+*** 1000031358 Modificación 27/11/2025 MLCRIS3 Fin.
+
+      "<!-- 1000005154, ARIBA Error en la integ de Contactos y M
+*      READ TABLE lt_contacto ASSIGNING FIELD-SYMBOL(<ls_contacto>) WITH KEY ekorg = <lw_vendor>-data_key-ekorg.
+*
+***    Formulario interno - Contacto
+*      IF sy-subrc EQ 0 AND <ls_contacto>-zzname IS NOT INITIAL AND
+*         cl_feature_toggle=>is_active( iv_toggle_id =  gc_toggle_slp_contacto ) = abap_true.
+*
+**     Name
+*        <lw_vendor>-data-zzname  = <ls_contacto>-zzname.
+*        <lw_vendor>-datax-zzname = abap_true.
+**     Last name
+*        <lw_vendor>-data-zzname_last  = <ls_contacto>-zzname_last.
+*        <lw_vendor>-datax-zzname_last = abap_true.
+**      Telephone
+*        <lw_vendor>-data-zztel_number  = <ls_contacto>-zztel_number.
+*        <lw_vendor>-datax-zztel_number = abap_true.
+**      Mail
+*        <lw_vendor>-data-zzsmtp_addr  = <ls_contacto>-zzsmtp_addr.
+*        <lw_vendor>-datax-zzsmtp_addr = abap_true.
+**      Medio de envio
+*        <lw_vendor>-data-zztipo_envio  = <ls_contacto>-zztipo_envio.
+*        <lw_vendor>-datax-zztipo_envio = abap_true.
+*      ELSE.
+      "--> 1000092342 Fin
+      CLEAR <lw_vendor>-data-rdprf.
+
+      DATA(ls_contact) = VALUE #( lt_contacts[ purchasing_organization = <lw_vendor>-data_key-ekorg ] OPTIONAL ).
+
+**    Formulario interno - Contacto
+      IF     ls_contact-first_name IS NOT INITIAL
+         AND cl_feature_toggle=>is_active( iv_toggle_id = gc_toggle_slp_contacto )  = abap_true.
+
+*     Name
+        <lw_vendor>-data-zzname  = ls_contact-first_name.
+        <lw_vendor>-datax-zzname = abap_true.
+*     Last name
+        <lw_vendor>-data-zzname_last  = ls_contact-last_name.
+        <lw_vendor>-datax-zzname_last = abap_true.
+*      Telephone
+        <lw_vendor>-data-zztel_number  = ls_contact-phone_number.
+        <lw_vendor>-datax-zztel_number = abap_true.
+*      Mail
+        <lw_vendor>-data-zzsmtp_addr  = ls_contact-email.
+        <lw_vendor>-datax-zzsmtp_addr = abap_true.
+*      Medio de envio
+        <lw_vendor>-data-zztipo_envio  = ls_contact-send_type.
+        <lw_vendor>-datax-zztipo_envio = abap_true.
+      ELSE.
+        "--> 1000005154, ARIBA Error en la integ de Contactos y M
+
+        READ TABLE lt_cust_fld INTO DATA(ls_cust_fld) WITH KEY ekorg = <lw_vendor>-data_key-ekorg.
+        IF sy-subrc <> 0.
+          CLEAR ls_cust_fld.
+        ENDIF.
+        CLEAR ls_custfld.
+        READ TABLE in-business_partner-supplier-zmdg_bp_generic_custom_field
+             INTO  ls_custfld
+             WITH KEY name = lc_nombre_pcompras.         "#EC CI_STDSEQ
+
+        IF ls_custfld-content IS INITIAL.
+          ls_custfld-content = ls_cust_fld-zzname.
+        ENDIF.
+
+        <lw_vendor>-data-zzname  = ls_custfld-content.
+        <lw_vendor>-datax-zzname = abap_true.
+
+        CLEAR ls_custfld.
+        READ TABLE in-business_partner-supplier-zmdg_bp_generic_custom_field
+             INTO  ls_custfld
+             WITH KEY name = lc_apellidos_pcompras.      "#EC CI_STDSEQ
+
+        IF ls_custfld-content IS INITIAL.
+          ls_custfld-content = ls_cust_fld-zzname_last.
+        ENDIF.
+
+        <lw_vendor>-data-zzname_last  = ls_custfld-content.
+        <lw_vendor>-datax-zzname_last = abap_true.
+
+        CLEAR ls_custfld.
+        READ TABLE in-business_partner-supplier-zmdg_bp_generic_custom_field
+             INTO  ls_custfld
+             WITH KEY name = lc_telefono_pcompras.       "#EC CI_STDSEQ
+
+        IF ls_custfld-content IS INITIAL.
+          ls_custfld-content = ls_cust_fld-zztel_number.
+        ENDIF.
+
+        <lw_vendor>-data-zztel_number  = ls_custfld-content.
+        <lw_vendor>-datax-zztel_number = abap_true.
+
+        CLEAR ls_custfld.
+        READ TABLE in-business_partner-supplier-zmdg_bp_generic_custom_field
+             INTO  ls_custfld
+             WITH KEY name = lc_email_pcompras.          "#EC CI_STDSEQ
+
+        IF ls_custfld-content IS INITIAL.
+          ls_custfld-content = ls_cust_fld-zzsmtp_addr.
+        ENDIF.
+
+        <lw_vendor>-data-zzsmtp_addr  = ls_custfld-content.
+        <lw_vendor>-datax-zzsmtp_addr = abap_true.
+
+        CLEAR ls_custfld.
+        "<!-- 1000092342 Inicio
+*        IF <ls_contacto> IS ASSIGNED.
+*          <lw_vendor>-data-zztipo_envio  = <ls_contacto>-zztipo_envio.
+*          <lw_vendor>-datax-zztipo_envio = abap_true.
+*        ELSE.
+*          <lw_vendor>-data-zztipo_envio = ls_cust_fld-zztipo_envio.
+*          <lw_vendor>-datax-zztipo_envio = abap_true.
+*        ENDIF.
+
+        "<!-- 1000005154, ARIBA Error en la integ de Contactos y M
+        IF ls_contact IS NOT INITIAL.
+          <lw_vendor>-data-zztipo_envio  = ls_contact-send_type.
+          <lw_vendor>-datax-zztipo_envio = abap_true.
+        ELSE.
+          <lw_vendor>-data-zztipo_envio = ls_cust_fld-zztipo_envio.
+          <lw_vendor>-datax-zztipo_envio = abap_true.
+        ENDIF.
+        "--> 1000005154, ARIBA Error en la integ de Contactos y M
+      ENDIF.
+      "--> 1000092342 Fin
+    ENDLOOP.
+
+    "<!-- [RCJAIM1] 1000008203, ROBR - Erro na sincronizaçao
+    IF     out-partner-finserv_data-common-data-fsbp_centrl-vbund <> out-vendor-central_data-central-data-vbund
+       AND out-vendor-central_data-central-data-vbund             IS NOT INITIAL.
+      out-partner-finserv_data-common-data-fsbp_centrl-vbund  = out-vendor-central_data-central-data-vbund.
+      out-partner-finserv_data-common-datax-fsbp_centrl-vbund = abap_true.
+    ENDIF.
+    "--> [RCJAIM1] 1000008203, ROBR - Erro na sincronizaçao
+
+    "<!-- [RCJAIM1 - 20210428] Eliminar organizaciones de compras sin actualizaciones
+    IF out-vendor-purchasing_data-current_state = abap_false.
+      DELETE out-vendor-purchasing_data-purchasing WHERE task IS INITIAL.
+    ENDIF.
+    "--> [RCJAIM1 - 20210428] Eliminar organizaciones de compras sin actualizaciones
+
+  ENDMETHOD.                 "#EC CI_NOES "#EC CI_CYCLO "#EC CI_NESTING
