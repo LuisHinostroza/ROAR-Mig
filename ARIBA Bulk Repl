@@ -1,3 +1,800 @@
+FUNCTION zmmmmf_send_email.
+*"----------------------------------------------------------------------
+*"*"Interfase local
+*"  IMPORTING
+*"     VALUE(IV_LIFNR) TYPE  LIFNR OPTIONAL
+*"     VALUE(IV_PARTNER) TYPE  BAPI_JBD_DTE_PARTNER OPTIONAL
+*"     VALUE(IV_IBAN) TYPE  /FSCAA/IBAN OPTIONAL
+*"     VALUE(IV_REGIMEN_IMPOSITIVO) TYPE  STRING OPTIONAL
+*"     VALUE(IV_TIPO_CUENTA_CO) TYPE  STRING OPTIONAL
+*"     VALUE(IV_NAME) TYPE  CHAR100
+*"     VALUE(IV_TYPE) TYPE  CHAR01
+*"     VALUE(IV_NAME_ORG) TYPE  CHAR100 OPTIONAL
+*"     VALUE(IV_NAME_FIS) TYPE  CHAR100 OPTIONAL
+*"     VALUE(IV_BKREF) TYPE  BKREF OPTIONAL
+*"     VALUE(IV_BANKA) TYPE  BANKA OPTIONAL
+*"     VALUE(IV_WAERS) TYPE  WAERS OPTIONAL
+*"     VALUE(IV_LAND1) TYPE  LAND1 OPTIONAL
+*"     VALUE(IV_ACTIVIDAD) TYPE  STRING OPTIONAL
+*"     VALUE(IS_ATTACHMENT) TYPE  /RSLT/ARBAPI_S_ATTACHMENT_BIN
+*"       OPTIONAL
+*"     VALUE(IV_PAIS_BANCO) TYPE  STRING OPTIONAL
+*"     VALUE(IV_CUENTA_CLABE) TYPE  STRING OPTIONAL
+*"     VALUE(IV_NUMBERO_ABA) TYPE  STRING OPTIONAL
+*"     VALUE(IV_NUMERO_CONVENIO_CIE) TYPE  STRING OPTIONAL
+*"     VALUE(IV_REFERENCIA_CONVENIO_CIE) TYPE  STRING OPTIONAL
+*"     VALUE(IV_ROUTING_NUMBER) TYPE  STRING OPTIONAL
+*"     VALUE(IV_FACT_MAIL) TYPE  STRING OPTIONAL
+*"  TABLES
+*"      PT_EMAILS STRUCTURE  ZDST_EMAILS OPTIONAL
+*"      PT_BUKRS STRUCTURE  ZDST_BUKRS OPTIONAL
+*"      PT_RETURN STRUCTURE  BAPIRETURN OPTIONAL
+*"----------------------------------------------------------------------
+***********************************************************************************
+* Created by:
+* Created on: 02-06-2020
+* Purpose   : Sending Mail for the Respective Person's SAP Inbox and External Email id.
+***********************************************************************************
+* *&Get the Email id and User id Whom you want to Send  ******
+
+*--------------------------------------------------------------------*    "MOD 1000097556 - MU ARIBA_SLP notificación cambios admon - HRamirez oct2022
+*             lc_upd_ent     TYPE c VALUE 'A',
+*             lc_upd_ban     TYPE c VALUE 'B',
+*             lc_new_ent     TYPE c VALUE 'C',
+*             lc_new_ban     TYPE c VALUE 'D',
+*             lc_upd_ent_txt TYPE tdobname VALUE 'ZMMM_EMAIL_A_LIFNR_U_ENTIDAD',
+*             lc_upd_ban_txt TYPE tdobname VALUE 'ZMMM_EMAIL_B_LIFNR_U_BANCO',
+*             lc_new_ent_txt TYPE tdobname VALUE 'ZMMM_EMAIL_C_LIFNR_I_ENTIDAD',
+*             lc_new_ban_txt TYPE tdobname VALUE 'ZMMM_EMAIL_D_LIFNR_I_BANCO',
+  CONSTANTS lc_text_subj          TYPE tdobname    VALUE 'ZMMM_EMAIL_SLP_SUBJECTS'.
+  CONSTANTS lc_txt_id             TYPE tdid        VALUE 'ST'.
+*  CONSTANTS lc_bukrs              TYPE c LENGTH 7  VALUE '&BUKRS&'.
+*  CONSTANTS lc_name               TYPE c LENGTH 6  VALUE '&NAME&'.
+*  CONSTANTS lc_lifnr              TYPE c LENGTH 7  VALUE '&LIFNR&'.
+*  CONSTANTS lc_email_bukrs        TYPE c           VALUE '&EMAIL_BUKRS&' LENGTH 13.
+*  CONSTANTS lc_iban               TYPE c LENGTH 6  VALUE '&IBAN&'.
+*  CONSTANTS lc_regimen_impositivo TYPE string      VALUE `&REGIMEN_IMPOSITIVO&`.
+*  CONSTANTS lc_tipo_cuenta_co     TYPE string      VALUE `&TIPO_CUENTA_CO&`.
+*  CONSTANTS lc_name_org           TYPE c LENGTH 10 VALUE '&NAME_ORG&'.
+*  CONSTANTS lc_name_fis           TYPE c LENGTH 10 VALUE '&NEW_NAME&'.
+**** 1000001832 Modificación 16/06/2023 MLCRIS3 Ini.
+*  CONSTANTS lc_bkref              TYPE c LENGTH 7  VALUE '&BKREF&'.
+*  CONSTANTS lc_banka              TYPE c LENGTH 7  VALUE '&BANKA&'.
+*  CONSTANTS lc_waers              TYPE c LENGTH 7  VALUE '&WAERS&'.
+**** 1000001832 Modificación 16/06/2023 MLCRIS3 Fin.
+  CONSTANTS lc_esp                TYPE spras       VALUE 'S'.
+*** 1000001832 Modificación 16/06/2023 MLCRIS3 Ini.
+  CONSTANTS lc_guatemala          TYPE land1       VALUE 'GT'.
+*** 1000001832 Modificación 16/06/2023 MLCRIS3 Fin.
+  CONSTANTS lc_colombia           TYPE land1       VALUE 'CO'. " ROCO
+  CONSTANTS lc_mexico             TYPE land1       VALUE 'MX'. " ROMX: Sincronización CLABE
+  CONSTANTS lc_usa                TYPE land1       VALUE 'US'. " 1000020009, ROUS - Routing number notif finanzas
+**** 1000014294 Modificación 13/05/2024 MLCRIS3 Ini.
+*  CONSTANTS lc_actividad          TYPE c LENGTH 11 VALUE '&ACTIVIDAD&'.
+**** 1000014294 Modificación 13/05/2024 MLCRIS3 Fin.
+
+  CONSTANTS: BEGIN OF lc_tag,
+               bukrs                   TYPE string VALUE '&BUKRS&',
+               name                    TYPE string VALUE '&NAME&',
+               lifnr                   TYPE string VALUE '&LIFNR&',
+               email_bukrs             TYPE string VALUE '&EMAIL_BUKRS&',
+               iban                    TYPE string VALUE '&IBAN&',
+               regimen_impositivo      TYPE string VALUE `&REGIMEN_IMPOSITIVO&`,
+               tipo_cuenta_co          TYPE string VALUE `&TIPO_CUENTA_CO&`,
+               name_org                TYPE string VALUE '&NAME_ORG&',
+               name_fis                TYPE string VALUE '&NEW_NAME&',
+               bkref                   TYPE string VALUE '&BKREF&',                     " 1000001832 Modificación 16/06/2023 MLCRIS3
+               banka                   TYPE string VALUE '&BANKA&',                     " 1000001832 Modificación 16/06/2023 MLCRIS3
+               waers                   TYPE string VALUE '&WAERS&',                     " 1000001832 Modificación 16/06/2023 MLCRIS3
+               actividad               TYPE string VALUE '&ACTIVIDAD&',                 " 1000014294 Modificación 13/05/2024 MLCRIS3
+               pais_banco              TYPE string VALUE '&PAIS_BANCO&',                " ROMX: Notificación de bancos México
+               cuenta_clabe            TYPE string VALUE '&CUENTA_CLABE&',              " ROMX: Notificación de bancos México
+               numbero_aba             TYPE string VALUE '&NUMERO_ABA&',                " ROMX: Notificación de bancos México
+               numero_convenio_cie     TYPE string VALUE '&NUMERO_CONVENIO_CIE&',       " ROMX: Notificación de bancos México
+               referencia_convenio_cie TYPE string VALUE '&REFERENCIA_CONVENIO_CIE&',   " ROMX: Notificación de bancos México
+               routing_number          TYPE string VALUE '&ROUTING_NUMBER&',            " 1000020009, ROUS - Routing number notif finanzas
+               fact_mail               TYPE string VALUE '&EMAIL&',                     " 1000016827, Modificación 11/08/2025 MLCRIS3
+             END OF lc_tag.
+
+  CONSTANTS: BEGIN OF lc_type,
+               upd_ent TYPE c LENGTH 1 VALUE 'A', "UPDATE: Entidad
+               upd_ban TYPE c LENGTH 1 VALUE 'B', "UPDATE: Banco
+               new_ent TYPE c LENGTH 1 VALUE 'C', "NEW:    Entidad
+               new_ban TYPE c LENGTH 1 VALUE 'D', "NEW:    Banco
+               upd_rzn TYPE c LENGTH 1 VALUE 'E', "UPDATE: Razón social
+               upd_nom TYPE c LENGTH 1 VALUE 'F', "UPDATE: Nombre
+             END OF lc_type,
+
+             BEGIN OF lc_noti,    "Notificaciones
+               "NEW:
+               new_ent_txt TYPE tdobname VALUE 'ZMMM_EMAIL_C_LIFNR_I_ENTIDAD',
+               new_ban_txt TYPE tdobname VALUE 'ZMMM_EMAIL_D_LIFNR_I_BANCO',
+               "UPDATE:
+               upd_ent_txt TYPE tdobname VALUE 'ZMMM_EMAIL_A_LIFNR_U_ENTIDAD',
+               upd_ban_txt TYPE tdobname VALUE 'ZMMM_EMAIL_B_LIFNR_U_BANCO',
+               upd_rzn_txt TYPE tdobname VALUE 'ZMMM_EMAIL_E_LIFNR_U_RZON_SOCIAL',
+               upd_nom_txt TYPE tdobname VALUE 'ZMMM_EMAIL_F_LIFNR_U_NAME',
+*** 1000001832 Modificación 16/06/2023 MLCRIS3 Ini.
+               new_ban_gt  TYPE tdobname VALUE 'ZMMM_EMAIL_D_LIFNR_I_BANCO_GT',
+               upd_ban_gt  TYPE tdobname VALUE 'ZMMM_EMAIL_B_LIFNR_U_BANCO_GT',
+*** 1000001832 Modificación 16/06/2023 MLCRIS3 Fin.
+               new_ban_co  TYPE tdobname VALUE 'ZMMM_EMAIL_D_LIFNR_I_BANCO_CO',     " 1000012745, ROCO Distinción Tipo de Cta Bancaria Prov
+               upd_ban_co  TYPE tdobname VALUE 'ZMMM_EMAIL_B_LIFNR_U_BANCO_CO',     " 1000012745, ROCO Distinción Tipo de Cta Bancaria Prov
+               new_ent_co  TYPE tdobname VALUE 'ZMMM_EMAIL_C_LIFNR_I_ENTIDAD_CO',   " ROCO
+               upd_ent_co  TYPE tdobname VALUE 'ZMMM_EMAIL_A_LIFNR_U_ENTIDAD_CO',   " ROCO
+               new_ban_mx  TYPE tdobname VALUE 'ZMMM_EMAIL_D_LIFNR_I_BANCO_MX',     " ROMX: Sincronización CLABE
+               upd_ban_mx  TYPE tdobname VALUE 'ZMMM_EMAIL_B_LIFNR_U_BANCO_MX',     " ROMX: Sincronización CLABE
+               new_ent_mx  TYPE tdobname VALUE 'ZMMM_EMAIL_C_LIFNR_I_ENTIDAD_MX',   " ROMX: Sincronización CLABE
+               upd_ent_mx  TYPE tdobname VALUE 'ZMMM_EMAIL_A_LIFNR_U_ENTIDAD_MX',   " ROMX: Sincronización CLABE
+               new_ban_us  TYPE tdobname VALUE 'ZMMM_EMAIL_D_LIFNR_I_BANCO_US',     " 1000020009, ROUS - Routing number notif finanzas
+               upd_ban_us  TYPE tdobname VALUE 'ZMMM_EMAIL_B_LIFNR_U_BANCO_US',     " 1000020009, ROUS - Routing number notif finanzas
+             END OF lc_noti.
+*--------------------------------------------------------------------*
+
+
+  DATA: lt_receivers    TYPE STANDARD TABLE OF  somlreci1,
+        ls_receivers    LIKE LINE OF lt_receivers,
+        lt_packing_list TYPE STANDARD TABLE OF  sopcklsti1,
+        ls_doc_data     TYPE sodocchgi1,
+        ls_packing_list LIKE LINE OF  lt_packing_list,
+        lt_message      TYPE STANDARD TABLE OF solisti1,
+        ls_message      LIKE LINE OF lt_message,
+        lv_c1(99)       TYPE c,
+        lv_c2(15)       TYPE c,
+        lv_num_lines    TYPE i,
+*        ls_bukrs        LIKE LINE OF PT_BUKRS,
+        ls_return       LIKE LINE OF pt_return,
+        lv_text_name    TYPE tdobname,
+        lv_index        TYPE i,
+        lv_subject      LIKE ls_doc_data-obj_descr,
+        lv_spras        TYPE spras,
+        lt_lines        TYPE STANDARD TABLE OF tline,
+        ls_lines        LIKE LINE OF lt_lines,
+        lv_tipo_subj    TYPE string.
+
+*** 1000015798 Modificación 31/07/2024 MLCRIS3 Ini.
+  CONSTANTS: lc_toggle_bankcert TYPE sftgl_ft_id VALUE 'ZARB_ATTACH_BANKCERT'.
+  DATA: lt_attach TYPE solix_tab.
+  DATA: lv_extension TYPE w3fileext.
+*** 1000015798 Modificación 31/07/2024 MLCRIS3 Fin.
+
+  IF pt_emails[] IS INITIAL.
+    RETURN.
+  ENDIF.
+  SELECT bukrs,
+         smtp_addr
+    FROM zarb_email_bukrs
+    INTO TABLE @DATA(lt_email_bukrs).
+  IF sy-subrc = 0.
+
+  ENDIF.
+
+  LOOP AT pt_emails ASSIGNING FIELD-SYMBOL(<ls_emails>).
+*  &-- Assign the email id and User id to  whom you want to Send  -------------&
+    FREE ls_receivers.
+    ls_receivers-receiver   =  <ls_emails>-smtp_addr."lv_emp_emailid. "&---- Assign Email id
+    ls_receivers-rec_type   = 'U'.                    "&---- Send to External Email id
+    ls_receivers-com_type   = 'INT'.
+    ls_receivers-notif_del  = 'X'.
+    ls_receivers-notif_ndel = 'X'.
+    APPEND ls_receivers TO lt_receivers.
+    FREE ls_receivers.
+    IF lv_spras IS INITIAL.
+      lv_spras = <ls_emails>-spras.
+    ENDIF.
+  ENDLOOP.
+
+  lv_spras = COND #( WHEN lv_spras = space
+                     THEN lc_esp
+                     ELSE lv_spras ).
+
+  CALL FUNCTION 'READ_TEXT'
+    EXPORTING
+      id                      = lc_txt_id
+      language                = lv_spras
+      name                    = lc_text_subj
+      object                  = 'TEXT'
+    TABLES
+      lines                   = lt_lines
+    EXCEPTIONS
+      id                      = 1
+      language                = 2
+      name                    = 3
+      not_found               = 4
+      object                  = 5
+      reference_check         = 6
+      wrong_access_to_archive = 7
+      OTHERS                  = 8.
+  IF sy-subrc = 0.
+    CONCATENATE '&' iv_type '&' INTO lv_tipo_subj.
+
+    FIND lv_tipo_subj IN TABLE lt_lines MATCH LINE DATA(lv_mline).
+    IF sy-subrc = 0.
+      READ TABLE lt_lines INTO ls_lines INDEX lv_mline.
+      IF sy-subrc = 0.
+        REPLACE lv_tipo_subj INTO ls_lines-tdline WITH space.
+        lv_subject = ls_lines-tdline.
+      ENDIF.
+    ENDIF.
+  ENDIF.
+
+*--------------------------------------------------------------------*    "MOD 1000097556 - MU ARIBA_SLP notificación cambios admon - HRamirez oct2022
+*  lv_text_name = COND #( WHEN iv_type = lc_upd_ent THEN lc_upd_ent_txt
+*                         WHEN iv_type = lc_upd_ban THEN lc_upd_ban_txt
+*                         WHEN iv_type = lc_new_ent THEN lc_new_ent_txt
+*                         WHEN iv_type = lc_new_ban THEN lc_new_ban_txt ).
+
+
+  "<!-- ROCO
+**** 1000001832 Modificación 16/06/2023 MLCRIS3 Ini.
+*  IF iv_land1 = lc_guatemala.
+*    lv_text_name = COND #( WHEN iv_type = lc_type-upd_ban THEN lc_noti-upd_ban_gt
+*                           WHEN iv_type = lc_type-new_ban THEN lc_noti-new_ban_gt ).
+*  ELSE.
+**** 1000001832 Modificación 16/06/2023 MLCRIS3 Fin.
+  "--> ROCO
+
+  lv_text_name = COND #( WHEN iv_type = lc_type-upd_ent THEN lc_noti-upd_ent_txt
+                         WHEN iv_type = lc_type-upd_ban THEN lc_noti-upd_ban_txt
+                         WHEN iv_type = lc_type-new_ent THEN lc_noti-new_ent_txt
+                         WHEN iv_type = lc_type-new_ban THEN lc_noti-new_ban_txt
+                         WHEN iv_type = lc_type-upd_rzn THEN lc_noti-upd_rzn_txt
+                         WHEN iv_type = lc_type-upd_nom THEN lc_noti-upd_nom_txt ).
+
+  "<!-- ROCO
+**** 1000001832 Modificación 16/06/2023 MLCRIS3 Ini.
+*  ENDIF.
+**** 1000001832 Modificación 16/06/2023 MLCRIS3 Fin.
+  "--> ROCO
+
+  "<!-- ROCO
+  CASE iv_land1.
+    WHEN lc_guatemala.
+      lv_text_name = SWITCH #( iv_type
+                               WHEN lc_type-upd_ban THEN lc_noti-upd_ban_gt
+                               WHEN lc_type-new_ban THEN lc_noti-new_ban_gt
+                               ELSE                      lv_text_name ).
+
+    WHEN lc_colombia.
+      lv_text_name = SWITCH #( iv_type
+                               WHEN lc_type-new_ban THEN lc_noti-new_ban_co     " 1000012745, ROCO Distinción Tipo de Cta Bancaria Prov
+                               WHEN lc_type-upd_ban THEN lc_noti-upd_ban_co     " 1000012745, ROCO Distinción Tipo de Cta Bancaria Prov
+                               WHEN lc_type-new_ent THEN lc_noti-new_ent_co
+                               WHEN lc_type-upd_ent THEN lc_noti-upd_ent_co
+                               ELSE                      lv_text_name ).
+
+    WHEN lc_mexico.                                                             " ROMX: Sincronización CLABE
+      lv_text_name = SWITCH #( iv_type
+                               WHEN lc_type-new_ban THEN lc_noti-new_ban_mx
+                               WHEN lc_type-upd_ban THEN lc_noti-upd_ban_mx
+                               WHEN lc_type-new_ent THEN lc_noti-new_ent_mx
+                               WHEN lc_type-upd_ent THEN lc_noti-upd_ent_mx
+                               ELSE                      lv_text_name ).
+
+    WHEN lc_usa.                                                                " 1000020009, ROUS - Routing number notif finanzas
+      lv_text_name = SWITCH #( iv_type
+                               WHEN lc_type-new_ban THEN lc_noti-new_ban_us
+                               WHEN lc_type-upd_ban THEN lc_noti-upd_ban_us
+                               ELSE                      lv_text_name ).
+
+  ENDCASE.
+  "--> ROCO
+
+*--------------------------------------------------------------------*
+
+  REPLACE lc_tag-lifnr INTO lv_subject WITH iv_lifnr.
+
+  "&--- Read the Number of lines in the Internal Table
+  lv_num_lines = lines( lt_receivers ).
+  "&--- Check the Sender Email id or SAP User id is got or not.
+  IF lv_num_lines IS NOT INITIAL.
+    CLEAR: lt_lines, ls_lines.
+
+    CALL FUNCTION 'READ_TEXT'
+      EXPORTING
+        id                      = lc_txt_id
+        language                = lv_spras
+        name                    = lv_text_name
+        object                  = 'TEXT'
+      TABLES
+        lines                   = lt_lines
+      EXCEPTIONS
+        id                      = 1
+        language                = 2
+        name                    = 3
+        not_found               = 4
+        object                  = 5
+        reference_check         = 6
+        wrong_access_to_archive = 7
+        OTHERS                  = 8.
+    IF sy-subrc = 0.
+      LOOP AT lt_lines INTO ls_lines.              "#EC CI_LOOP_INTO_WA
+        IF sy-tabix = 1.
+          CLEAR ls_lines-tdformat.
+        ENDIF.
+
+        IF ls_lines-tdformat <> space.
+          APPEND ls_message TO lt_message.
+          CLEAR ls_message.
+        ENDIF.
+
+        CONCATENATE ls_message-line ls_lines-tdline
+               INTO ls_message-line
+          SEPARATED BY space.
+
+        FIND lc_tag-bukrs IN ls_message-line.
+        IF sy-subrc = 0.
+          LOOP AT pt_bukrs INTO DATA(ls_bukrs). "#EC CI_LOOP_INTO_WA "#EC CI_NESTED
+            DATA(lv_line) = ls_message-line.            "#EC DECL_IN_IF
+            REPLACE lc_tag-bukrs INTO lv_line WITH ls_bukrs-bukrs.
+            APPEND lv_line TO lt_message.
+          ENDLOOP.
+          CLEAR ls_message.
+        ENDIF.
+        FIND lc_tag-email_bukrs IN ls_message-line.
+        IF sy-subrc = 0.
+          IF ls_bukrs-bukrs IS INITIAL.
+            READ TABLE pt_bukrs INTO ls_bukrs INDEX 1.
+          ENDIF.
+          READ TABLE lt_email_bukrs INTO DATA(ls_email_bukrs) WITH KEY bukrs = ls_bukrs-bukrs.
+          IF sy-subrc = 0.
+            REPLACE lc_tag-email_bukrs INTO ls_message-line WITH ls_email_bukrs-smtp_addr.
+          ELSE.
+            READ TABLE lt_email_bukrs INTO ls_email_bukrs WITH KEY bukrs = '*'.
+            IF sy-subrc = 0.
+              REPLACE lc_tag-email_bukrs INTO ls_message-line WITH ls_email_bukrs-smtp_addr.
+            ENDIF.
+          ENDIF.
+        ENDIF.
+        REPLACE lc_tag-name               INTO ls_message-line WITH iv_name.
+        REPLACE lc_tag-lifnr              INTO ls_message-line WITH iv_lifnr.
+        REPLACE lc_tag-iban               INTO ls_message-line WITH iv_iban.
+        REPLACE lc_tag-regimen_impositivo INTO ls_message-line WITH iv_regimen_impositivo.      " ROCO
+        REPLACE lc_tag-tipo_cuenta_co     INTO ls_message-line WITH iv_tipo_cuenta_co.          " 1000012745, ROCO Distinción Tipo de Cta Bancaria Prov
+
+*** 1000097556 Modificación 13/02/2023 MLCRIS3 Ini.
+        REPLACE lc_tag-name_org INTO ls_message-line WITH iv_name_org.
+        REPLACE lc_tag-name_fis INTO ls_message-line WITH iv_name_fis.
+*** 1000097556 Modificación 13/02/2023 MLCRIS3 Fin.
+
+*** 1000001832 Modificación 16/06/2023 MLCRIS3 Ini.
+        REPLACE lc_tag-bkref INTO ls_message-line WITH iv_bkref.
+        REPLACE lc_tag-banka INTO ls_message-line WITH iv_banka.
+        REPLACE lc_tag-waers INTO ls_message-line WITH iv_waers.
+*** 1000001832 Modificación 16/06/2023 MLCRIS3 Fin.
+
+*** 1000014294 Modificación 13/05/2024 MLCRIS3 Ini.
+        REPLACE lc_tag-actividad INTO ls_message-line WITH iv_actividad.
+*** 1000014294 Modificación 13/05/2024 MLCRIS3 Fin.
+
+        "<!-- ROMX: Notificación de bancos México
+        REPLACE lc_tag-pais_banco              INTO ls_message-line WITH iv_pais_banco.
+        REPLACE lc_tag-cuenta_clabe            INTO ls_message-line WITH iv_cuenta_clabe.
+        REPLACE lc_tag-numbero_aba             INTO ls_message-line WITH iv_numbero_aba.
+        REPLACE lc_tag-numero_convenio_cie     INTO ls_message-line WITH iv_numero_convenio_cie.
+        REPLACE lc_tag-referencia_convenio_cie INTO ls_message-line WITH iv_referencia_convenio_cie.
+        "--> ROMX: Notificación de bancos México
+
+        "<!-- 1000020009, ROUS - Routing number notif finanzas
+        REPLACE lc_tag-routing_number INTO ls_message-line WITH iv_routing_number.
+        "-->  1000020009, ROUS - Routing number notif finanzas
+
+*** 1000016827 Modificación 11/08/2025 MLCRIS3 Ini.
+        REPLACE lc_tag-fact_mail INTO ls_message-line WITH iv_fact_mail.
+*** 1000016827 Modificación 11/08/2025 MLCRIS3 Fin.
+
+        AT LAST.
+          APPEND ls_message TO lt_message.
+          CLEAR ls_message.
+        ENDAT.
+      ENDLOOP.
+    ENDIF.
+
+    ls_doc_data-doc_size = 1.
+*Populate the subject/generic message attributes
+    ls_doc_data-obj_langu = sy-langu.
+    ls_doc_data-obj_name = 'SAPRPT'.
+    ls_doc_data-obj_descr = lv_subject.
+    ls_doc_data-sensitivty = 'F'.
+*Describe the body of the message
+    CLEAR: ls_packing_list,
+           lt_packing_list.
+    ls_packing_list-transf_bin = space.
+    ls_packing_list-head_start = 1.
+    ls_packing_list-head_num = 0.
+    ls_packing_list-body_start = 1.
+
+    ls_packing_list-body_num = lines( lt_message ).
+
+    ls_packing_list-doc_type = 'RAW'.
+    APPEND ls_packing_list TO lt_packing_list.
+
+*** 1000015798 Modificación 31/07/2024 MLCRIS3 Ini.
+    IF cl_feature_toggle=>is_active( iv_toggle_id =  lc_toggle_bankcert ) = abap_true.
+
+      TRY.
+          DATA(lo_send_request) = cl_bcs=>create_persistent( ).
+        CATCH cx_send_req_bcs INTO DATA(lx_send_req_bcs).
+      ENDTRY.
+
+      TRY.
+          DATA(lo_sender) = cl_sapuser_bcs=>create( sy-uname ).
+
+          lo_send_request->set_sender( lo_sender ).
+
+          LOOP AT lt_receivers INTO DATA(ls_receiver).
+            DATA(lo_recipient) = cl_cam_address_bcs=>create_internet_address( CONV #( ls_receiver-receiver ) ).
+
+            lo_send_request->add_recipient( i_recipient = lo_recipient
+                                            i_express   = abap_true ).
+          ENDLOOP.
+        CATCH cx_send_req_bcs INTO lx_send_req_bcs.
+        CATCH cx_address_bcs INTO DATA(lx_address_bcs).
+      ENDTRY.
+
+      TRY.
+          DATA(lo_document) = cl_document_bcs=>create_document( i_type    = 'RAW'
+                                                                i_text    = lt_message
+                                                                i_subject = lv_subject ).
+          IF is_attachment IS NOT INITIAL.
+
+            CLEAR lv_extension.
+            CALL FUNCTION 'SDOK_FILE_NAME_EXTENSION_GET'
+              EXPORTING
+                mimetype  = CONV w3conttype( is_attachment-content_type )
+              IMPORTING
+                extension = lv_extension.
+
+            CLEAR lt_attach[].
+            PERFORM get_content TABLES lt_attach USING is_attachment-binary.
+
+            IF lv_extension IS NOT INITIAL AND lt_attach[] IS NOT INITIAL.
+              DATA(lv_size) = CONV so_obj_len( lines( lt_attach ) * 255 ).
+
+              lo_document->add_attachment( i_attachment_type    = CONV #( lv_extension )
+                                           i_attachment_subject = CONV #( is_attachment-file_name )
+                                           i_attachment_size    = lv_size
+                                           i_att_content_hex    = lt_attach ).
+            ENDIF.
+          ENDIF.
+        CATCH cx_document_bcs INTO DATA(lx_document_bcs).
+      ENDTRY.
+
+      TRY.
+          lo_send_request->set_document( lo_document ).
+        CATCH cx_send_req_bcs INTO lx_send_req_bcs.
+      ENDTRY.
+
+      TRY.
+          IF lo_send_request->send( abap_true ).
+            COMMIT WORK.
+          ENDIF.
+        CATCH cx_send_req_bcs INTO lx_send_req_bcs.
+      ENDTRY.
+
+    ELSE.
+*** 1000015798 Modificación 31/07/2024 MLCRIS3 Fin.
+
+      CLEAR ls_return.
+*&------ Call the Function Module to send the message to External and SAP Inbox
+      CALL FUNCTION 'SO_NEW_DOCUMENT_ATT_SEND_API1'
+        EXPORTING
+          document_data              = ls_doc_data
+          put_in_outbox              = abap_true
+          commit_work                = abap_true
+        TABLES
+          packing_list               = lt_packing_list
+          contents_txt               = lt_message
+          receivers                  = lt_receivers
+        EXCEPTIONS
+          document_not_sent          = 2
+          document_type_not_exist    = 3
+          operation_no_authorization = 4
+          parameter_error            = 5
+          x_error                    = 6
+          enqueue_error              = 7
+          OTHERS                     = 8.
+      IF sy-subrc <> 0.
+        RETURN.
+      ENDIF.
+*** 1000015798 Modificación 31/07/2024 MLCRIS3 Ini.
+    ENDIF.
+*** 1000015798 Modificación 31/07/2024 MLCRIS3 Fin.
+
+  ENDIF.
+
+
+
+ENDFUNCTION.                                 "#EC CI_NOES "#EC CI_CYCLO
+FUNCTION zmmmmf_get_zterm.
+*"----------------------------------------------------------------------
+*"*"Interfase local
+*"  IMPORTING
+*"     REFERENCE(I_LIFNR) TYPE  LFB1-LIFNR
+*"  CHANGING
+*"     REFERENCE(CT_PURCHASING) TYPE  VMDS_EI_PURCHASING_T OPTIONAL
+*"----------------------------------------------------------------------
+  TYPES: BEGIN OF t_lfm1,
+           ekorg TYPE lfm1-ekorg,
+           zterm TYPE lfm1-zterm,
+         END OF t_lfm1.
+  DATA: lt_lfm1 TYPE STANDARD TABLE OF t_lfm1,
+        ls_lfm1 LIKE LINE OF lt_lfm1.
+  CONSTANTS: lc_task_m TYPE vmds_ei_purchasing-task VALUE 'M',
+             lc_task_i TYPE vmds_ei_purchasing-task VALUE 'I',
+             lc_task_u TYPE vmds_ei_purchasing-task VALUE 'U'.
+  FIELD-SYMBOLS: <ls_purchasing> TYPE LINE OF vmds_ei_purchasing_t.
+  SELECT ekorg,
+         zterm
+    INTO TABLE @DATA(lt_zterm)
+    FROM zmmmt_slp_zterm.
+  IF sy-subrc = 0.
+    SELECT ekorg,
+           zterm
+      INTO TABLE @lt_lfm1
+      FROM lfm1
+      WHERE lifnr = @i_lifnr.
+    IF sy-subrc = 0.
+
+    ENDIF.
+    LOOP AT ct_purchasing ASSIGNING <ls_purchasing>.
+      IF ( <ls_purchasing>-task = lc_task_m
+      OR <ls_purchasing>-task = lc_task_i
+      OR <ls_purchasing>-task = lc_task_u ) AND <ls_purchasing>-data-zterm IS INITIAL.
+        READ TABLE lt_zterm INTO DATA(ls_zterm) WITH KEY ekorg = <ls_purchasing>-data_key-ekorg.
+        IF sy-subrc = 0.
+          CLEAR ls_lfm1.
+          READ TABLE lt_lfm1 INTO ls_lfm1 WITH KEY ekorg = <ls_purchasing>-data_key-ekorg.
+          IF ( sy-subrc <> 0 OR ls_lfm1-zterm IS INITIAL ) AND ls_zterm-zterm IS NOT INITIAL.
+            <ls_purchasing>-data-zterm = ls_zterm-zterm.
+            <ls_purchasing>-datax-zterm = abap_true.
+          ELSEIF ls_lfm1-zterm IS NOT INITIAL.
+            <ls_purchasing>-data-zterm = ls_lfm1-zterm.
+            <ls_purchasing>-datax-zterm = abap_true.
+          ENDIF.
+        ENDIF.
+        IF <ls_purchasing>-data-zterm IS INITIAL.
+          <ls_purchasing>-datax-zterm = abap_false.
+        ENDIF.
+      ENDIF.
+    ENDLOOP.
+  ENDIF.
+
+ENDFUNCTION.
+FUNCTION zmmmmf_read_data.
+*"----------------------------------------------------------------------
+*"*"Interfase local
+*"  EXPORTING
+*"     REFERENCE(EV_NATPERS) TYPE  BU_NATURAL_PERSON
+*"     REFERENCE(EV_ACMID) TYPE  ARBCIG_SYSTIDMAP-SYSTEMID
+*"----------------------------------------------------------------------
+
+  ev_natpers = gv_natpers.
+  ev_acmid   = gv_acmid.
+
+ENDFUNCTION.
+FUNCTION zmmmmf_refresh.
+*"----------------------------------------------------------------------
+*"*"Local Interface:
+*"----------------------------------------------------------------------
+  CLEAR gv_name.
+  CLEAR gv_a.
+  CLEAR gv_b.
+  CLEAR gv_c.
+  CLEAR gv_d.
+  CLEAR gv_e.
+  CLEAR gv_f.
+  CLEAR gv_name_org.
+  CLEAR gv_name_fis.
+  CLEAR gv_iban.
+  CLEAR gv_regimen_impositivo.      " ROCO
+  CLEAR gv_tipo_cuenta_co.          " 1000012745, ROCO Distinción Tipo de Cta Bancaria Prov
+
+  "<!-- ROMX: Notificación de bancos México
+  CLEAR gv_pais_banco.
+  CLEAR gv_cuenta_clabe.
+  CLEAR gv_numbero_aba.
+  CLEAR gv_numero_convenio_cie.
+  CLEAR gv_referencia_convenio_cie.
+  "--> ROMX: Notificación de bancos México
+
+  CLEAR gv_routing_number.          " 1000020009, ROUS - Routing number notif finanzas
+
+  REFRESH gt_emails_admon.
+  REFRESH gt_emails.
+  REFRESH gt_emails_iban.
+
+ENDFUNCTION.
+
+FUNCTION zmmmmf_start_send_email.
+*"----------------------------------------------------------------------
+*"*"Local Interface:
+*"  IMPORTING
+*"     REFERENCE(IV_LIFNR) TYPE  LIFNR OPTIONAL
+*"     REFERENCE(IV_PARTNER) TYPE  BAPI_JBD_DTE_PARTNER OPTIONAL
+*"----------------------------------------------------------------------
+***********************************************************************************
+* Created by:
+* Created on: 02-06-2020
+* Purpose   : Sending Mail for the Respective Person's SAP Inbox and External Email id.
+***********************************************************************************
+* *&Get the Email id and User id Whom you want to Send  ******
+  DATA: lt_bukrs      TYPE STANDARD TABLE OF zdst_bukrs,
+        ls_bukrs      LIKE LINE OF lt_bukrs,
+        lt_return     TYPE STANDARD TABLE OF bapireturn,
+        lt_emails_aux TYPE STANDARD TABLE OF zdst_emails,
+        lv_type       TYPE char1.
+
+
+  IF gt_emails[] IS INITIAL AND gt_emails_iban[] IS INITIAL
+*** 1000097556 Modificación 01/02/2023 MLCRIS3 Ini.
+    AND gt_emails_admon[] IS INITIAL.
+*** 1000097556 Modificación 01/02/2023 MLCRIS3 Fin.
+    RETURN.
+  ENDIF.
+
+
+  CLEAR gt_sort_email.
+
+  LOOP AT gt_emails INTO DATA(ls_emails).          "#EC CI_LOOP_INTO_WA
+    gs_sort_email = CORRESPONDING #( ls_emails ).
+    COLLECT gs_sort_email INTO gt_sort_email.
+  ENDLOOP.
+
+  SORT gt_sort_email BY smtp_addr ASCENDING.
+
+  IF gv_a = abap_true OR gv_c = abap_true.
+    IF gv_a = abap_true.
+      lv_type = 'A'.
+    ELSEIF gv_c = abap_true.
+      lv_type = 'C'.
+    ENDIF.
+
+    LOOP AT gt_sort_email INTO gs_sort_email.      "#EC CI_LOOP_INTO_WA
+      ls_emails = CORRESPONDING #( gs_sort_email ).
+
+      ls_bukrs = ls_emails-bukrs.
+      CLEAR ls_emails-bukrs.
+      COLLECT ls_emails INTO lt_emails_aux.
+      COLLECT ls_bukrs INTO lt_bukrs.
+      AT END OF smtp_addr.
+
+        CALL FUNCTION 'ZMMMMF_SEND_EMAIL' STARTING NEW TASK 'EMAIL_SLP'
+          EXPORTING
+            iv_lifnr                   = iv_lifnr
+            iv_partner                 = iv_partner
+            iv_iban                    = gv_iban
+            iv_regimen_impositivo      = gv_regimen_impositivo          " ROCO
+            iv_tipo_cuenta_co          = gv_tipo_cuenta_co              " 1000012745, ROCO Distinción Tipo de Cta Bancaria Prov
+            iv_name                    = gv_name
+            iv_type                    = lv_type
+            iv_land1                   = gv_land1                       " ROCO
+            iv_actividad               = gv_actividad                   " 1000014294 Modificación 13/05/2024 MLCRIS3
+            iv_pais_banco              = gv_pais_banco                  " ROMX: Notificación de bancos México
+            iv_cuenta_clabe            = gv_cuenta_clabe                " ROMX: Notificación de bancos México
+            iv_numbero_aba             = gv_numbero_aba                 " ROMX: Notificación de bancos México
+            iv_numero_convenio_cie     = gv_numero_convenio_cie         " ROMX: Notificación de bancos México
+            iv_referencia_convenio_cie = gv_referencia_convenio_cie     " ROMX: Notificación de bancos México
+            iv_routing_number          = gv_routing_number              " 1000020009, ROUS - Routing number notif finanzas
+            iv_fact_mail               = gv_fact_mail                   " 1000016827 Modificación 11/08/2025 MLCRIS3 Ini
+          TABLES
+            pt_emails                  = lt_emails_aux
+            pt_bukrs                   = lt_bukrs
+            pt_return                  = lt_return.
+
+        CLEAR: lt_emails_aux, lt_bukrs, lt_return.
+      ENDAT.
+    ENDLOOP.
+  ENDIF.
+  CLEAR gt_sort_email.
+  LOOP AT gt_emails_iban INTO ls_emails.           "#EC CI_LOOP_INTO_WA
+    gs_sort_email = CORRESPONDING #( ls_emails ).
+    COLLECT gs_sort_email INTO gt_sort_email.
+  ENDLOOP.
+
+  SORT gt_sort_email BY smtp_addr ASCENDING.
+  IF gv_b = abap_true OR gv_d = abap_true.
+    IF gv_b = abap_true.
+      lv_type = 'B'.
+
+    ELSEIF gv_d = abap_true.
+      lv_type = 'D'.
+    ENDIF.
+
+    LOOP AT gt_sort_email INTO gs_sort_email.      "#EC CI_LOOP_INTO_WA
+      ls_emails = CORRESPONDING #( gs_sort_email ).
+      ls_bukrs = ls_emails-bukrs.
+      CLEAR ls_emails-bukrs.
+      COLLECT ls_emails INTO lt_emails_aux.
+      COLLECT ls_bukrs INTO lt_bukrs.
+      AT END OF smtp_addr.
+
+        CALL FUNCTION 'ZMMMMF_SEND_EMAIL' STARTING NEW TASK 'EMAIL_SLP'
+          EXPORTING
+            iv_lifnr                   = iv_lifnr
+            iv_partner                 = iv_partner
+            iv_iban                    = gv_iban
+            iv_regimen_impositivo      = gv_regimen_impositivo          " ROCO
+            iv_tipo_cuenta_co          = gv_tipo_cuenta_co              " 1000012745, ROCO Distinción Tipo de Cta Bancaria Prov
+            iv_name                    = gv_name
+            iv_type                    = lv_type
+            iv_bkref                   = gv_bkref                       " 1000001832 Modificación 16/06/2023 MLCRIS3
+            iv_banka                   = gv_banka                       " 1000001832 Modificación 16/06/2023 MLCRIS3
+            iv_waers                   = gv_waers                       " 1000001832 Modificación 16/06/2023 MLCRIS3
+            iv_land1                   = gv_land1                       " 1000001832 Modificación 16/06/2023 MLCRIS3
+            is_attachment              = gs_attachment                  " 1000015798 Modificación 30/07/2024 MLCRIS3
+            iv_pais_banco              = gv_pais_banco                  " ROMX: Notificación de bancos México
+            iv_cuenta_clabe            = gv_cuenta_clabe                " ROMX: Notificación de bancos México
+            iv_numbero_aba             = gv_numbero_aba                 " ROMX: Notificación de bancos México
+            iv_numero_convenio_cie     = gv_numero_convenio_cie         " ROMX: Notificación de bancos México
+            iv_referencia_convenio_cie = gv_referencia_convenio_cie     " ROMX: Notificación de bancos México
+            iv_routing_number          = gv_routing_number              " 1000020009, ROUS - Routing number notif finanzas
+          TABLES
+            pt_emails                  = lt_emails_aux
+            pt_bukrs                   = lt_bukrs
+            pt_return                  = lt_return.
+
+        CLEAR lt_emails_aux.
+        CLEAR lt_bukrs.
+        CLEAR lt_return.
+      ENDAT.
+    ENDLOOP.
+  ENDIF.
+
+*--------------------------------------------------------------------*    "ADD 1000097556 - MU ARIBA_SLP notificación cambios admon - HRamirez oct2022
+  CHECK gt_emails_admon[] IS NOT INITIAL.
+
+  gt_sort_email = VALUE #( FOR ls_email_admon IN gt_emails_admon
+                           ( smtp_addr = ls_email_admon-smtp_addr
+                             spras     = ls_email_admon-spras
+                             bukrs     = ls_email_admon-bukrs ) ).
+
+  SORT gt_sort_email BY smtp_addr ASCENDING.
+  DELETE ADJACENT DUPLICATES FROM gt_sort_email COMPARING smtp_addr.
+
+  IF ( gv_e EQ abap_true ) OR ( gv_f EQ abap_true ).
+    lv_type = 'E'.
+    IF gv_f EQ abap_true.
+      lv_type = 'F'.
+    ENDIF.
+
+    LOOP AT gt_sort_email INTO gs_sort_email.      "#EC CI_LOOP_INTO_WA
+      ls_emails = CORRESPONDING #( gs_sort_email ).
+      ls_bukrs = ls_emails-bukrs.
+      CLEAR ls_emails-bukrs.
+      COLLECT ls_emails INTO lt_emails_aux.
+      COLLECT ls_bukrs INTO lt_bukrs.
+      AT END OF smtp_addr.
+
+        CALL FUNCTION 'ZMMMMF_SEND_EMAIL' STARTING NEW TASK 'EMAIL_SLP'
+          EXPORTING
+            iv_lifnr              = iv_lifnr
+            iv_partner            = iv_partner
+            iv_iban               = gv_iban
+            iv_regimen_impositivo = gv_regimen_impositivo       " ROCO
+            iv_tipo_cuenta_co     = gv_tipo_cuenta_co           " 1000012745, ROCO Distinción Tipo de Cta Bancaria Prov
+            iv_name               = gv_name
+            iv_type               = lv_type
+            iv_name_org           = gv_name_org
+            iv_name_fis           = gv_name_fis
+            iv_land1              = gv_land1                    " ROCO
+          TABLES
+            pt_emails             = lt_emails_aux
+            pt_bukrs              = lt_bukrs
+            pt_return             = lt_return.
+
+        CLEAR: lt_emails_aux, lt_bukrs, lt_return.
+      ENDAT.
+    ENDLOOP.
+  ENDIF.
+*--------------------------------------------------------------------*
+
+*** 1000107180 Modificación 01/03/2023 MLCRIS3 Ini.
+  CALL FUNCTION 'ZMMMMF_REFRESH'.
+*** 1000107180 Modificación 01/03/2023 MLCRIS3 Fin.
+
+ENDFUNCTION.                                              "#EC CI_CYCLO
+***********************************************************************************
 FUNCTION zmmmmf_save_data.
 *"----------------------------------------------------------------------
 *"*"Interfase local
