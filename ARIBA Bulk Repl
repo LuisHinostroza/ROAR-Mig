@@ -1,3 +1,34 @@
+Ya está casi todo. Con ZMMMMF_SEND_EMAIL y ZMMMMF_START_SEND_EMAIL queda claro el flujo completo, y solo me falta un dato.
+
+Lo que necesito: el nombre exacto de la variable que dejaron en los textos SO10 ZMMM_EMAIL_B_LIFNR_U_BANCO_AR y ZMMM_EMAIL_D_LIFNR_I_BANCO_AR en desarrollo (&CBU&, &NUMERO_CBU&, etc.). El REPLACE tiene que coincidir letra por letra. De paso, revisa en qué idiomas los crearon: el idioma sale de ZFI14A-SPRAS de la sociedad, y si para AR viene uno distinto de ES y el texto no existe en ese idioma, el READ_TEXT falla y el correo sale vacío.
+
+Lo que ya confirmé con el código:
+
+El texto se elige por iv_land1, que es el país de la dirección del BP, no Pais_banco. En el XML de prueba viene CountryCode = AR, así que la rama sería WHEN 'AR', igual que MX/US.
+B/D están cruzados en el correo del cliente. En lc_type, B es UPDATE: Banco y D es NEW: Banco. Entonces B_..._U_BANCO_AR es la modificación y D_..._I_BANCO_AR el alta. Vale la pena mencionárselo, porque si redactaron cada texto pensando en el caso contrario, el contenido no va a cuadrar.
+El asunto no se toca: ZMMM_EMAIL_SLP_SUBJECTS se busca por &B& / &D& y es común a todos los países.
+
+Lo que tocaría (cuando me digas):
+
+Método INBOUND_PROCESSING: lo que ya vimos (lectura del CBU, comparación con BUT0BK y flags lv_b/lv_d).
+ZMMMMF_SAVE_DATA + TOP include: IV_CBU → gv_cbu.
+ZMMMMF_START_SEND_EMAIL: pasar iv_cbu = gv_cbu, solo en la llamada de bancos (B/D).
+ZMMMMF_SEND_EMAIL:
+Agregar IV_CBU. Tiene que ser por valor, porque se llama con STARTING NEW TASK.
+Agregar la constante del tag y new_ban_ar / upd_ban_ar.
+Agregar WHEN 'AR' en el CASE iv_land1.
+Agregar el REPLACE del CBU.
+ZMMMMF_REFRESH: CLEAR gv_cbu.
+
+Pendientes con el cliente (no bloquean el desarrollo):
+
+El IBAN del caso de prueba. Llega IBAN = 123456789 además del CBU. Si no coincide con BUT0BK, se notifica por el IBAN aunque el CBU no haya cambiado.
+Transporte de los SO10. No se graban solos en la orden; hay que meterlos con RSTXTRAN.
+
+Una cosa que noté y que no es de este alcance: ZMMMMF_REFRESH no limpia gv_land1, gv_bkref, gv_banka, gv_waers, gv_actividad, gv_fact_mail ni gs_attachment. Si en la misma sesión entran dos BPs seguidos, el segundo podría heredar valores del primero. Solo lo menciono por si quieres reportarlo.
+
+Pásame el nombre de la variable y te armo todo completo.
+
 FUNCTION zmmmmf_send_email.
 *"----------------------------------------------------------------------
 *"*"Interfase local
