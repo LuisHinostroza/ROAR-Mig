@@ -1,3 +1,11 @@
+Orden de workbench
+DFIK987451	S 7000003745: ROAR - Control de transportes
+
+Orden Customizing
+DFIK987448	S 7000003744: ROCE - CONTROL TRANSPORTES
+DFIK987454	S 7000003745: ROAR - Control de transportes 
+DFIK987457	S 7000003746: RORE - CONTROL TRANSPORTES
+DFIK987460	S 7000003747: ROMW2 - CONTROL TRANSPORTES
 Va con B. El CBU viaja completo al correo y un flag aparte decide si cuenta como cambio.
 
 ZMMMMF_SAVE_DATA queda igual que en la versión completa que te pasé (IV_CBU → gv_cbu). ZMMMMF_START_SEND_EMAIL y ZMMMMF_REFRESH van completas abajo. Del método y de ZMMMMF_SEND_EMAIL te paso los bloques con su ancla exacta: son objetos de cientos de líneas escritos por otros, y reescribirlos a mano completos tiene más riesgo de colar un error de transcripción que de ayudar.
