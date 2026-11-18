@@ -1,3 +1,145 @@
+Tienes razón, algunos bloques no estaban bien anclados. Aquí va el método IF_MDG_SE_BP_BULK_REPLRQ_IN~INBOUND_PROCESSING punto por punto. En cada uno te indico qué buscar con Ctrl+F (es texto único en el método) y cómo debe quedar, con las líneas de alrededor para que no haya duda.
+
+a) Constante CBU
+
+Buscar: END OF us,
+
+abap
+                 BEGIN OF us,       " 1000020009, ROUS - Routing number notif finanzas
+                   routing_number TYPE arbcig_gen_cust_field_name VALUE 'Routing.Number.US',
+                 END OF us,
+*** ROAR Rollout S/4HANA Argentina 06/11/2026 LUISHIN Ini.
+                 BEGIN OF ar,       " ROAR: Notificación de bancos Argentina
+                   cbu TYPE arbcig_gen_cust_field_name VALUE 'CBU',
+                 END OF ar,
+*** ROAR Rollout S/4HANA Argentina 06/11/2026 LUISHIN Fin.
+               END OF lc_custom_field.
+b) Declaraciones
+
+Buscar: DATA lv_datum
+
+abap
+*** 1000039877 Modificación 05/11/2026 MLCRIS3 Ini.
+    DATA ls_addr                    TYPE bapibus1006_address.
+    DATA lt_aduse                   TYPE TABLE OF bapibus1006_addressusage.
+    DATA lt_address_usages          TYPE bus_ei_bupa_addressusage_t.
+    DATA lv_datum                   TYPE sy-datum.
+*** 1000039877 Modificación 05/11/2026 MLCRIS3 Fin.
+*** ROAR Rollout S/4HANA Argentina 06/11/2026 LUISHIN Ini.
+    DATA lv_cbu                     TYPE string.
+    DATA lv_cbu_changed             TYPE abap_bool.
+    DATA lv_cbu_bankl               TYPE string.
+    DATA lv_cbu_bankn               TYPE string.
+*** ROAR Rollout S/4HANA Argentina 06/11/2026 LUISHIN Fin.
+c) Lectura del CBU
+
+Buscar: DATA(lv_routing_number)
+
+abap
+    "<!-- 1000020009, ROUS - Routing number notif finanzas
+    DATA(lv_routing_number) = VALUE #( <lt_custom_fields>[ name = lc_custom_field-us-routing_number ]-content OPTIONAL ).
+    "--> 1000020009, ROUS - Routing number notif finanzas
+
+*** ROAR Rollout S/4HANA Argentina 06/11/2026 LUISHIN Ini.
+    " CBU Argentina: el valor viaja siempre completo al correo;
+    " lv_cbu_changed indica si debe disparar la notificación
+    lv_cbu = VALUE #( <lt_custom_fields>[ name = lc_custom_field-ar-cbu ]-content OPTIONAL ).
+    lv_cbu = condense( val = lv_cbu from = ` ` to = `` ).
+    lv_cbu_changed = xsdbool( lv_cbu IS NOT INITIAL ).
+*** ROAR Rollout S/4HANA Argentina 06/11/2026 LUISHIN Fin.
+
+    "<!-- ROCO
+    DATA(lv_regimen_impositivo) =
+d) Comparación contra BUT0BK
+
+Buscar: lv_a = abap_true
+
+Va entre el ENDIF. que cierra el bloque bancario de 1000039448 y el IF lt_bukrs IS NOT INITIAL.:
+
+abap
+          ENDLOOP.
+        ENDIF.
+*** 1000039448 Modificación 23/10/2026 MLCRIS3 Fin.
+      ENDIF.
+
+*** ROAR Rollout S/4HANA Argentina 06/11/2026 LUISHIN Ini.
+      " CBU Argentina: si ya existe en BUT0BK no se considera cambio
+      IF lv_cbu_changed = abap_true.
+        SELECT bankl, bankn
+          FROM but0bk
+          WHERE partner = @lv_lifnr
+          INTO TABLE @DATA(lt_but0bk_cbu).
+        IF sy-subrc = 0.
+          LOOP AT lt_but0bk_cbu ASSIGNING FIELD-SYMBOL(<ls_but0bk_cbu>).
+            lv_cbu_bankl = condense( val = CONV string( <ls_but0bk_cbu>-bankl ) from = ` ` to = `` ).
+            lv_cbu_bankn = condense( val = CONV string( <ls_but0bk_cbu>-bankn ) from = ` ` to = `` ).
+            IF    lv_cbu = lv_cbu_bankn
+               OR lv_cbu = lv_cbu_bankl
+               OR lv_cbu = |{ lv_cbu_bankl }{ lv_cbu_bankn }|.
+              lv_cbu_changed = abap_false.
+              EXIT.
+            ENDIF.
+          ENDLOOP.
+        ENDIF.
+      ENDIF.
+*** ROAR Rollout S/4HANA Argentina 06/11/2026 LUISHIN Fin.
+
+      IF lt_bukrs IS NOT INITIAL.
+        lv_a = abap_true.
+      ENDIF.
+e) Flag de modificación
+
+Buscar: lv_b = abap_true
+
+abap
+      IF    lv_iban         IS NOT INITIAL
+         OR lv_cuenta_clabe IS NOT INITIAL      " ROMX: Notificación de bancos México
+*** ROAR Rollout S/4HANA Argentina 06/11/2026 LUISHIN Ini.
+         OR lv_cbu_changed  = abap_true.        " ROAR: Notificación de bancos Argentina
+*** ROAR Rollout S/4HANA Argentina 06/11/2026 LUISHIN Fin.
+        lv_b = abap_true.
+      ENDIF.
+
+      lv_activ = lc_02.
+
+Fíjate que se quita el punto después de IS NOT INITIAL en la línea de lv_cuenta_clabe.
+
+f) Flag de alta
+
+Buscar: lv_d = abap_true
+
+abap
+      IF lt_bukrs IS NOT INITIAL.
+        lv_c = abap_true.
+      ENDIF.
+
+      IF    lv_iban         IS NOT INITIAL
+         OR lv_cuenta_clabe IS NOT INITIAL      " ROMX: Notificación de bancos México
+*** ROAR Rollout S/4HANA Argentina 06/11/2026 LUISHIN Ini.
+         OR lv_cbu_changed  = abap_true.        " ROAR: Notificación de bancos Argentina
+*** ROAR Rollout S/4HANA Argentina 06/11/2026 LUISHIN Fin.
+        lv_d = abap_true.
+      ENDIF.
+
+    ENDIF.
+
+Aquí también se quita el punto en la línea de lv_cuenta_clabe.
+
+g) Llamada a ZMMMMF_SAVE_DATA
+
+Buscar: iv_fact_mail               = lv_fact_mail
+
+abap
+          iv_routing_number          = lv_routing_number              " 1000020009, ROUS - Routing number notif finanzas
+          iv_fact_mail               = lv_fact_mail                   " 1000016827 Modificación 11/08/2025 MLCRIS3
+*** ROAR Rollout S/4HANA Argentina 06/11/2026 LUISHIN Ini.
+          iv_cbu                     = lv_cbu                         " ROAR: Notificación de bancos Argentina
+*** ROAR Rollout S/4HANA Argentina 06/11/2026 LUISHIN Fin.
+        TABLES
+          pt_emails                  = lt_emails
+
+Con eso el método queda completo. Si en ZMMMMF_SEND_EMAIL también quieres el mismo formato de “buscar → cómo queda”, te lo paso igual.
+*************************************************************************************************************************
 Orden de workbench
 DFIK987451	S 7000003745: ROAR - Control de transportes
 
