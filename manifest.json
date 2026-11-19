@@ -1,3 +1,13 @@
+Te paso los 11 objetos completos.
+
+Orden de activación
+ZI_MexInf2_CfgDocType, ZI_MexInf2_CfgAnul, ZI_MexInf2_CfgTax: la configuración que se lee de ZFI_CTES.
+ZI_MexInf2_GLAmt y ZI_MexInf2_Tax: importe neto de mayor e IVA por documento.
+ZI_MexInf2_Item: la vista base, con una fila por línea de tercero y tipo de retención.
+ZCL_MEX_INF2_FOLIO, la clase del folio, y ZC_MexInforme2, la vista de consumo.
+ZRL_MEXINFORME2, que autoriza por sociedad con F_BKPF_BUK.
+ZSD_MEX_INFORME: reemplaza la service definition actual. Expone la vista con el mismo nombre de entidad MexInforme.
+
 {
   "_version": "1.60.0",
   "sap.app": {
