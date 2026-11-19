@@ -1,0 +1,953 @@
+*&---------------------------------------------------------------------*
+*& Report  ZMFI_MEX_INFORME2
+*&
+*&---------------------------------------------------------------------*
+*&
+*&
+*&---------------------------------------------------------------------*
+
+INCLUDE zmfi_mex_informe_2_top.    " global Data
+INCLUDE zmfi_mex_informe_2_c01.    " class Definition
+INCLUDE zmfi_mex_informe_2_sel.    " global Data
+INCLUDE zmfi_mex_informe_2_f01.    " FORM-Routines
+
+START-OF-SELECTION.
+
+  PERFORM get_search_parameters.
+
+  PERFORM get_data.
+
+  IF gt_bkpf IS NOT INITIAL.
+    PERFORM arma_salida.
+    PERFORM get_fieldcat.
+    PERFORM get_alv.
+  ELSE.
+    MESSAGE text-001 TYPE 'E' DISPLAY LIKE 'E'.
+  ENDIF.
+*&---------------------------------------------------------------------*
+*& Include ZMFI_MEX_INFORME_2_TOP                            Report ZMFI_MEX_INFORME2
+*&
+*&---------------------------------------------------------------------*
+
+REPORT zmfi_mex_informe2.
+TYPE-POOLS: abap, slis.
+TABLES: bkpf , bseg , bset , with_item , lfa1.
+
+DATA: gt_bkpf TYPE TABLE OF bkpf,
+      gt_bseg TYPE TABLE OF bseg,
+      gs_bkpf TYPE bkpf,
+      gs_bseg TYPE bseg.
+
+TYPES: BEGIN OF GTY_SALIDA,
+  bldat    TYPE bkpf-bldat,         "Fecha documento
+  budat    TYPE bkpf-budat,         "Fecha contabilización
+  monat    TYPE bkpf-monat,         "Período
+  xblnr    TYPE bkpf-xblnr,         "Referencia
+  folio    TYPE string,             "Nuevo Folio Fiscal
+  wrbtr    TYPE bseg-wrbtr,         "Importe MD
+  waers    TYPE bkpf-waers,         "Moneda MD
+  dmbtr    TYPE bseg-dmbtr,         "Importe ML
+  mwskz    TYPE bseg-mwskz,         "Indicador IVA
+  fwste    TYPE bset-FWSTE,         "Importe IVA
+  wt_qbshb TYPE with_item-wt_qbshb, "Retenciones
+  belnr    TYPE bkpf-belnr,         "Número de Documento
+  augbl    TYPE bseg-augbl,         "Documento de compensación
+  augdt    TYPE bseg-augdt,         "Fecha de compensación
+  blart    TYPE bkpf-blart,         "Clase de documento
+  lifnr    TYPE lfa1-lifnr,         "Acreedor
+  kunnr    TYPE kna1-kunnr,         "Cliente
+  stcd1    TYPE lfa1-stcd1,         "R.F.C
+  name1    TYPE lfa1-name1,         "Nombre o Razón Social
+  land1    TYPE lfa1-land1,         "Clave país
+  pstlz    TYPE lfa1-pstlz,         "Código Postal
+  hkont    TYPE bseg-hkont,         "Cuenta contable GTO
+  hkont_i  TYPE bseg-hkont,         "Cuenta contable IVA
+  sgtxt    TYPE bseg-sgtxt,         "Texto/Concepto
+  kostl    TYPE bseg-kostl,         "Ceco
+  usnam    TYPE bkpf-usnam,         "Usuario registro
+END OF gty_salida.
+
+DATA: gt_salida  TYPE TABLE OF gty_salida,
+      gs_salida  TYPE gty_salida.
+DATA: t_fieldcat TYPE TABLE OF slis_fieldcat_alv.
+DATA: w_fieldcat TYPE slis_fieldcat_alv.
+
+*Parámetros de búsqueda
+DATA: gv_koart TYPE bseg-koart.
+
+TYPES: BEGIN OF gty_r_mwskz,
+          sign   TYPE c LENGTH 1,
+          option TYPE c LENGTH 2,
+          low    TYPE bseg-mwskz,
+          high   TYPE bseg-mwskz,
+       END OF gty_r_mwskz,
+       BEGIN OF gty_r_blart,
+          sign   TYPE c LENGTH 1,
+          option TYPE c LENGTH 2,
+          low    TYPE bkpf-blart,
+          high   TYPE bkpf-blart,
+       END OF gty_r_blart,
+       BEGIN OF gty_anul,
+          blart     TYPE bkpf-blart,
+          anulacion TYPE bkpf-blart,
+       END OF gty_anul.
+
+DATA: "Indicador de retención
+      gr_mwskz TYPE TABLE OF gty_r_mwskz,
+      "Clase de documento
+      gr_blart TYPE TABLE OF gty_r_blart,
+      "Anulaciones
+      gr_anul  TYPE TABLE OF gty_r_blart,
+      gt_anul  TYPE TABLE OF gty_anul.
+
+*&---------------------------------------------------------------------*
+*&  Include           ZMFI_MEX_INFORME_2_C01
+*&---------------------------------------------------------------------*
+CLASS lcl_event DEFINITION.
+
+  PUBLIC SECTION.
+
+    METHODS: link_click FOR EVENT link_click OF cl_salv_events_table "click en enlace
+                          IMPORTING row
+                                    column,
+               on_user_command FOR EVENT before_user_command OF cl_gui_alv_grid
+                          IMPORTING e_ucomm,
+
+               on_after_refresh FOR EVENT after_refresh OF cl_gui_alv_grid
+                          IMPORTING sender.
+
+    CLASS-DATA grid_ref TYPE REF TO cl_gui_alv_grid..
+
+ENDCLASS.                    "lcl_event DEFINITION
+
+*----------------------------------------------------------------------*
+*       CLASS lcl_event IMPLEMENTATION
+*----------------------------------------------------------------------*
+*
+*----------------------------------------------------------------------*
+CLASS lcl_event IMPLEMENTATION.
+  METHOD link_click.
+
+    IF row NE 0.
+      READ TABLE gt_salida
+      INTO gs_salida
+      INDEX row.
+
+      IF sy-subrc = 0.
+        CASE column.
+          WHEN 'BELNR'.
+            SET PARAMETER ID: 'BUK' FIELD 'MEXA',
+                              'GJR' FIELD gs_salida-budat(4),
+                              'BLN' FIELD gs_salida-belnr.
+            CALL TRANSACTION 'FB03' AND SKIP FIRST SCREEN.
+          WHEN OTHERS.
+        ENDCASE.
+      ENDIF.
+    ENDIF.
+
+    CLEAR: gs_salida.
+  ENDMETHOD.                    "link_click
+
+  METHOD on_after_refresh.
+    " Solo la primera vez, ligamos el handler de on_user_command
+    IF grid_ref IS INITIAL.
+      grid_ref = sender.              " cl_gui_alv_grid
+      SET HANDLER on_user_command FOR grid_ref.
+    ENDIF.
+  ENDMETHOD.                    "on_after_refresh
+
+  METHOD on_user_command.
+    DATA: lo_excel        TYPE REF TO zcl_excel,
+          lo_excel_writer TYPE REF TO zcl_excel_writer_2007,
+          lo_worksheet    TYPE REF TO zcl_excel_worksheet,
+          lv_content      TYPE xstring,
+          lv_name         TYPE string,
+          lv_bytecount    TYPE i,
+          lt_file_tab     TYPE solix_tab,
+          lv_path         TYPE string,
+          lv_filename     TYPE string,
+          lv_fullpath     TYPE string,
+          lv_action       TYPE i.
+
+    CASE e_ucomm.
+      WHEN '&ZEXCEL'.
+        CREATE OBJECT lo_excel.
+        lo_worksheet = lo_excel->get_active_worksheet( ).
+        lo_worksheet->bind_table( gt_salida ).
+        lo_worksheet->calculate_column_widths( ).
+
+        CREATE OBJECT lo_excel_writer.
+        lv_content = lo_excel_writer->zif_excel_writer~write_file( lo_excel ).
+
+        CALL METHOD cl_gui_frontend_services=>file_save_dialog
+          EXPORTING
+            window_title      = 'Descargar Excel'
+            default_extension = 'XLSX'
+            default_file_name = '.xlsx'
+          CHANGING
+            filename          = lv_filename
+            path              = lv_path
+            fullpath          = lv_fullpath
+            user_action       = lv_action.
+
+        IF lv_action <> cl_gui_frontend_services=>action_cancel.
+          CALL FUNCTION 'SCMS_XSTRING_TO_BINARY'
+            EXPORTING
+              buffer        = lv_content
+            IMPORTING
+              output_length = lv_bytecount
+            TABLES
+              binary_tab    = lt_file_tab.
+
+          CALL METHOD cl_gui_frontend_services=>gui_download
+            EXPORTING
+              bin_filesize            = lv_bytecount
+              filename                = lv_filename
+              filetype                = 'BIN'
+            CHANGING
+              data_tab                = lt_file_tab
+            EXCEPTIONS
+              file_write_error        = 1
+              no_batch                = 2
+              gui_refuse_filetransfer = 3
+              invalid_type            = 4
+              no_authority            = 5
+              unknown_error           = 6
+              header_not_allowed      = 7
+              separator_not_allowed   = 8
+              filesize_not_allowed    = 9
+              header_too_long         = 10
+              dp_error_create         = 11
+              dp_error_send           = 12
+              dp_error_write          = 13
+              unknown_dp_error        = 14
+              access_denied           = 15
+              dp_out_of_memory        = 16
+              disk_full               = 17
+              dp_timeout              = 18
+              file_not_found          = 19
+              dataprovider_exception  = 20
+              control_flush_error     = 21
+              OTHERS                  = 22.
+        ENDIF.
+
+        EXIT.
+      WHEN OTHERS.
+    ENDCASE.
+  ENDMETHOD.                    "on_user_command
+
+ENDCLASS.                    "lcl_event IMPLEMENTATION
+
+
+*&---------------------------------------------------------------------*
+*&  Include           ZMFI_MEX_INFORME_2_SEL
+*&---------------------------------------------------------------------*
+
+SELECTION-SCREEN BEGIN OF BLOCK b1 WITH FRAME TITLE text-s01.
+SELECT-OPTIONS: s_bukrs FOR bkpf-bukrs NO-DISPLAY DEFAULT 'MEXA',
+                s_budat FOR bkpf-budat OBLIGATORY,
+                s_belnr FOR bkpf-belnr,
+                s_xblnr FOR bkpf-xblnr,
+                s_partnr FOR lfa1-lifnr.
+
+PARAMETERS: p_folio TYPE string LOWER CASE.
+SELECTION-SCREEN END OF BLOCK b1.
+
+SELECTION-SCREEN BEGIN OF BLOCK b2 WITH FRAME TITLE text-s02.
+PARAMETERS: rb_ingr RADIOBUTTON GROUP r1 DEFAULT 'X',
+            rb_gasto RADIOBUTTON GROUP r1.
+SELECTION-SCREEN END OF BLOCK b2.
+
+
+*&---------------------------------------------------------------------*
+*&  Include           ZMFI_MEX_INFORME_2_F01
+*&---------------------------------------------------------------------*
+*&---------------------------------------------------------------------*
+*&      Form  GET_SEARCH_PARAMETERS
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*  -->  p1        text
+*  <--  p2        text
+*----------------------------------------------------------------------*
+FORM get_search_parameters.
+  CONSTANTS: lc_sign_I    TYPE c LENGTH 1 VALUE 'I',
+             lc_option_EQ TYPE c LENGTH 2 VALUE 'EQ'.
+
+  FIELD-SYMBOLS: <fs_r_mwskz> TYPE gty_r_mwskz,
+                 <fs_r_blart> TYPE gty_r_blart.
+
+*Cuenta de acreedor o deudor
+  CASE abap_true.
+    WHEN rb_ingr.
+      gv_koart = 'D'.
+    WHEN rb_gasto.
+      gv_koart = 'K'.
+    WHEN OTHERS.
+  ENDCASE.
+
+*Indicador de impuestos
+  SELECT valor1 AS low
+  FROM zfi_ctes
+  INTO CORRESPONDING FIELDS OF TABLE gr_mwskz
+  WHERE clave1 EQ sy-cprog
+    AND clave2 EQ 'MWSKZ'
+    AND clave3 EQ gv_koart.
+
+  LOOP AT gr_mwskz ASSIGNING <fs_r_mwskz>.
+    <fs_r_mwskz>-sign = lc_sign_I.
+    <fs_r_mwskz>-option = lc_option_EQ.
+  ENDLOOP.
+
+  "Clase de documento
+  SELECT valor1 AS low
+  FROM zfi_ctes
+  INTO CORRESPONDING FIELDS OF TABLE gr_blart
+  WHERE clave1 EQ sy-cprog
+    AND clave2 EQ 'BLART'
+    AND clave3 EQ gv_koart.
+
+  LOOP AT gr_blart ASSIGNING <fs_r_blart>.
+    <fs_r_blart>-sign = lc_sign_I.
+    <fs_r_blart>-option = lc_option_EQ.
+  ENDLOOP.
+
+  "Anulaciones
+  """Rango anulaciones
+  SELECT clave4 AS low
+  FROM zfi_ctes
+  INTO CORRESPONDING FIELDS OF TABLE gr_anul
+  WHERE clave1 EQ sy-cprog
+    AND clave2 EQ 'BLART'
+    AND clave3 EQ gv_koart.
+
+  SORT gr_anul BY low.
+  DELETE ADJACENT DUPLICATES FROM gr_anul COMPARING low.
+
+  LOOP AT gr_anul ASSIGNING <fs_r_blart>.
+    <fs_r_blart>-sign = lc_sign_I.
+    <fs_r_blart>-option = lc_option_EQ.
+  ENDLOOP.
+
+  """Correspondencia entre anulación y clase de documento
+  SELECT valor1 AS blart
+         clave4 AS anulacion
+  FROM zfi_ctes
+  INTO CORRESPONDING FIELDS OF TABLE gt_anul
+  WHERE clave1 EQ sy-cprog
+    AND clave2 EQ 'BLART'
+    AND clave3 EQ gv_koart.
+
+ENDFORM.                    " get_sets
+*&---------------------------------------------------------------------*
+*&      Form  GET_DATA
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*  -->  p1        text
+*  <--  p2        text
+*----------------------------------------------------------------------*
+FORM get_data .
+
+  DATA: lt_bseg_aux TYPE TABLE OF bseg.
+
+  SELECT *
+    FROM bkpf
+    INTO TABLE gt_bkpf
+      WHERE bukrs IN s_bukrs
+       AND  belnr IN s_belnr
+       AND  budat IN s_budat
+       AND  xblnr IN s_xblnr
+       AND  blart IN gr_blart.
+
+  PERFORM get_anulaciones CHANGING gt_bkpf.
+
+  IF gt_bkpf[] IS NOT INITIAL.
+    SELECT *
+      FROM bseg
+        INTO TABLE lt_bseg_aux
+          FOR ALL ENTRIES IN gt_bkpf
+            WHERE bukrs = gt_bkpf-bukrs
+              AND belnr = gt_bkpf-belnr
+              AND gjahr = gt_bkpf-gjahr
+              AND koart = gv_koart          "se filtran documentos por clase de cuenta
+              AND mwskz IN gr_mwskz         "se filtran documentos por indicador de impuestos
+              AND (    lifnr IN s_partnr
+                    OR kunnr IN s_partnr ). "se filtran documentos por tercero
+
+    SORT lt_bseg_aux BY bukrs belnr gjahr.
+    DELETE ADJACENT DUPLICATES FROM lt_bseg_aux COMPARING bukrs belnr gjahr.
+
+    IF lt_bseg_aux[] IS NOT INITIAL.
+      SELECT *
+      FROM bseg
+      INTO TABLE gt_bseg
+        FOR ALL ENTRIES IN lt_bseg_aux
+          WHERE bukrs = lt_bseg_aux-bukrs
+            AND belnr = lt_bseg_aux-belnr
+            AND gjahr = lt_bseg_aux-gjahr. "se recogen el resto de posiciones sin los filtros anteriores
+    ENDIF.
+  ENDIF.
+
+ENDFORM.                    " GET_DATA
+*&---------------------------------------------------------------------*
+*&      Form  GET_ANULACIONES
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*      <--CT_BKPF  text
+*----------------------------------------------------------------------*
+FORM get_anulaciones CHANGING ct_bkpf LIKE gt_bkpf.
+
+  DATA: lt_bkpf_anulaciones TYPE TABLE OF bkpf,
+        lt_bkpf_anulados    TYPE TABLE OF bkpf,
+        ls_bkpf_anulados    TYPE bkpf.
+
+  FIELD-SYMBOLS: <fs_bkpf> TYPE bkpf.
+
+  SELECT *
+    FROM bkpf
+    INTO TABLE lt_bkpf_anulaciones
+      WHERE bukrs IN s_bukrs
+       AND  belnr IN s_belnr
+       AND  budat IN s_budat
+       AND  xblnr IN s_xblnr
+       AND  blart IN gr_anul.
+
+  CHECK sy-subrc IS INITIAL.
+
+  SELECT *
+    FROM bkpf
+    INTO TABLE lt_bkpf_anulados
+    FOR ALL ENTRIES IN lt_bkpf_anulaciones
+      WHERE bukrs EQ lt_bkpf_anulaciones-bukrs
+        AND belnr EQ lt_bkpf_anulaciones-stblg
+        AND gjahr EQ lt_bkpf_anulaciones-stjah
+        AND belnr NE space
+        AND blart IN gr_blart.
+
+  CHECK sy-subrc IS INITIAL.
+
+  """Se descartan anulaciones que no correspondan con las clases de documento en el rango gr_balrt
+  LOOP AT lt_bkpf_anulaciones ASSIGNING <fs_bkpf>.
+    READ TABLE lt_bkpf_anulados
+    WITH KEY bukrs = <fs_bkpf>-bukrs
+             belnr = <fs_bkpf>-stblg
+             gjahr = <fs_bkpf>-stjah
+    INTO ls_bkpf_anulados.
+
+    IF sy-subrc IS INITIAL.
+      READ TABLE gt_anul
+      WITH KEY blart = ls_bkpf_anulados-blart
+               anulacion = <fs_bkpf>-blart
+      TRANSPORTING NO FIELDS.
+
+      IF sy-subrc IS INITIAL.
+        APPEND <fs_bkpf> TO ct_bkpf.
+      ENDIF.
+    ENDIF.
+
+    CLEAR: ls_bkpf_anulados.
+  ENDLOOP.
+
+ENDFORM.                    " GET_ANULACIONES
+*&---------------------------------------------------------------------*
+*&      Form  ARMA_SALIDA
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*  -->  p1        text
+*  <--  p2        text
+*----------------------------------------------------------------------*
+FORM arma_salida .
+  DATA: ls_lfa1 TYPE lfa1,
+        ls_kna1 TYPE kna1,
+        ls_bsec TYPE bsec.
+  DATA: ls_bseg TYPE bseg.
+  DATA: lt_bset TYPE TABLE OF bset,
+        ls_bset TYPE bset.
+  DATA: lt_with_item TYPE TABLE OF with_item,
+        ls_with_item TYPE with_item.
+  DATA: lv_name TYPE tdobname.
+  DATA lt_lines TYPE STANDARD TABLE OF tline.
+
+  FIELD-SYMBOLS: <fs_line> TYPE tline.
+
+  LOOP AT gt_bseg INTO gs_bseg WHERE koart = gv_koart
+                                 AND mwskz IN gr_mwskz.
+    CLEAR gs_salida.
+
+    ""Campos BKPF
+    READ TABLE gt_bkpf INTO gs_bkpf WITH KEY bukrs = gs_bseg-bukrs
+                                             belnr = gs_bseg-belnr
+                                             gjahr = gs_bseg-gjahr.
+    IF sy-subrc EQ 0.
+      "1.- Fecha de documento
+      gs_salida-bldat = gs_bkpf-bldat.
+      "2.- Fecha contable
+      gs_salida-budat = gs_bkpf-budat.
+      "3.- Periodo
+      gs_salida-monat = gs_bkpf-monat.
+      "4.- Referencia
+      gs_salida-xblnr = gs_bkpf-xblnr.
+      "5.- Nuevo folio fiscal
+      CONCATENATE gs_bkpf-bukrs gs_bkpf-belnr gs_bkpf-gjahr INTO lv_name.
+
+      CALL FUNCTION 'READ_TEXT'
+        EXPORTING
+          id                      = 'YUUD'
+          language                = sy-langu
+          name                    = lv_name
+          object                  = 'BELEG'
+        TABLES
+          lines                   = lt_lines
+        EXCEPTIONS
+          id                      = 1
+          language                = 2
+          name                    = 3
+          not_found               = 4
+          object                  = 5
+          reference_check         = 6
+          wrong_access_to_archive = 7
+          OTHERS                  = 8.
+      CLEAR: lv_name.
+
+      IF sy-subrc <> 0.
+        CLEAR lt_lines.
+      ELSE.
+        IF sy-subrc <> 0.
+          CLEAR lt_lines.
+        ELSE.
+          LOOP AT lt_lines ASSIGNING <fs_line>.
+            gs_salida-folio = <fs_line>-tdline.
+          ENDLOOP.
+        ENDIF.
+      ENDIF.
+
+      IF p_folio IS NOT INITIAL. "Fltro folio fiscal
+        CHECK gs_salida-folio EQ p_folio.
+      ENDIF.
+
+      "7.- Moneda
+      gs_salida-waers = gs_bkpf-waers.
+      "12.-Numero de documento
+      gs_salida-belnr = gs_bkpf-belnr.
+      "15.- Clase de documento
+      gs_salida-blart = gs_bkpf-blart.
+      "26.- Usuario registrado
+      gs_salida-usnam = gs_bkpf-usnam.
+
+      ""Campos Bseg
+*      "6.- Importe MD
+*      gs_salida-wrbtr = gs_bseg-wrbtr.
+*      "8.- Importe ML
+*      gs_salida-dmbtr = gs_bseg-dmbtr.
+      "13.- Documento compensacion
+      gs_salida-augbl = gs_bseg-augbl.
+      "14.- Fecha de compensacion
+      gs_salida-augdt = gs_bseg-augdt.
+      "16.- Acreedor
+      gs_salida-lifnr = gs_bseg-lifnr.
+      "17.- Cliente
+      gs_salida-kunnr = gs_bseg-kunnr.
+      "24.- Texto
+      gs_salida-sgtxt = gs_bseg-sgtxt.
+
+      "Campos Proveedor
+      IF gs_salida-lifnr IS NOT INITIAL.
+        SELECT SINGLE *
+          FROM bsec
+            INTO ls_bsec
+              WHERE bukrs = gs_bseg-bukrs
+                AND belnr = gs_bseg-belnr
+                AND gjahr = gs_bseg-gjahr
+                AND buzei = gs_bseg-buzei.
+        IF sy-subrc EQ 0.
+          "18.- R.F.C
+          gs_salida-stcd1 = ls_bsec-stcd1.
+          "19.- Nombre
+          gs_salida-name1 = ls_bsec-name1.
+          "20.- Pais
+          gs_salida-land1 = ls_bsec-land1.
+          "21.- Codigo Postal
+          gs_salida-pstlz = ls_bsec-pstlz.
+        ELSE.
+          SELECT SINGLE *
+            FROM lfa1
+              INTO ls_lfa1
+                WHERE lifnr = gs_bseg-lifnr.
+          IF sy-subrc EQ 0.
+            "18.- R.F.C
+            gs_salida-stcd1 = ls_lfa1-stcd1.
+            "19.- Nombre
+            gs_salida-name1 = ls_lfa1-name1.
+            "20.- Pais
+            gs_salida-land1 = ls_lfa1-land1.
+            "21.- Codigo Postal
+            gs_salida-pstlz = ls_lfa1-pstlz.
+          ENDIF.
+        ENDIF.
+      ENDIF.
+      "Campos Deudor
+      IF gs_salida-kunnr IS NOT INITIAL.
+        SELECT SINGLE *
+          FROM bsec
+            INTO ls_bsec
+              WHERE bukrs = gs_bseg-bukrs
+                AND belnr = gs_bseg-belnr
+                AND gjahr = gs_bseg-gjahr
+                AND buzei = gs_bseg-buzei.
+        IF sy-subrc EQ 0.
+          "18.- R.F.C
+          gs_salida-stcd1 = ls_bsec-stcd1.
+          "19.- Nombre
+          gs_salida-name1 = ls_bsec-name1.
+          "20.- Pais
+          gs_salida-land1 = ls_bsec-land1.
+          "21.- Codigo Postal
+          gs_salida-pstlz = ls_bsec-pstlz.
+        ELSE.
+          SELECT SINGLE *
+            FROM kna1
+              INTO ls_kna1
+                WHERE kunnr = gs_bseg-kunnr.
+          IF sy-subrc EQ 0.
+            "18.- R.F.C
+            gs_salida-stcd1 = ls_kna1-stcd1.
+            "19.- Nombre
+            gs_salida-name1 = ls_kna1-name1.
+            "20.- Pais
+            gs_salida-land1 = ls_kna1-land1.
+            "21.- Codigo Postal
+            gs_salida-pstlz = ls_kna1-pstlz.
+          ENDIF.
+        ENDIF.
+      ENDIF.
+      "Campos Impuestos y retenciones
+      CLEAR: lt_bset , lt_with_item.
+      SELECT *
+        FROM bset
+          INTO TABLE lt_bset
+            WHERE bukrs = gs_bseg-bukrs
+              AND belnr = gs_bseg-belnr
+              AND gjahr = gs_bseg-gjahr.
+
+      SELECT *
+        FROM with_item
+          INTO TABLE lt_with_item
+            WHERE bukrs = gs_bseg-bukrs
+              AND belnr = gs_bseg-belnr
+              AND gjahr = gs_bseg-gjahr.
+
+
+      LOOP AT gt_bseg INTO ls_bseg WHERE bukrs = gs_bseg-bukrs
+                                         AND belnr = gs_bseg-belnr
+                                         AND gjahr = gs_bseg-gjahr
+                                         AND koart = 'S'
+                                         AND xauto <> 'X'.
+        "6.- Importe MD
+        gs_salida-wrbtr = ls_bseg-wrbtr.
+        "8.- Importe ML
+        gs_salida-dmbtr = ls_bseg-dmbtr.
+        "22.- Cuenta contable
+        gs_salida-hkont = ls_bseg-hkont.
+        "24.- Ceco
+        gs_salida-kostl = ls_bseg-kostl.
+      ENDLOOP.
+      IF lt_bset IS NOT INITIAL AND lt_with_item IS NOT INITIAL.
+        LOOP AT lt_bset INTO ls_bset.
+          "9.- Indicador IVA
+          gs_salida-mwskz = ls_bset-mwskz.
+          "10.- Importe IVA
+          gs_salida-fwste = ls_bset-fwste.
+          "23.- Cuenta Contable IVA
+          gs_salida-hkont_i = ls_bset-hkont.
+
+          LOOP AT lt_with_item INTO ls_with_item..
+            "11.- Retenciones
+            gs_salida-wt_qbshb = ls_with_item-wt_qbshb.
+            APPEND gs_salida TO gt_salida.
+          ENDLOOP.
+
+        ENDLOOP.
+      ELSEIF lt_bset IS NOT INITIAL AND lt_with_item IS INITIAL.
+        LOOP AT lt_bset INTO ls_bset.
+          "9.- Indicador IVA
+          gs_salida-mwskz = ls_bset-mwskz.
+          "10.- Importe IVA
+          gs_salida-fwste = ls_bset-fwste.
+          "23.- Cuenta Contable IVA
+          gs_salida-hkont_i = ls_bset-hkont.
+
+          APPEND gs_salida TO gt_salida.
+        ENDLOOP.
+      ELSEIF lt_bset IS INITIAL AND lt_with_item IS NOT INITIAL.
+        LOOP AT lt_with_item INTO ls_with_item..
+          "11.- Retenciones
+          gs_salida-wt_qbshb = ls_with_item-wt_qbshb.
+          APPEND gs_salida TO gt_salida.
+        ENDLOOP.
+      ELSE.
+        APPEND gs_salida TO gt_salida.
+      ENDIF.
+    ENDIF.
+  ENDLOOP.
+
+  SORT gt_salida BY bldat budat belnr.
+ENDFORM.                    " ARMA_SALIDA
+*&---------------------------------------------------------------------*
+*&      Form  GET_FIELDCAT
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*  -->  p1        text
+*  <--  p2        text
+*----------------------------------------------------------------------*
+FORM get_fieldcat .
+
+  CLEAR w_fieldcat.
+  w_fieldcat-tabname   = 'GT_SALIDA'.
+  w_fieldcat-fieldname = 'BLDAT'.
+  w_fieldcat-seltext_m = 'Fecha documento'.
+  w_fieldcat-outputlen = '15'.
+  APPEND w_fieldcat TO t_fieldcat.
+
+  CLEAR w_fieldcat.
+  w_fieldcat-tabname   = 'GT_SALIDA'.
+  w_fieldcat-fieldname = 'BUDAT'.
+  w_fieldcat-seltext_m = 'Fecha contabilización'.
+  w_fieldcat-outputlen = '15'.
+  APPEND w_fieldcat TO t_fieldcat.
+
+  CLEAR w_fieldcat.
+  w_fieldcat-tabname   = 'GT_SALIDA'.
+  w_fieldcat-fieldname = 'MONAT'.
+  w_fieldcat-seltext_m = 'Período'.
+  w_fieldcat-outputlen = '5'.
+  APPEND w_fieldcat TO t_fieldcat.
+
+  CLEAR w_fieldcat.
+  w_fieldcat-tabname   = 'GT_SALIDA'.
+  w_fieldcat-fieldname = 'XBLNR'.
+  w_fieldcat-seltext_m = 'Referencia'.
+  w_fieldcat-outputlen = '16'.
+  APPEND w_fieldcat TO t_fieldcat.
+
+  CLEAR w_fieldcat.
+  w_fieldcat-tabname   = 'GT_SALIDA'.
+  w_fieldcat-fieldname = 'FOLIO'.
+  w_fieldcat-seltext_m = 'Nuevo Folio Fiscal'.
+  w_fieldcat-outputlen = '25'.
+  APPEND w_fieldcat TO t_fieldcat.
+
+  CLEAR w_fieldcat.
+  w_fieldcat-tabname   = 'GT_SALIDA'.
+  w_fieldcat-fieldname = 'WRBTR'.
+  w_fieldcat-seltext_m = 'Importe MD'.
+  w_fieldcat-outputlen = '17'.
+  APPEND w_fieldcat TO t_fieldcat.
+
+  CLEAR w_fieldcat.
+  w_fieldcat-tabname   = 'GT_SALIDA'.
+  w_fieldcat-fieldname = 'WAERS'.
+  w_fieldcat-seltext_m = 'Moneda MD'.
+  w_fieldcat-outputlen = '5'.
+  APPEND w_fieldcat TO t_fieldcat.
+
+  CLEAR w_fieldcat.
+  w_fieldcat-tabname   = 'GT_SALIDA'.
+  w_fieldcat-fieldname = 'DMBTR'.
+  w_fieldcat-seltext_m = 'Importe ML'.
+  w_fieldcat-outputlen = '17'.
+  APPEND w_fieldcat TO t_fieldcat.
+
+  CLEAR w_fieldcat.
+  w_fieldcat-tabname   = 'GT_SALIDA'.
+  w_fieldcat-fieldname = 'MWSKZ'.
+  w_fieldcat-seltext_m = 'Indicador IVA'.
+  w_fieldcat-outputlen = '4'.
+  APPEND w_fieldcat TO t_fieldcat.
+
+  CLEAR w_fieldcat.
+  w_fieldcat-tabname   = 'GT_SALIDA'.
+  w_fieldcat-fieldname = 'FWSTE'.
+  w_fieldcat-seltext_m = 'Importe IVA'.
+  w_fieldcat-outputlen = '17'.
+  APPEND w_fieldcat TO t_fieldcat.
+
+  CLEAR w_fieldcat.
+  w_fieldcat-tabname   = 'GT_SALIDA'.
+  w_fieldcat-fieldname = 'WT_QBSHB'.
+  w_fieldcat-seltext_m = 'Retenciones'.
+  w_fieldcat-outputlen = '17'.
+  APPEND w_fieldcat TO t_fieldcat.
+
+  CLEAR w_fieldcat.
+  w_fieldcat-tabname   = 'GT_SALIDA'.
+  w_fieldcat-fieldname = 'BELNR'.
+  w_fieldcat-seltext_m = 'Número de Documento'.
+  w_fieldcat-outputlen = '10'.
+  APPEND w_fieldcat TO t_fieldcat.
+
+  CLEAR w_fieldcat.
+  w_fieldcat-tabname   = 'GT_SALIDA'.
+  w_fieldcat-fieldname = 'AUGBL'.
+  w_fieldcat-seltext_m = 'Documento compensación'.
+  w_fieldcat-outputlen = '10'.
+  APPEND w_fieldcat TO t_fieldcat.
+
+  CLEAR w_fieldcat.
+  w_fieldcat-tabname   = 'GT_SALIDA'.
+  w_fieldcat-fieldname = 'AUGDT'.
+  w_fieldcat-seltext_m = 'Fecha compensación'.
+  w_fieldcat-outputlen = '10'.
+  APPEND w_fieldcat TO t_fieldcat.
+
+  CLEAR w_fieldcat.
+  w_fieldcat-tabname   = 'GT_SALIDA'.
+  w_fieldcat-fieldname = 'BLART'.
+  w_fieldcat-seltext_m = 'Clase documento'.
+  w_fieldcat-outputlen = '4'.
+  APPEND w_fieldcat TO t_fieldcat.
+
+  CLEAR w_fieldcat.
+  w_fieldcat-tabname   = 'GT_SALIDA'.
+  w_fieldcat-fieldname = 'LIFNR'.
+  w_fieldcat-seltext_m = 'Acreedor'.
+  w_fieldcat-outputlen = '10'.
+  APPEND w_fieldcat TO t_fieldcat.
+
+  CLEAR w_fieldcat.
+  w_fieldcat-tabname   = 'GT_SALIDA'.
+  w_fieldcat-fieldname = 'KUNNR'.
+  w_fieldcat-seltext_m = 'Cliente'.
+  w_fieldcat-outputlen = '10'.
+  APPEND w_fieldcat TO t_fieldcat.
+
+  CLEAR w_fieldcat.
+  w_fieldcat-tabname   = 'GT_SALIDA'.
+  w_fieldcat-fieldname = 'STCD1'.
+  w_fieldcat-seltext_m = 'R.F.C'.
+  w_fieldcat-outputlen = '16'.
+  APPEND w_fieldcat TO t_fieldcat.
+
+  CLEAR w_fieldcat.
+  w_fieldcat-tabname   = 'GT_SALIDA'.
+  w_fieldcat-fieldname = 'NAME1'.
+  w_fieldcat-seltext_m = 'Nombre o Razón Social'.
+  w_fieldcat-outputlen = '35'.
+  APPEND w_fieldcat TO t_fieldcat.
+
+  CLEAR w_fieldcat.
+  w_fieldcat-tabname   = 'GT_SALIDA'.
+  w_fieldcat-fieldname = 'LAND1'.
+  w_fieldcat-seltext_m = 'Clave país'.
+  w_fieldcat-outputlen = '3'.
+  APPEND w_fieldcat TO t_fieldcat.
+
+  CLEAR w_fieldcat.
+  w_fieldcat-tabname   = 'GT_SALIDA'.
+  w_fieldcat-fieldname = 'PSTLZ'.
+  w_fieldcat-seltext_m = 'Código Postal'.
+  w_fieldcat-outputlen = '10'.
+  APPEND w_fieldcat TO t_fieldcat.
+
+  CLEAR w_fieldcat.
+  w_fieldcat-tabname   = 'GT_SALIDA'.
+  w_fieldcat-fieldname = 'HKONT'.
+  w_fieldcat-seltext_m = 'Cuenta contable GTO'.
+  w_fieldcat-outputlen = '10'.
+  APPEND w_fieldcat TO t_fieldcat.
+
+  CLEAR w_fieldcat.
+  w_fieldcat-tabname   = 'GT_SALIDA'.
+  w_fieldcat-fieldname = 'HKONT_I'.
+  w_fieldcat-seltext_m = 'Cuenta contable IVA'.
+  w_fieldcat-outputlen = '10'.
+  APPEND w_fieldcat TO t_fieldcat.
+
+  CLEAR w_fieldcat.
+  w_fieldcat-tabname   = 'GT_SALIDA'.
+  w_fieldcat-fieldname = 'SGTXT'.
+  w_fieldcat-seltext_m = 'Texto/Concepto'.
+  w_fieldcat-outputlen = '40'.
+  APPEND w_fieldcat TO t_fieldcat.
+
+  CLEAR w_fieldcat.
+  w_fieldcat-tabname   = 'GT_SALIDA'.
+  w_fieldcat-fieldname = 'KOSTL'.
+  w_fieldcat-seltext_m = 'Ceco'.
+  w_fieldcat-outputlen = '10'.
+  APPEND w_fieldcat TO t_fieldcat.
+
+  CLEAR w_fieldcat.
+  w_fieldcat-tabname   = 'GT_SALIDA'.
+  w_fieldcat-fieldname = 'USNAM'.
+  w_fieldcat-seltext_m = 'Usuario registro'.
+  w_fieldcat-outputlen = '12'.
+  APPEND w_fieldcat TO t_fieldcat.
+ENDFORM.                    " GET_FIELDCAT
+*&---------------------------------------------------------------------*
+*&      Form  GET_ALV
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*  -->  p1        text
+*  <--  p2        text
+*----------------------------------------------------------------------*
+FORM get_alv .
+  DATA: lo_alv        TYPE REF TO cl_salv_table,
+        lo_cols       TYPE REF TO cl_salv_columns_table,
+        lo_col        TYPE REF TO cl_salv_column,
+        lo_column     TYPE REF TO cl_salv_column_table,
+        lo_funcs      TYPE REF TO cl_salv_functions,
+        lo_selections TYPE REF TO cl_salv_selections,
+        ls_ref        TYPE salv_s_ddic_reference,
+        lo_events     TYPE REF TO cl_salv_events_table,
+        lo_event_handler TYPE REF TO lcl_event.
+
+  TRY.
+    CALL METHOD cl_salv_table=>factory
+      IMPORTING
+        r_salv_table = lo_alv
+      CHANGING
+        t_table      = gt_salida.
+
+    "Status
+    lo_alv->set_screen_status(
+      pfstatus      = 'STANDARD_FULLSCREEN'
+      report        = sy-repid
+      set_functions = cl_salv_table=>c_functions_all ).
+
+    " Funciones
+    lo_funcs = lo_alv->get_functions( ).
+
+    " Columnas
+    lo_cols = lo_alv->get_columns( ).
+    lo_cols->set_optimize( 'X' ).
+
+    lo_selections = lo_alv->get_selections( ).
+    lo_selections->set_selection_mode( cl_salv_selections=>row_column ).
+
+    "Enlace documento
+    lo_column ?= lo_cols->get_column( 'BELNR' ).
+    lo_column->set_cell_type( if_salv_c_cell_type=>hotspot ).
+
+    "Nombres fieldcat
+    LOOP AT t_fieldcat INTO w_fieldcat.
+      lo_col = lo_cols->get_column( w_fieldcat-fieldname ).
+      lo_col->set_short_text( w_fieldcat-seltext_s ).
+      lo_col->set_medium_text( w_fieldcat-seltext_m ).
+      lo_col->set_long_text( w_fieldcat-seltext_l ).
+      lo_col->set_output_length( w_fieldcat-outputlen ).
+    ENDLOOP.
+
+    "Double_click & EXCEL
+    lo_events = lo_alv->get_event( ).
+    CREATE OBJECT lo_event_handler.
+    SET HANDLER lo_event_handler->link_click FOR lo_events.
+    SET HANDLER lo_event_handler->on_after_refresh FOR ALL INSTANCES.
+
+    lo_alv->display( ).
+  ENDTRY.
+ENDFORM.                    " GET_ALV
