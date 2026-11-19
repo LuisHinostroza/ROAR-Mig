@@ -1,0 +1,6 @@
+@EndUserText.label: 'Informe MX2 - Autorización por sociedad'
+@MappingRole: true
+define role ZRL_MEXINFORME2 {
+  grant select on ZC_MexInforme2
+    where ( Sociedad ) = aspect pfcg_auth( F_BKPF_BUK, BUKRS, ACTVT = '03' );
+}

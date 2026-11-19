@@ -1,0 +1,4 @@
+@EndUserText.label: 'Informe de Retenciones ISR Exterior'
+define service ZSD_MEX_INFORME {
+  expose ZC_MexInforme2 as MexInforme;
+}
