@@ -1,3 +1,158 @@
+Va en el mismo formato. En ZMMMMF_SAVE_DATA son tres cambios.
+
+a) Firma (SE37 → pestaña Import)
+
+Agrega una línea al final de los parámetros:
+
+Parámetro	Tipificación	Tipo	Opcional	Transferencia valor
+IV_CBU	TYPE	STRING	✔	—
+
+Aquí puede ir por referencia, igual que los demás, porque esta FM no se llama con STARTING NEW TASK. El bloque de comentarios *"Interfase local se actualiza solo al grabar, así que no lo edites a mano.
+
+b) Variable global (TOP include del grupo de funciones)
+
+Desde SE37: Pasar a → Datos globales, o abre el include L<grupo>TOP en SE80.
+
+Buscar: gv_routing_number
+
+Justo debajo de esa declaración, agrega:
+
+abap
+*** ROAR Rollout S/4HANA Argentina 06/11/2026 LUISHIN Ini.
+DATA gv_cbu TYPE string.                                " ROAR: Notificación de bancos Argentina
+*** ROAR Rollout S/4HANA Argentina 06/11/2026 LUISHIN Fin.
+
+Si las globales están dentro de un DATA: encadenado, ponlo como sentencia aparte después del punto final de ese bloque, como en el código de arriba.
+
+c) Cuerpo de la FM
+
+Buscar: gv_fact_mail = iv_fact_mail
+
+abap
+*** 1000016827 Modificación 11/08/2025 MLCRIS3 Ini.
+  gv_fact_mail = iv_fact_mail.
+*** 1000016827 Modificación 11/08/2025 MLCRIS3 Fin.
+
+*** ROAR Rollout S/4HANA Argentina 06/11/2026 LUISHIN Ini.
+  gv_cbu = iv_cbu.                                      " ROAR: Notificación de bancos Argentina
+*** ROAR Rollout S/4HANA Argentina 06/11/2026 LUISHIN Fin.
+
+ENDFUNCTION.
+
+Activa primero el TOP include y luego la FM. Si activas la FM sola, marca gv_cbu como desconocida.
+
+y los otros FM?
+
+Van las tres restantes en el mismo formato. Ubiqué las anclas sobre el código que me pasaste.
+
+1. ZMMMMF_SEND_EMAIL
+a) Firma (SE37 → Import)
+Parámetro	Tipificación	Tipo	Opcional	Transferencia valor
+IV_CBU	TYPE	STRING	✔	✔
+
+Aquí sí tiene que ir por valor (igual que los demás de esta FM), porque se llama con STARTING NEW TASK. Si no lo marcas, no activa.
+
+b) Constante de país
+
+Buscar: CONSTANTS lc_usa
+
+abap
+  CONSTANTS lc_usa                TYPE land1       VALUE 'US'. " 1000020009, ROUS - Routing number notif finanzas
+*** ROAR Rollout S/4HANA Argentina 06/11/2026 LUISHIN Ini.
+  CONSTANTS lc_argentina          TYPE land1       VALUE 'AR'. " ROAR: Notificación de bancos Argentina
+*** ROAR Rollout S/4HANA Argentina 06/11/2026 LUISHIN Fin.
+c) Tag &CBU&
+
+Buscar: END OF lc_tag
+
+abap
+               fact_mail               TYPE string VALUE '&EMAIL&',                     " 1000016827, Modificación 11/08/2025 MLCRIS3
+*** ROAR Rollout S/4HANA Argentina 06/11/2026 LUISHIN Ini.
+               cbu                     TYPE string VALUE '&CBU&',                       " ROAR: Notificación de bancos Argentina
+*** ROAR Rollout S/4HANA Argentina 06/11/2026 LUISHIN Fin.
+             END OF lc_tag.
+d) Nombres de los textos
+
+Buscar: END OF lc_noti
+
+abap
+               upd_ban_us  TYPE tdobname VALUE 'ZMMM_EMAIL_B_LIFNR_U_BANCO_US',     " 1000020009, ROUS - Routing number notif finanzas
+*** ROAR Rollout S/4HANA Argentina 06/11/2026 LUISHIN Ini.
+               new_ban_ar  TYPE tdobname VALUE 'ZMMM_EMAIL_D_LIFNR_I_BANCO_AR',     " ROAR: Notificación de bancos Argentina
+               upd_ban_ar  TYPE tdobname VALUE 'ZMMM_EMAIL_B_LIFNR_U_BANCO_AR',     " ROAR: Notificación de bancos Argentina
+*** ROAR Rollout S/4HANA Argentina 06/11/2026 LUISHIN Fin.
+             END OF lc_noti.
+e) Selección del texto por país
+
+Buscar: WHEN lc_usa.
+
+abap
+    WHEN lc_usa.                                                                " 1000020009, ROUS - Routing number notif finanzas
+      lv_text_name = SWITCH #( iv_type
+                               WHEN lc_type-new_ban THEN lc_noti-new_ban_us
+                               WHEN lc_type-upd_ban THEN lc_noti-upd_ban_us
+                               ELSE                      lv_text_name ).
+
+*** ROAR Rollout S/4HANA Argentina 06/11/2026 LUISHIN Ini.
+    WHEN lc_argentina.                                                          " ROAR: Notificación de bancos Argentina
+      lv_text_name = SWITCH #( iv_type
+                               WHEN lc_type-new_ban THEN lc_noti-new_ban_ar
+                               WHEN lc_type-upd_ban THEN lc_noti-upd_ban_ar
+                               ELSE                      lv_text_name ).
+*** ROAR Rollout S/4HANA Argentina 06/11/2026 LUISHIN Fin.
+
+  ENDCASE.
+  "--> ROCO
+f) Sustitución en el cuerpo
+
+Buscar: REPLACE lc_tag-fact_mail
+
+abap
+*** 1000016827 Modificación 11/08/2025 MLCRIS3 Ini.
+        REPLACE lc_tag-fact_mail INTO ls_message-line WITH iv_fact_mail.
+*** 1000016827 Modificación 11/08/2025 MLCRIS3 Fin.
+
+*** ROAR Rollout S/4HANA Argentina 06/11/2026 LUISHIN Ini.
+        REPLACE lc_tag-cbu INTO ls_message-line WITH iv_cbu.            " ROAR: Notificación de bancos Argentina
+*** ROAR Rollout S/4HANA Argentina 06/11/2026 LUISHIN Fin.
+
+        AT LAST.
+2. ZMMMMF_START_SEND_EMAIL
+
+Solo cambia la llamada del bloque de bancos (B/D). iv_routing_number = gv_routing_number aparece dos veces: la buena es la segunda, la que va justo antes de TABLES. Para ir directo, busca la línea de is_attachment, que solo está en ese bloque.
+
+Buscar: is_attachment              = gs_attachment
+
+abap
+            is_attachment              = gs_attachment                  " 1000015798 Modificación 30/07/2024 MLCRIS3
+            iv_pais_banco              = gv_pais_banco                  " ROMX: Notificación de bancos México
+            iv_cuenta_clabe            = gv_cuenta_clabe                " ROMX: Notificación de bancos México
+            iv_numbero_aba             = gv_numbero_aba                 " ROMX: Notificación de bancos México
+            iv_numero_convenio_cie     = gv_numero_convenio_cie         " ROMX: Notificación de bancos México
+            iv_referencia_convenio_cie = gv_referencia_convenio_cie     " ROMX: Notificación de bancos México
+            iv_routing_number          = gv_routing_number              " 1000020009, ROUS - Routing number notif finanzas
+*** ROAR Rollout S/4HANA Argentina 06/11/2026 LUISHIN Ini.
+            iv_cbu                     = gv_cbu                         " ROAR: Notificación de bancos Argentina
+*** ROAR Rollout S/4HANA Argentina 06/11/2026 LUISHIN Fin.
+          TABLES
+            pt_emails                  = lt_emails_aux
+3. ZMMMMF_REFRESH
+
+Buscar: CLEAR gv_routing_number
+
+abap
+  CLEAR gv_routing_number.          " 1000020009, ROUS - Routing number notif finanzas
+
+*** ROAR Rollout S/4HANA Argentina 06/11/2026 LUISHIN Ini.
+  CLEAR gv_cbu.                     " ROAR: Notificación de bancos Argentina
+*** ROAR Rollout S/4HANA Argentina 06/11/2026 LUISHIN Fin.
+
+  REFRESH gt_emails_admon.
+
+Orden de activación: TOP include → ZMMMMF_SAVE_DATA y ZMMMMF_SEND_EMAIL (por las firmas) → ZMMMMF_START_SEND_EMAIL y ZMMMMF_REFRESH → método de la clase. Lo más seguro es activar todo junto desde la lista de objetos inactivos.
+**************************************************************************************************************************************************************************************************************
+**************************************************************************************************************************************************************************************************************
+
 Tienes razón, algunos bloques no estaban bien anclados. Aquí va el método IF_MDG_SE_BP_BULK_REPLRQ_IN~INBOUND_PROCESSING punto por punto. En cada uno te indico qué buscar con Ctrl+F (es texto único en el método) y cómo debe quedar, con las líneas de alrededor para que no haya duda.
 
 a) Constante CBU
